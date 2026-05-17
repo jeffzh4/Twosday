@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>weekly schedule</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBJ3GEf1i6BXEcVIStBS-7iE1Hk4dCR_Kc",
+    authDomain: "jhschedule4.firebaseapp.com",
+    projectId: "jhschedule4",
+    storageBucket: "jhschedule4.firebasestorage.app",
+    messagingSenderId: "699230921946",
+    appId: "1:699230921946:web:caeac0208e66a4f01c71e3",
+    measurementId: "G-4RDK4ZH0KN"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const FIRESTORE_DOC = db.collection('schedules').doc('shared-schedule');
+</script>
+<style>
+/* ── dark theme (default) ── */
+[data-theme="dark"] {
+  --bg: #0e0e10;
+  --surface: #18181b;
+  --surface2: #232326;
+  --border: rgba(255,255,255,0.06);
+  --border-hover: rgba(255,255,255,0.12);
+  --text: #e4e4e7;
+  --text-muted: #71717a;
+  --text-dim: #52525b;
+  --accent: #a78bfa;
+  --accent-dim: rgba(167,139,250,0.12);
+  --modal-overlay: rgba(0,0,0,0.55);
+  --ev-hover-border: rgba(255,255,255,0.08);
+  --ev-act-bg: rgba(0,0,0,0.3);
+  --ev-act-hover: rgba(0,0,0,0.5);
+  --shared-badge-bg: rgba(255,255,255,0.08);
+  --half-line: rgba(255,255,255,0.03);
+}
+
+/* ── light theme ── */
+[data-theme="light"] {
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --surface2: #e4e4e7;
+  --border: rgba(0,0,0,0.08);
+  --border-hover: rgba(0,0,0,0.15);
+  --text: #18181b;
+  --text-muted: #71717a;
+  --text-dim: #a1a1aa;
+  --accent: #7c3aed;
+  --accent-dim: rgba(124,58,237,0.1);
+  --modal-overlay: rgba(0,0,0,0.3);
+  --ev-hover-border: rgba(0,0,0,0.1);
+  --ev-act-bg: rgba(255,255,255,0.5);
+  --ev-act-hover: rgba(255,255,255,0.8);
+  --shared-badge-bg: rgba(0,0,0,0.06);
+  --half-line: rgba(0,0,0,0.04);
+}
+
+:root {
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: 'DM Sans', -apple-system, sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  height: 100%;
+  overflow: hidden;
+  transition: background 0.25s, color 0.25s;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 28px 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-switch {
+  display: flex;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  border: 0.5px solid var(--border);
+}
+
+.view-btn {
+  font-family: var(--font);
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.view-btn.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.title span { color: var(--text-dim); font-weight: 400; }
+
+.btn-add, .btn-icon {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 7px 16px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-add:hover, .btn-icon:hover { background: rgba(167,139,250,0.2); }
+
+.btn-icon {
+  padding: 7px 10px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── user switcher ── */
+.user-switcher {
+  display: flex;
+  gap: 2px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 3px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  transition: background 0.25s;
+}
+
+.user-tab {
+  flex: 1;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 0;
+  text-align: center;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.user-tab:hover { color: var(--text); }
+.user-tab.active { color: var(--text); }
+.user-tab.active.jeff {
+  background: rgba(96,165,250,0.15);
+  color: #60a5fa;
+}
+.user-tab.active.helen {
+  background: rgba(244,114,182,0.15);
+  color: #f472b6;
+}
+[data-theme="light"] .user-tab.active.jeff {
+  background: rgba(96,165,250,0.15);
+  color: #2563eb;
+}
+[data-theme="light"] .user-tab.active.helen {
+  background: rgba(244,114,182,0.15);
+  color: #db2777;
+}
+.user-tab .user-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.user-tab.jeff .user-dot { background: #60a5fa; }
+.user-tab.helen .user-dot { background: #f472b6; }
+
+/* ── day tabs ── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 4px;
+  transition: background 0.25s;
+}
+
+.tab {
+  flex: 1;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 0;
+  text-align: center;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+.tab .count {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: 3px;
+}
+.tab.active .count { color: var(--text-muted); }
+
+/* ── grid ── */
+.grid-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: var(--radius) var(--radius) 0 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface2) transparent;
+}
+
+.grid {
+  display: grid;
+  position: relative;
+  min-height: 988px;
+}
+
+.hours { display: flex; flex-direction: column; }
+
+.hour-label {
+  height: 60px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  transform: translateY(-6px);
+}
+
+.col {
+  position: relative;
+  border-left: 0.5px solid var(--border);
+}
+
+.col-head {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 0.5px solid var(--border);
+}
+
+.col-body {
+  position: relative;
+  height: calc(100% - 28px);
+}
+
+.hour-line {
+  position: absolute;
+  left: 0; right: 0;
+  border-top: 0.5px solid var(--border);
+}
+.hour-line.half {
+  border-top: 0.5px dashed var(--half-line);
+}
+
+/* ── events ── */
+.ev {
+  position: absolute;
+  left: 4px; right: 4px;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  cursor: grab;
+  overflow: hidden;
+  z-index: 2;
+  transition: transform 0.1s, opacity 0.15s;
+  border: 0.5px solid transparent;
+  user-select: none;
+}
+.ev.dragging { cursor: grabbing; }
+.ev:hover { transform: scale(1.005); border-color: var(--ev-hover-border); }
+.ev.conflict { box-shadow: inset 0 0 0 1px rgba(248,113,113,0.8); }
+
+.ev-title {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ev-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  margin-top: 2px;
+  opacity: 0.6;
+}
+
+.ev .ev-actions {
+  position: absolute;
+  top: 4px; right: 6px;
+  display: flex; gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ev:hover .ev-actions { opacity: 1; }
+
+.ev-act {
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--ev-act-bg);
+  border: none;
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.3;
+  color: inherit;
+}
+.ev-act:hover { background: var(--ev-act-hover); }
+
+.resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  z-index: 3;
+}
+
+.resize-handle.top { top: 0; cursor: ns-resize; }
+.resize-handle.bottom { bottom: 0; cursor: ns-resize; }
+
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid rgba(250, 204, 21, 0.8);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.now-line::before {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(250, 204, 21, 0.9);
+  top: -4px;
+  left: -2px;
+}
+
+.conflict-warning {
+  font-size: 11px;
+  color: #f87171;
+  line-height: 1.4;
+  min-height: 16px;
+}
+
+.repeat-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.repeat-day {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-icon:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ev.done { opacity: 0.35; }
+.ev.done .ev-title { text-decoration: line-through; }
+
+.ev-shared {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--shared-badge-bg);
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.03em;
+  opacity: 0.7;
+}
+
+/* ── modal ── */
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-overlay);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: var(--surface);
+  border: 0.5px solid var(--border-hover);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: background 0.25s;
+}
+
+.modal h3 {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.field label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field input, .field select {
+  width: 100%;
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 8px 10px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+
+.field-row { display: flex; gap: 10px; }
+.field-row .field { flex: 1; }
+
+/* ── toggle switch (shared / theme) ── */
+.shared-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 2px;
+}
+.shared-toggle > label {
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 0;
+}
+.toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--surface2);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 0.5px solid var(--border);
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: rgba(167,139,250,0.25);
+  border-color: rgba(167,139,250,0.3);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  left: 19px;
+  background: var(--accent);
+}
+
+/* ── color category in modal ── */
+.field select option { background: var(--surface2); color: var(--text); }
+
+.color-picker-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.color-swatch {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  position: relative;
+}
+.color-swatch:hover { transform: scale(1.1); }
+.color-swatch.active { border-color: var(--text); }
+.color-swatch.active::after {
+  content: '\2713';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.modal-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.mbtn {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s;
+}
+.mbtn-cancel {
+  background: var(--surface2);
+  color: var(--text-muted);
+}
+.mbtn-cancel:hover { color: var(--text); }
+.mbtn-save {
+  background: var(--accent);
+  color: white;
+  font-weight: 500;
+}
+[data-theme="dark"] .mbtn-save { color: #0e0e10; }
+.mbtn-save:hover { filter: brightness(1.1); }
+
+.empty-state {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  pointer-events: none;
+}
+.empty-state span { display: block; font-size: 11px; margin-top: 4px; color: var(--text-dim); opacity: 0.6; }
+
+/* ── notes sidebar ── */
+/* ── week nav ── */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.week-nav-btn {
+  font-family: var(--font);
+  font-size: 16px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.week-nav-btn:hover { color: var(--text); background: var(--surface2); }
+.week-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 180px;
+  text-align: center;
+}
+.week-label small {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.week-today-btn {
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 4px 10px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.week-today-btn:hover { background: rgba(167,139,250,0.2); }
+
+.notes-toggle {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 7px 10px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.notes-toggle:hover { background: rgba(167,139,250,0.2); }
+
+.notes-panel {
+  position: fixed;
+  top: 0;
+  right: -320px;
+  width: 320px;
+  height: 100vh;
+  background: var(--surface);
+  border-left: 0.5px solid var(--border-hover);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  transition: right 0.25s ease, background 0.25s;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+}
+.notes-panel.open { right: 0; }
+
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+.notes-header h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.notes-close {
+  font-size: 18px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.notes-close:hover { color: var(--text); background: var(--surface2); }
+
+.notes-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface2) transparent;
+}
+
+.note-item {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  position: relative;
+  transition: background 0.15s;
+  border: 0.5px solid var(--border);
+}
+.note-item:hover { border-color: var(--border-hover); }
+
+.note-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.note-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.note-del {
+  font-size: 13px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.note-item:hover .note-del { opacity: 1; }
+.note-del:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+
+.notes-input-area {
+  padding: 12px 16px;
+  border-top: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+.notes-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.notes-input {
+  flex: 1;
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 8px 10px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  resize: none;
+  min-height: 36px;
+  max-height: 80px;
+  transition: border-color 0.15s;
+}
+.notes-input:focus { border-color: var(--accent); }
+.notes-input::placeholder { color: var(--text-dim); }
+
+.notes-send {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #0e0e10;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  align-self: flex-end;
+  transition: filter 0.15s;
+}
+[data-theme="light"] .notes-send { color: white; }
+.notes-send:hover { filter: brightness(1.1); }
+
+.notes-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 32px 0;
+}
+
+/* notes panel overlays, no layout shift */
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="header-left">
+      <div class="title">schedule</div>
+      <div class="week-nav">
+        <button class="week-nav-btn" id="btn-prev-week" title="Previous week">&#8249;</button>
+        <div class="week-label" id="week-label"></div>
+        <button class="week-nav-btn" id="btn-next-week" title="Next week">&#8250;</button>
+        <button class="week-today-btn" id="btn-today">today</button>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="btn-icon" id="btn-theme" title="Toggle light/dark mode">&#9790;</button>
+      <button class="btn-icon" id="btn-undo" title="Undo">&#8630;</button>
+      <button class="btn-icon" id="btn-redo" title="Redo">&#8631;</button>
+      <div class="view-switch" id="view-switch"></div>
+      <button class="btn-add" id="btn-add">+ add event</button>
+      <button class="notes-toggle" id="btn-notes" title="Notes">&#9998; notes</button>
+    </div>
+  </div>
+  <div class="user-switcher" id="user-switcher"></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="grid-wrap" id="grid-wrap">
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<div class="notes-panel" id="notes-panel">
+  <div class="notes-header">
+    <h3>notes</h3>
+    <button class="notes-close" id="notes-close">&times;</button>
+  </div>
+  <div class="notes-list" id="notes-list"></div>
+  <div class="notes-input-area">
+    <div class="notes-input-row">
+      <textarea class="notes-input" id="notes-input" placeholder="write a note..." rows="1"></textarea>
+      <button class="notes-send" id="notes-send">add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const USERS = ['jeff', 'helen'];
+const START_H = 7;
+const END_H = 23;
+const STEP_H = 0.5;
+const PX_PER_HOUR = 60;
+const STORAGE_KEY = 'schedule_app_state_v1';
+
+const COLOR_PRESETS = [
+  { name: 'purple',  dark: { bg:'rgba(167,139,250,0.12)', text:'#c4b5fd' }, light: { bg:'rgba(139,92,246,0.13)', text:'#7c3aed' } },
+  { name: 'green',   dark: { bg:'rgba(52,211,153,0.10)',  text:'#6ee7b7' }, light: { bg:'rgba(16,185,129,0.12)', text:'#059669' } },
+  { name: 'orange',  dark: { bg:'rgba(251,146,60,0.12)',  text:'#fdba74' }, light: { bg:'rgba(251,146,60,0.13)', text:'#c2410c' } },
+  { name: 'blue',    dark: { bg:'rgba(96,165,250,0.12)',  text:'#93c5fd' }, light: { bg:'rgba(59,130,246,0.12)', text:'#2563eb' } },
+  { name: 'pink',    dark: { bg:'rgba(244,114,182,0.12)', text:'#f9a8d4' }, light: { bg:'rgba(236,72,153,0.13)', text:'#db2777' } },
+  { name: 'cyan',    dark: { bg:'rgba(34,211,238,0.10)',  text:'#67e8f9' }, light: { bg:'rgba(6,182,212,0.12)',  text:'#0891b2' } },
+  { name: 'yellow',  dark: { bg:'rgba(250,204,21,0.10)',  text:'#fde047' }, light: { bg:'rgba(234,179,8,0.13)',  text:'#a16207' } },
+  { name: 'red',     dark: { bg:'rgba(248,113,113,0.12)', text:'#fca5a5' }, light: { bg:'rgba(239,68,68,0.12)',  text:'#dc2626' } },
+  { name: 'gray',    dark: { bg:'rgba(161,161,170,0.10)', text:'#a1a1aa' }, light: { bg:'rgba(113,113,122,0.10)', text:'#52525b' } },
+];
+
+const SHARED_COLOR = {
+  dark: { bg:'rgba(232,121,249,0.14)', text:'#e9a8f2' },
+  light: { bg:'rgba(192,38,211,0.12)', text:'#a21caf' },
+};
+
+const categoryColors = { class: 'purple', meal: 'green', social: 'orange', work: 'blue', other: 'gray' };
+
+let _idCounter = 0;
+function uid() { return 'ev_' + Date.now() + '_' + (++_idCounter); }
+function clone(v) { return JSON.parse(JSON.stringify(v)); }
+function getTheme() { return document.documentElement.getAttribute('data-theme'); }
+function getColor(presetName) {
+  const p = COLOR_PRESETS.find(c => c.name === presetName);
+  return p ? p[getTheme()] : COLOR_PRESETS[8][getTheme()];
+}
+function getSharedColor() { return SHARED_COLOR[getTheme()]; }
+function getOtherUser(user) { return user === 'jeff' ? 'helen' : 'jeff'; }
+function clampTime(h) { return Math.max(START_H, Math.min(END_H, Math.round(h * 2) / 2)); }
+function overlaps(aStart, aEnd, bStart, bEnd) { return aStart < bEnd && bStart < aEnd; }
+
+function fmt(h) {
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  const ap = hh >= 12 ? 'p' : 'a', d = hh % 12 || 12;
+  return mm === 0 ? d + ap : d + ':' + String(mm).padStart(2,'0') + ap;
+}
+function fmtFull(h) {
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  const ap = hh >= 12 ? ' pm' : ' am', d = hh % 12 || 12;
+  return d + ':' + String(mm).padStart(2,'0') + ap;
+}
+function timeOpts(sel) {
+  let o = '';
+  for (let h = START_H; h <= END_H; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const v = h + m / 60;
+      if (v > END_H) break;
+      o += `<option value="${v}"${Math.abs(v - sel) < 0.01 ? ' selected' : ''}>${fmtFull(v)}</option>`;
+    }
+  }
+  return o;
+}
+
+function categorize(text) {
+  const l = text.toLowerCase();
+  if (/math|phys|stat|ee|hw|chem|bio|lab|lecture/.test(l)) return 'class';
+  if (/breakfast|lunch|dinner|meal|eat|cook/.test(l)) return 'meal';
+  if (/akp|rush|haircut|party|hang|social/.test(l)) return 'social';
+  if (/boeing|resume|review|work|meeting|interview/.test(l)) return 'work';
+  return 'other';
+}
+
+function palette(ev) {
+  if (ev.shared) return getSharedColor();
+  if (ev.color) return getColor(ev.color);
+  return getColor(categoryColors[categorize(ev.text)] || 'gray');
+}
+
+// State uses week keys like "2026-W16" → { jeff: { mon:[], ... }, helen: { mon:[], ... } }
+// The `users` object holds the CURRENT week's data for backward compat with all existing logic
+const users = {
+  jeff: { mon:[], tue:[], wed:[], thu:[], fri:[], sat:[], sun:[] },
+  helen: { mon:[], tue:[], wed:[], thu:[], fri:[], sat:[], sun:[] },
+};
+
+// Multi-week storage: weekKey → { jeff: {...}, helen: {...} }
+const allWeeks = {};
+
+let activeUser = 'jeff';
+let activeDay = 'mon';
+let viewMode = 'week';
+const userTheme = { jeff: 'dark', helen: 'light' };
+const history = { undo: [], redo: [] };
+let dragState = null;
+
+// Week offset: 0 = current week, -1 = last week, +1 = next week, etc.
+let weekOffset = 0;
+
+function getWeekStartDate(offset) {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + mondayOffset + (offset * 7));
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function getWeekKey(offset) {
+  const d = getWeekStartDate(offset);
+  // ISO week key
+  const year = d.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const days = Math.floor((d - jan1) / 86400000);
+  const weekNum = Math.ceil((days + jan1.getDay() + 1) / 7);
+  return `${year}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+function getWeekLabel(offset) {
+  const mon = getWeekStartDate(offset);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  const mStart = months[mon.getMonth()];
+  const mEnd = months[sun.getMonth()];
+  if (mStart === mEnd) {
+    return `${mStart} ${mon.getDate()} \u2013 ${sun.getDate()}`;
+  }
+  return `${mStart} ${mon.getDate()} \u2013 ${mEnd} ${sun.getDate()}`;
+}
+
+function getWeekDates(offset) {
+  const mon = getWeekStartDate(offset);
+  return DAYS.map((_, i) => {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    return d;
+  });
+}
+
+function saveWeekToStorage() {
+  const key = getWeekKey(weekOffset);
+  allWeeks[key] = clone({ jeff: users.jeff, helen: users.helen });
+}
+
+function loadWeekFromStorage() {
+  const key = getWeekKey(weekOffset);
+  const data = allWeeks[key];
+  USERS.forEach(u => {
+    DAYS.forEach(d => {
+      users[u][d] = data && data[u] && Array.isArray(data[u][d]) ? clone(data[u][d]) : [];
+    });
+  });
+}
+
+function switchWeek(newOffset) {
+  saveWeekToStorage();
+  weekOffset = newOffset;
+  loadWeekFromStorage();
+  render();
+}
+
+function renderWeekNav() {
+  const label = document.getElementById('week-label');
+  const weekLabel = getWeekLabel(weekOffset);
+  const isThisWeek = weekOffset === 0;
+  label.innerHTML = weekLabel + (isThisWeek ? ' <small>(this week)</small>' : '');
+}
+
+function snapshotState() {
+  saveWeekToStorage();
+  return clone({ allWeeks, users, activeUser, activeDay, viewMode, userTheme, weekOffset });
+}
+
+function normalizeEvent(raw) {
+  const start = clampTime(typeof raw.start === 'number' ? raw.start : 9);
+  const endCandidate = clampTime(typeof raw.end === 'number' ? raw.end : start + STEP_H);
+  const end = endCandidate > start ? endCandidate : Math.min(END_H, start + STEP_H);
+  return {
+    id: raw.id || uid(),
+    text: typeof raw.text === 'string' ? raw.text : 'event',
+    start,
+    end,
+    done: !!raw.done,
+    shared: !!raw.shared,
+    sharedId: raw.sharedId || null,
+    color: raw.color || null,
+    recurrenceId: raw.recurrenceId || null,
+    recurrenceDays: Array.isArray(raw.recurrenceDays) ? raw.recurrenceDays.filter(d => DAYS.includes(d)) : null,
+  };
+}
+
+let _saveDebounce = null;
+let _isLoadingFromFirestore = false;
+
+function saveToLocalStorage() {
+  saveWeekToStorage();
+  try {
+    const payload = {
+      allWeeks: clone(allWeeks),
+      activeUser,
+      activeDay,
+      viewMode,
+      weekOffset,
+      userTheme: clone(userTheme),
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {}
+
+  if (_isLoadingFromFirestore) return;
+  clearTimeout(_saveDebounce);
+  _saveDebounce = setTimeout(() => {
+    saveToFirestore();
+  }, 400);
+}
+
+function saveToFirestore() {
+  saveWeekToStorage();
+  try {
+    const payload = {
+      allWeeks: clone(allWeeks),
+      userTheme: clone(userTheme),
+      savedAt: Date.now(),
+    };
+    FIRESTORE_DOC.set(payload).catch(err => {
+      console.warn('Firestore save failed:', err);
+    });
+  } catch (err) {
+    console.warn('Firestore save error:', err);
+  }
+}
+
+function loadFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    applyParsedData(parsed, true);
+  } catch (err) {}
+}
+
+function applyParsedData(parsed, applyViewState) {
+  // Load multi-week data
+  if (parsed.allWeeks && typeof parsed.allWeeks === 'object') {
+    Object.keys(allWeeks).forEach(k => delete allWeeks[k]);
+    Object.keys(parsed.allWeeks).forEach(wk => {
+      const weekData = {};
+      USERS.forEach(user => {
+        weekData[user] = {};
+        DAYS.forEach(day => {
+          const src = parsed.allWeeks[wk] && parsed.allWeeks[wk][user] && Array.isArray(parsed.allWeeks[wk][user][day])
+            ? parsed.allWeeks[wk][user][day] : [];
+          weekData[user][day] = src.map(normalizeEvent);
+          weekData[user][day].sort((a, b) => a.start - b.start);
+        });
+      });
+      allWeeks[wk] = weekData;
+    });
+  }
+  // Also handle old format (single-week `users` field) for backward compat
+  if (!parsed.allWeeks && parsed.users) {
+    const key = getWeekKey(0);
+    const weekData = {};
+    USERS.forEach(user => {
+      weekData[user] = {};
+      DAYS.forEach(day => {
+        const src = parsed.users[user] && Array.isArray(parsed.users[user][day]) ? parsed.users[user][day] : [];
+        weekData[user][day] = src.map(normalizeEvent);
+        weekData[user][day].sort((a, b) => a.start - b.start);
+      });
+    });
+    allWeeks[key] = weekData;
+  }
+
+  if (applyViewState) {
+    if (parsed.activeUser && USERS.includes(parsed.activeUser)) activeUser = parsed.activeUser;
+    if (parsed.activeDay && DAYS.includes(parsed.activeDay)) activeDay = parsed.activeDay;
+    if (parsed.viewMode === 'day' || parsed.viewMode === 'week') viewMode = parsed.viewMode;
+    if (typeof parsed.weekOffset === 'number') weekOffset = parsed.weekOffset;
+  }
+  if (parsed.userTheme && (parsed.userTheme.jeff === 'dark' || parsed.userTheme.jeff === 'light')) userTheme.jeff = parsed.userTheme.jeff;
+  if (parsed.userTheme && (parsed.userTheme.helen === 'dark' || parsed.userTheme.helen === 'light')) userTheme.helen = parsed.userTheme.helen;
+
+  // Load current week into users
+  loadWeekFromStorage();
+}
+
+function startFirestoreListener() {
+  FIRESTORE_DOC.onSnapshot(snap => {
+    if (!snap.exists) return;
+    const data = snap.data();
+    if (data.savedAt && Math.abs(Date.now() - data.savedAt) < 1000) return;
+    _isLoadingFromFirestore = true;
+    applyParsedData(data, false);
+    applyTheme();
+    render();
+    _isLoadingFromFirestore = false;
+  }, err => {
+    console.warn('Firestore listener error:', err);
+  });
+}
+
+function pushHistory() {
+  history.undo.push(snapshotState());
+  if (history.undo.length > 80) history.undo.shift();
+  history.redo = [];
+  updateHistoryButtons();
+}
+
+function restoreState(snap) {
+  // Restore all weeks
+  Object.keys(allWeeks).forEach(k => delete allWeeks[k]);
+  if (snap.allWeeks) Object.assign(allWeeks, clone(snap.allWeeks));
+  Object.keys(users).forEach(user => {
+    DAYS.forEach(day => {
+      users[user][day] = clone(snap.users[user][day] || []);
+    });
+  });
+  activeUser = snap.activeUser;
+  activeDay = snap.activeDay;
+  viewMode = snap.viewMode || 'week';
+  weekOffset = snap.weekOffset || 0;
+  userTheme.jeff = snap.userTheme.jeff;
+  userTheme.helen = snap.userTheme.helen;
+  applyTheme();
+  render();
+}
+
+function undoAction() {
+  if (!history.undo.length) return;
+  const prev = history.undo.pop();
+  history.redo.push(snapshotState());
+  restoreState(prev);
+  updateHistoryButtons();
+}
+
+function redoAction() {
+  if (!history.redo.length) return;
+  const next = history.redo.pop();
+  history.undo.push(snapshotState());
+  restoreState(next);
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons() {
+  document.getElementById('btn-undo').disabled = history.undo.length === 0;
+  document.getElementById('btn-redo').disabled = history.redo.length === 0;
+}
+
+function applyTheme() {
+  const t = userTheme[activeUser];
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('btn-theme').innerHTML = t === 'dark' ? '&#9790;' : '&#9788;';
+}
+
+function getState(user = activeUser) { return users[user]; }
+
+function sortDay(user, day) {
+  users[user][day].sort((a, b) => a.start - b.start);
+}
+
+function detectConflicts({ user = activeUser, day, start, end, excludeId = null, shared = false }) {
+  const own = users[user][day].filter(ev => ev.id !== excludeId && overlaps(start, end, ev.start, ev.end));
+  const other = shared ? users[getOtherUser(user)][day].filter(ev => overlaps(start, end, ev.start, ev.end)) : [];
+  return { own, other, hasConflict: own.length > 0 || other.length > 0 };
+}
+
+function syncSharedForUser(user, sharedId, day, action, updates) {
+  const other = getOtherUser(user);
+  const arr = users[other][day];
+  const idx = arr.findIndex(e => e.sharedId === sharedId);
+  if (action === 'add' && idx === -1) {
+    arr.push(clone(updates));
+    sortDay(other, day);
+  } else if (action === 'delete' && idx !== -1) {
+    arr.splice(idx, 1);
+  } else if (action === 'toggle-done' && idx !== -1) {
+    arr[idx].done = updates.done;
+  } else if (action === 'edit' && idx !== -1) {
+    Object.assign(arr[idx], updates);
+    sortDay(other, day);
+  }
+}
+
+function hasEventConflict(user, day, ev) {
+  const res = detectConflicts({ user, day, start: ev.start, end: ev.end, excludeId: ev.id, shared: ev.shared });
+  return res.hasConflict;
+}
+
+function duplicateEvent(day, ev) {
+  pushHistory();
+  const dayIdx = DAYS.indexOf(day);
+  const targetDay = DAYS[(dayIdx + 1) % DAYS.length];
+  const copy = { ...clone(ev), id: uid(), done: false };
+  if (copy.shared) copy.sharedId = uid();
+  users[activeUser][targetDay].push(copy);
+  sortDay(activeUser, targetDay);
+  if (copy.shared) {
+    syncSharedForUser(activeUser, copy.sharedId, targetDay, 'add', {
+      ...clone(copy),
+      id: uid(),
+      shared: true,
+    });
+  }
+  activeDay = targetDay;
+  render();
+}
+
+function renderViewSwitch() {
+  const c = document.getElementById('view-switch');
+  c.innerHTML = `
+    <button class="view-btn${viewMode === 'day' ? ' active' : ''}" data-view="day">day</button>
+    <button class="view-btn${viewMode === 'week' ? ' active' : ''}" data-view="week">week</button>
+  `;
+  c.querySelectorAll('.view-btn').forEach(btn => {
+    btn.onclick = () => {
+      viewMode = btn.dataset.view;
+      render();
+    };
+  });
+}
+
+function renderUserSwitcher() {
+  const c = document.getElementById('user-switcher');
+  c.innerHTML = '';
+  USERS.forEach(u => {
+    const b = document.createElement('button');
+    b.className = 'user-tab ' + u + (u === activeUser ? ' active' : '');
+    b.innerHTML = `<span class="user-dot"></span>${u}`;
+    b.onclick = () => { activeUser = u; applyTheme(); render(); };
+    c.appendChild(b);
+  });
+}
+
+function renderTabs() {
+  const c = document.getElementById('tabs');
+  c.innerHTML = '';
+  const st = getState();
+  DAYS.forEach(d => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (d === activeDay ? ' active' : '');
+    const n = st[d].length;
+    b.innerHTML = d + (n ? ` <span class="count">${n}</span>` : '');
+    b.onclick = () => { activeDay = d; render(); };
+    c.appendChild(b);
+  });
+}
+
+function getVisibleDays() {
+  return viewMode === 'week' ? DAYS : [activeDay];
+}
+
+function getTodayDayKey() {
+  const jsDay = new Date().getDay();
+  return DAYS[(jsDay + 6) % 7];
+}
+
+function positionNowLines() {
+  const now = new Date();
+  const h = now.getHours() + now.getMinutes() / 60;
+  const today = getTodayDayKey();
+  const isCurrentWeek = weekOffset === 0;
+  document.querySelectorAll('.now-line').forEach(line => {
+    const day = line.dataset.day;
+    if (!isCurrentWeek || day !== today || h < START_H || h > END_H) {
+      line.style.display = 'none';
+      return;
+    }
+    line.style.display = 'block';
+    line.style.top = ((h - START_H) * PX_PER_HOUR) + 'px';
+  });
+}
+
+function getEventById(day, id) {
+  return users[activeUser][day].find(ev => ev.id === id) || null;
+}
+
+function moveEventAcrossDay(oldDay, newDay, ev) {
+  if (oldDay === newDay) return;
+  users[activeUser][oldDay] = users[activeUser][oldDay].filter(x => x.id !== ev.id);
+  users[activeUser][newDay].push(ev);
+  sortDay(activeUser, oldDay);
+  sortDay(activeUser, newDay);
+}
+
+function startDrag(e, mode, day, evId) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  dragState = {
+    mode,
+    day,
+    evId,
+    startY: e.clientY,
+    moved: false,
+    historyPushed: false,
+    prevX: e.clientX,
+    origin: null,
+  };
+  const ev = getEventById(day, evId);
+  if (!ev) return;
+  dragState.origin = { start: ev.start, end: ev.end, day };
+}
+
+function onDragMove(e) {
+  if (!dragState) return;
+  const day = dragState.day;
+  const ev = getEventById(day, dragState.evId);
+  if (!ev) return;
+  const deltaH = Math.round(((e.clientY - dragState.startY) / (PX_PER_HOUR * STEP_H))) * STEP_H;
+  if (!dragState.historyPushed && Math.abs(e.clientY - dragState.startY) > 2) {
+    pushHistory();
+    dragState.historyPushed = true;
+  }
+  if (!dragState.historyPushed) return;
+  dragState.moved = true;
+
+  if (dragState.mode === 'move') {
+    const len = dragState.origin.end - dragState.origin.start;
+    let nextStart = clampTime(dragState.origin.start + deltaH);
+    if (nextStart + len > END_H) nextStart = END_H - len;
+    ev.start = nextStart;
+    ev.end = nextStart + len;
+
+    const targetCol = document.elementFromPoint(e.clientX, e.clientY);
+    const targetBody = targetCol && targetCol.closest('.col-body');
+    if (targetBody) {
+      const nextDay = targetBody.dataset.day;
+      if (nextDay && nextDay !== day) {
+        if (ev.shared) {
+          syncSharedForUser(activeUser, ev.sharedId, day, 'delete');
+        }
+        moveEventAcrossDay(day, nextDay, ev);
+        if (ev.shared) {
+          syncSharedForUser(activeUser, ev.sharedId, nextDay, 'add', {
+            ...clone(ev),
+            id: uid(),
+            shared: true,
+            sharedId: ev.sharedId,
+          });
+        }
+        dragState.day = nextDay;
+        activeDay = nextDay;
+      }
+    }
+  }
+
+  if (dragState.mode === 'resize-start') {
+    ev.start = Math.min(ev.end - STEP_H, clampTime(dragState.origin.start + deltaH));
+  }
+
+  if (dragState.mode === 'resize-end') {
+    ev.end = Math.max(ev.start + STEP_H, clampTime(dragState.origin.end + deltaH));
+  }
+
+  sortDay(activeUser, dragState.day);
+
+  if (ev.shared) {
+    const sharedDay = dragState.day;
+    syncSharedForUser(activeUser, ev.sharedId, sharedDay, 'edit', {
+      start: ev.start,
+      end: ev.end,
+      text: ev.text,
+      color: ev.color,
+    });
+  }
+
+  renderGrid();
+}
+
+function onDragEnd() {
+  if (!dragState) return;
+  dragState = null;
+  render();
+}
+
+function renderDayColumn(day) {
+  const col = document.createElement('div');
+  col.className = 'col';
+
+  const head = document.createElement('div');
+  head.className = 'col-head';
+  const dates = getWeekDates(weekOffset);
+  const dayIdx = DAYS.indexOf(day);
+  const dateObj = dates[dayIdx];
+  const todayStr = new Date().toDateString();
+  const isToday = dateObj.toDateString() === todayStr;
+  head.innerHTML = `<span style="${isToday ? 'color:var(--accent);font-weight:500' : ''}">${day} <small>${dateObj.getDate()}</small></span>`;
+  col.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'col-body';
+  body.dataset.day = day;
+
+  for (let h = START_H; h < END_H; h++) {
+    const line = document.createElement('div');
+    line.className = 'hour-line';
+    line.style.top = ((h - START_H) * PX_PER_HOUR) + 'px';
+    body.appendChild(line);
+
+    const half = document.createElement('div');
+    half.className = 'hour-line half';
+    half.style.top = ((h - START_H) * PX_PER_HOUR + PX_PER_HOUR / 2) + 'px';
+    body.appendChild(half);
+  }
+
+  const nowLine = document.createElement('div');
+  nowLine.className = 'now-line';
+  nowLine.dataset.day = day;
+  body.appendChild(nowLine);
+
+  body.addEventListener('dblclick', e => {
+    const y = e.clientY - body.getBoundingClientRect().top;
+    const startAt = clampTime(Math.round(((y / PX_PER_HOUR + START_H) * 2)) / 2);
+    openModal({ startH: startAt, day });
+  });
+
+  const events = users[activeUser][day];
+  if (!events.length && viewMode === 'day') {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = 'no events yet<span>double-click to add or use + button</span>';
+    body.appendChild(empty);
+  }
+
+  events.forEach(ev => {
+    const top = (ev.start - START_H) * PX_PER_HOUR;
+    const height = Math.max((ev.end - ev.start) * PX_PER_HOUR, 28);
+    const p = palette(ev);
+    const conflict = hasEventConflict(activeUser, day, ev);
+
+    const div = document.createElement('div');
+    div.className = 'ev' + (ev.done ? ' done' : '') + (conflict ? ' conflict' : '');
+    div.style.cssText = `top:${top}px;height:${height}px;background:${p.bg};`;
+    div.dataset.id = ev.id;
+    div.dataset.day = day;
+
+    const badge = ev.shared ? '<span class="ev-shared">shared</span>' : '';
+    div.innerHTML =
+      '<div class="resize-handle top" data-r="top"></div>' +
+      '<div class="resize-handle bottom" data-r="bottom"></div>' +
+      `<div class="ev-title" style="color:${p.text}">${ev.text}${badge}</div>` +
+      (height >= 40 ? `<div class="ev-time" style="color:${p.text}">${fmtFull(ev.start)} - ${fmtFull(ev.end)}</div>` : '') +
+      `<div class="ev-actions">` +
+        `<button class="ev-act" data-id="${ev.id}" data-day="${day}" data-a="dup" style="color:${p.text}" title="Duplicate to next day">&#10697;</button>` +
+        `<button class="ev-act" data-id="${ev.id}" data-day="${day}" data-a="edit" style="color:${p.text}" title="Edit">&#9998;</button>` +
+        `<button class="ev-act" data-id="${ev.id}" data-day="${day}" data-a="done" style="color:${p.text}">${ev.done ? '&#8617;' : '&#10003;'}</button>` +
+        `<button class="ev-act" data-id="${ev.id}" data-day="${day}" data-a="del" style="color:${p.text}">&#215;</button>` +
+      `</div>`;
+
+    div.addEventListener('mousedown', evMouse => {
+      if (evMouse.target.closest('.ev-act')) return;
+      const handle = evMouse.target.closest('.resize-handle');
+      if (handle) {
+        const mode = handle.dataset.r === 'top' ? 'resize-start' : 'resize-end';
+        startDrag(evMouse, mode, day, ev.id);
+        return;
+      }
+      startDrag(evMouse, 'move', day, ev.id);
+    });
+
+    div.addEventListener('click', clickEvent => {
+      if (clickEvent.target.closest('.ev-act') || clickEvent.target.closest('.resize-handle')) return;
+      if (dragState && dragState.moved) return;
+      const idx = users[activeUser][day].findIndex(x => x.id === ev.id);
+      if (idx >= 0) openModal({ startH: ev.start, editDay: day, editIdx: idx });
+    });
+
+    body.appendChild(div);
+  });
+
+  body.querySelectorAll('.ev-act').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const action = e.currentTarget.dataset.a;
+      const dayKey = e.currentTarget.dataset.day;
+      const evId = e.currentTarget.dataset.id;
+      const arr = users[activeUser][dayKey];
+      const idx = arr.findIndex(item => item.id === evId);
+      if (idx < 0) return;
+      const ev = arr[idx];
+
+      if (action === 'edit') {
+        openModal({ startH: ev.start, editDay: dayKey, editIdx: idx });
+        return;
+      }
+
+      if (action === 'dup') {
+        duplicateEvent(dayKey, ev);
+        return;
+      }
+
+      pushHistory();
+      if (action === 'del') {
+        if (ev.shared) syncSharedForUser(activeUser, ev.sharedId, dayKey, 'delete');
+        arr.splice(idx, 1);
+      } else if (action === 'done') {
+        ev.done = !ev.done;
+        if (ev.shared) syncSharedForUser(activeUser, ev.sharedId, dayKey, 'toggle-done', { done: ev.done });
+      }
+      render();
+    });
+  });
+
+  col.appendChild(body);
+  return col;
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  const visibleDays = getVisibleDays();
+  const totalH = END_H - START_H;
+  grid.style.gridTemplateColumns = `44px repeat(${visibleDays.length}, minmax(0, 1fr))`;
+  grid.style.minHeight = (totalH * PX_PER_HOUR + 28) + 'px';
+
+  const hoursDiv = document.createElement('div');
+  hoursDiv.className = 'hours';
+  hoursDiv.style.paddingTop = '28px';
+  for (let h = START_H; h < END_H; h++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'hour-label';
+    lbl.textContent = fmt(h);
+    hoursDiv.appendChild(lbl);
+  }
+  grid.appendChild(hoursDiv);
+
+  visibleDays.forEach(day => {
+    grid.appendChild(renderDayColumn(day));
+  });
+
+  positionNowLines();
+}
+
+function render() {
+  renderWeekNav();
+  renderViewSwitch();
+  renderUserSwitcher();
+  renderTabs();
+  renderGrid();
+  updateHistoryButtons();
+  saveToLocalStorage();
+}
+
+function openModal({ startH = 9, editDay = activeDay, editIdx = null, day = activeDay } = {}) {
+  if (document.querySelector('.modal-bg')) return;
+
+  const isEdit = editIdx !== null && editIdx !== undefined;
+  const editEv = isEdit ? users[activeUser][editDay][editIdx] : null;
+  let selectedColor = isEdit ? (editEv.color || null) : null;
+
+  const nameVal = isEdit ? editEv.text : '';
+  const startVal = isEdit ? editEv.start : startH;
+  const endVal = isEdit ? editEv.end : startH + 1;
+  const dayVal = isEdit ? editDay : day;
+  const sharedVal = isEdit ? editEv.shared : false;
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal">
+      <h3>${isEdit ? 'edit event' : 'new event'}</h3>
+      <div class="field"><label>name</label><input id="m-name" value="${nameVal.replace(/"/g,'&quot;')}" placeholder="e.g. chem lab" autofocus /></div>
+      <div class="field-row">
+        <div class="field"><label>start</label><select id="m-start">${timeOpts(startVal)}</select></div>
+        <div class="field"><label>end</label><select id="m-end">${timeOpts(endVal)}</select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>day</label><select id="m-day">${DAYS.map(d => `<option value="${d}"${d === dayVal ? ' selected' : ''}>${d}</option>`).join('')}</select></div>
+      </div>
+      ${!isEdit ? `
+      <div class="field">
+        <label>repeat weekly</label>
+        <div class="shared-toggle">
+          <label class="toggle-switch" for="m-repeat">
+            <input type="checkbox" id="m-repeat" />
+            <span class="toggle-slider"></span>
+          </label>
+          <label for="m-repeat">repeat on selected days</label>
+        </div>
+        <div class="repeat-days" id="m-repeat-days" style="display:none; margin-top:8px;">
+          ${DAYS.map(d => `<label class="repeat-day"><input type="checkbox" value="${d}" ${d === dayVal ? 'checked' : ''} /> ${d}</label>`).join('')}
+        </div>
+      </div>
+      ` : ''}
+      <div class="field">
+        <label>color</label>
+        <div class="color-picker-row" id="m-colors"></div>
+      </div>
+      <div class="shared-toggle">
+        <label class="toggle-switch" for="m-shared">
+          <input type="checkbox" id="m-shared" ${sharedVal ? 'checked' : ''} />
+          <span class="toggle-slider"></span>
+        </label>
+        <label for="m-shared">shared with ${getOtherUser(activeUser)}</label>
+      </div>
+      <div class="conflict-warning" id="m-conflict"></div>
+      <div class="modal-btns">
+        <button class="mbtn mbtn-cancel" id="m-cancel">cancel</button>
+        <button class="mbtn mbtn-save" id="m-save">${isEdit ? 'save changes' : 'add event'}</button>
+      </div>
+    </div>
+  `;
+
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+
+  const colorRow = document.getElementById('m-colors');
+  const autoSwatch = document.createElement('div');
+  autoSwatch.className = 'color-swatch' + (selectedColor === null ? ' active' : '');
+  autoSwatch.title = 'auto';
+  autoSwatch.style.background = 'linear-gradient(135deg, #a78bfa 0%, #34d399 50%, #fb923c 100%)';
+  autoSwatch.onclick = () => {
+    selectedColor = null;
+    colorRow.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    autoSwatch.classList.add('active');
+  };
+  colorRow.appendChild(autoSwatch);
+
+  COLOR_PRESETS.forEach(preset => {
+    const s = document.createElement('div');
+    s.className = 'color-swatch' + (selectedColor === preset.name ? ' active' : '');
+    s.title = preset.name;
+    s.style.background = preset.dark.text;
+    s.style.opacity = '0.8';
+    s.onclick = () => {
+      selectedColor = preset.name;
+      colorRow.querySelectorAll('.color-swatch').forEach(sw => sw.classList.remove('active'));
+      s.classList.add('active');
+    };
+    colorRow.appendChild(s);
+  });
+
+  const conflictNode = document.getElementById('m-conflict');
+  function updateConflictMessage() {
+    const daySel = document.getElementById('m-day').value;
+    const s = parseFloat(document.getElementById('m-start').value);
+    const enRaw = parseFloat(document.getElementById('m-end').value);
+    const en = enRaw > s ? enRaw : s + STEP_H;
+    const shared = document.getElementById('m-shared').checked;
+    const excludeId = isEdit ? editEv.id : null;
+    const conflicts = detectConflicts({ user: activeUser, day: daySel, start: s, end: en, excludeId, shared });
+    if (!conflicts.hasConflict) {
+      conflictNode.textContent = '';
+      return;
+    }
+    const ownCount = conflicts.own.length;
+    const otherCount = conflicts.other.length;
+    let msg = `conflict: overlaps ${ownCount} event${ownCount === 1 ? '' : 's'} in your calendar`;
+    if (shared && otherCount) msg += ` and ${otherCount} in ${getOtherUser(activeUser)}'s`;
+    conflictNode.textContent = msg;
+  }
+
+  if (!isEdit) {
+    const repeatToggle = document.getElementById('m-repeat');
+    const repeatDays = document.getElementById('m-repeat-days');
+    repeatToggle.onchange = () => {
+      repeatDays.style.display = repeatToggle.checked ? 'flex' : 'none';
+    };
+  }
+
+  ['m-start', 'm-end', 'm-day', 'm-shared'].forEach(id => {
+    document.getElementById(id).addEventListener('change', updateConflictMessage);
+  });
+  updateConflictMessage();
+
+  document.getElementById('m-cancel').onclick = () => bg.remove();
+
+  document.getElementById('m-save').onclick = () => {
+    const name = document.getElementById('m-name').value.trim();
+    if (!name) return;
+    const s = parseFloat(document.getElementById('m-start').value);
+    const enRaw = parseFloat(document.getElementById('m-end').value);
+    const daySel = document.getElementById('m-day').value;
+    const isShared = document.getElementById('m-shared').checked;
+    const endTime = enRaw > s ? enRaw : s + STEP_H;
+    pushHistory();
+
+    if (isEdit) {
+      const oldDay = editDay;
+      const wasShared = editEv.shared;
+      const oldSharedId = editEv.sharedId;
+
+      if (daySel !== oldDay) {
+        users[activeUser][oldDay].splice(editIdx, 1);
+        users[activeUser][daySel].push(editEv);
+      }
+
+      editEv.text = name;
+      editEv.start = s;
+      editEv.end = endTime;
+      editEv.color = selectedColor;
+
+      if (wasShared && !isShared) {
+        syncSharedForUser(activeUser, oldSharedId, oldDay, 'delete');
+        if (daySel !== oldDay) syncSharedForUser(activeUser, oldSharedId, daySel, 'delete');
+        editEv.shared = false;
+        editEv.sharedId = null;
+      } else if (!wasShared && isShared) {
+        const sid = uid();
+        editEv.shared = true;
+        editEv.sharedId = sid;
+        syncSharedForUser(activeUser, sid, daySel, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: sid });
+      } else if (wasShared && isShared) {
+        if (daySel !== oldDay) {
+          syncSharedForUser(activeUser, oldSharedId, oldDay, 'delete');
+          syncSharedForUser(activeUser, oldSharedId, daySel, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: oldSharedId });
+        } else {
+          syncSharedForUser(activeUser, oldSharedId, daySel, 'edit', { text: name, start: s, end: endTime, color: selectedColor });
+        }
+      }
+
+      editEv.shared = isShared;
+      activeDay = daySel;
+      sortDay(activeUser, oldDay);
+      sortDay(activeUser, daySel);
+      bg.remove();
+      render();
+      return;
+    }
+
+    let daysToCreate = [daySel];
+    let recurrenceId = null;
+    if (document.getElementById('m-repeat') && document.getElementById('m-repeat').checked) {
+      const selectedDays = Array.from(document.querySelectorAll('#m-repeat-days input:checked')).map(el => el.value);
+      if (selectedDays.length) {
+        daysToCreate = selectedDays;
+        recurrenceId = uid();
+      }
+    }
+
+    daysToCreate.forEach(dayKey => {
+      const sharedId = isShared ? uid() : null;
+      const newEv = {
+        id: uid(),
+        text: name,
+        start: s,
+        end: endTime,
+        done: false,
+        shared: isShared,
+        sharedId,
+        color: selectedColor,
+        recurrenceId,
+        recurrenceDays: recurrenceId ? daysToCreate : null,
+      };
+
+      users[activeUser][dayKey].push(newEv);
+      sortDay(activeUser, dayKey);
+
+      if (isShared) {
+        syncSharedForUser(activeUser, sharedId, dayKey, 'add', {
+          ...clone(newEv),
+          id: uid(),
+          shared: true,
+          sharedId,
+        });
+      }
+    });
+
+    activeDay = daySel;
+    bg.remove();
+    render();
+  };
+
+  document.getElementById('m-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('m-save').click();
+  });
+}
+
+document.getElementById('btn-theme').onclick = () => {
+  userTheme[activeUser] = userTheme[activeUser] === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  render();
+};
+
+document.getElementById('btn-undo').onclick = undoAction;
+document.getElementById('btn-redo').onclick = redoAction;
+document.getElementById('btn-add').onclick = () => openModal({ startH: 9, day: activeDay });
+
+document.addEventListener('mousemove', onDragMove);
+document.addEventListener('mouseup', onDragEnd);
+
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undoAction();
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+    e.preventDefault();
+    redoAction();
+    return;
+  }
+  if (e.key === 'Escape') {
+    const m = document.querySelector('.modal-bg');
+    if (m) m.remove();
+  }
+});
+
+/* ── notes system (per-user) ── */
+const userNotes = { jeff: [], helen: [] };
+const NOTES_STORAGE_KEY = 'schedule_notes_v1';
+
+function saveNotes() {
+  try {
+    localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(userNotes));
+  } catch(e) {}
+  // also save to Firestore
+  try {
+    db.collection('schedules').doc('shared-notes').set({
+      notes: JSON.parse(JSON.stringify(userNotes)),
+      savedAt: Date.now(),
+    }).catch(() => {});
+  } catch(e) {}
+}
+
+function loadNotes() {
+  try {
+    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed.jeff && Array.isArray(parsed.jeff)) userNotes.jeff = parsed.jeff;
+    if (parsed.helen && Array.isArray(parsed.helen)) userNotes.helen = parsed.helen;
+  } catch(e) {}
+}
+
+function startNotesListener() {
+  db.collection('schedules').doc('shared-notes').onSnapshot(snap => {
+    if (!snap.exists) return;
+    const data = snap.data();
+    if (data.savedAt && Math.abs(Date.now() - data.savedAt) < 1000) return;
+    if (data.notes) {
+      if (Array.isArray(data.notes.jeff)) userNotes.jeff = data.notes.jeff;
+      if (Array.isArray(data.notes.helen)) userNotes.helen = data.notes.helen;
+      renderNotes();
+    }
+  }, () => {});
+}
+
+function renderNotes() {
+  const list = document.getElementById('notes-list');
+  const notes = userNotes[activeUser];
+  if (!notes.length) {
+    list.innerHTML = '<div class="notes-empty">no notes yet</div>';
+    return;
+  }
+  list.innerHTML = '';
+  notes.slice().reverse().forEach((note, ri) => {
+    const i = notes.length - 1 - ri; // real index
+    const item = document.createElement('div');
+    item.className = 'note-item';
+
+    const timeStr = note.time ? new Date(note.time).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    }) : '';
+
+    item.innerHTML =
+      `<div class="note-text">${escHtml(note.text)}</div>` +
+      `<div class="note-meta">` +
+        `<span class="note-time">${timeStr}</span>` +
+        `<button class="note-del" data-i="${i}" title="Delete">&times;</button>` +
+      `</div>`;
+    list.appendChild(item);
+  });
+
+  list.querySelectorAll('.note-del').forEach(btn => {
+    btn.onclick = e => {
+      const idx = parseInt(e.currentTarget.dataset.i);
+      userNotes[activeUser].splice(idx, 1);
+      saveNotes();
+      renderNotes();
+    };
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function addNote() {
+  const input = document.getElementById('notes-input');
+  const text = input.value.trim();
+  if (!text) return;
+  userNotes[activeUser].push({ text, time: Date.now() });
+  input.value = '';
+  input.style.height = '36px';
+  saveNotes();
+  renderNotes();
+  // scroll to top to show latest note
+  document.getElementById('notes-list').scrollTop = 0;
+}
+
+// toggle panel
+let notesOpen = false;
+function toggleNotes(forceState) {
+  notesOpen = forceState !== undefined ? forceState : !notesOpen;
+  document.getElementById('notes-panel').classList.toggle('open', notesOpen);
+  document.querySelector('.app').classList.toggle('notes-shifted', notesOpen);
+  if (notesOpen) renderNotes();
+}
+
+document.getElementById('btn-notes').onclick = () => toggleNotes();
+document.getElementById('notes-close').onclick = () => toggleNotes(false);
+document.getElementById('notes-send').onclick = addNote;
+document.getElementById('notes-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); }
+});
+// auto-resize textarea
+document.getElementById('notes-input').addEventListener('input', function() {
+  this.style.height = '36px';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
+
+loadNotes();
+startNotesListener();
+
+// re-render notes when switching users
+const _origRenderUserSwitcher = renderUserSwitcher;
+renderUserSwitcher = function() {
+  _origRenderUserSwitcher();
+  // re-bind onclick to also refresh notes
+  document.querySelectorAll('.user-tab').forEach(b => {
+    const origClick = b.onclick;
+    b.onclick = () => { origClick(); if (notesOpen) renderNotes(); };
+  });
+};
+
+loadFromLocalStorage();
+applyTheme();
+render();
+document.getElementById('grid-wrap').scrollTop = (9 - START_H) * PX_PER_HOUR - 20;
+setInterval(positionNowLines, 30000);
+window.addEventListener('beforeunload', saveToLocalStorage);
+
+// Start listening for remote changes from Firestore
+startFirestoreListener();
+
+// Initial load of notes from Firestore
+db.collection('schedules').doc('shared-notes').get().then(snap => {
+  if (snap.exists) {
+    const data = snap.data();
+    const localRaw = localStorage.getItem(NOTES_STORAGE_KEY);
+    const localNotes = localRaw ? JSON.parse(localRaw) : null;
+    const localTime = localNotes && localNotes._savedAt ? localNotes._savedAt : 0;
+    if (data.savedAt && data.savedAt > localTime) {
+      if (data.notes) {
+        if (Array.isArray(data.notes.jeff)) userNotes.jeff = data.notes.jeff;
+        if (Array.isArray(data.notes.helen)) userNotes.helen = data.notes.helen;
+        if (notesOpen) renderNotes();
+      }
+    }
+  }
+}).catch(() => {});
+
+// Also do an initial load from Firestore (in case it has newer data than localStorage)
+FIRESTORE_DOC.get().then(snap => {
+  if (snap.exists) {
+    const data = snap.data();
+    const localRaw = localStorage.getItem(STORAGE_KEY);
+    const localSaved = localRaw ? JSON.parse(localRaw).savedAt || 0 : 0;
+    if (data.savedAt && data.savedAt > localSaved) {
+      _isLoadingFromFirestore = true;
+      applyParsedData(data, false);
+      applyTheme();
+      render();
+      _isLoadingFromFirestore = false;
+    }
+  }
+}).catch(err => console.warn('Initial Firestore load failed:', err));
+</script>
+
+</body>
+</html>
