@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Twosday</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="header-left">
+      <div class="title">twosday</div>
+      <div class="nav-controls">
+        <button class="nav-btn" id="btn-prev">&#8249;</button>
+        <div class="nav-label" id="nav-label"></div>
+        <button class="nav-btn" id="btn-next">&#8250;</button>
+        <button class="nav-today-btn" id="btn-today">today</button>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="btn-icon" id="btn-search" title="Search events (/)">&#128269;</button>
+      <button class="btn-icon" id="btn-theme" title="Toggle theme">&#9790;</button>
+      <button class="btn-icon" id="btn-undo" title="Undo">&#8630;</button>
+      <button class="btn-icon" id="btn-redo" title="Redo">&#8631;</button>
+      <div class="view-switch" id="view-switch"></div>
+      <button class="btn-add" id="btn-add">+ add event</button>
+      <button class="notes-toggle" id="btn-notes">&#9998; notes</button>
+    </div>
+  </div>
+  <div class="user-switcher" id="user-switcher"></div>
+
+  <!-- Search bar (hidden by default, slides in below user-switcher) -->
+  <div class="search-container" id="search-container" style="display:none">
+    <div class="search-bar-row">
+      <span class="search-icon-inline">&#128269;</span>
+      <input class="search-input" id="search-input" placeholder="search events across all dates…" autocomplete="off" />
+      <button class="search-close-btn" id="search-close">&#215;</button>
+    </div>
+    <div class="search-results" id="search-results"></div>
+  </div>
+
+  <div class="main-content" id="main-content"></div>
+</div>
+
+<div class="notes-panel" id="notes-panel">
+  <div class="notes-header">
+    <h3>notes</h3>
+    <button class="notes-close" id="notes-close">&times;</button>
+  </div>
+  <div class="notes-list" id="notes-list"></div>
+  <div class="notes-input-area">
+    <div class="notes-input-row">
+      <textarea class="notes-input" id="notes-input" placeholder="write a note..." rows="1"></textarea>
+      <button class="notes-send" id="notes-send">add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- App scripts — order matters (global scope, no bundler) -->
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/state.js"></script>
+<script src="js/events.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/repeat-modal.js"></script>
+<script src="js/search.js"></script>
+<script src="js/views/day-week.js"></script>
+<script src="js/views/month.js"></script>
+<script src="js/views/year.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
