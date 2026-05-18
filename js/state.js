@@ -1,11 +1,13 @@
 // ── Global app state ──────────────────────────────────────────────────────────
-// allData[dateKey][user] = Event[]  e.g. allData["2026-05-16"]["Alex"] = [...]
+// allData[dateKey][user] = Event[]
+//   e.g. allData["2026-05-16"]["Alex"] = [...]
+// USERS / activeUser / userTheme are populated by auth.js after login.
 const allData = {};
 
-let activeUser = 'Alex';
+let activeUser = null;       // set by auth.js → activateAccount()
 let viewMode = 'week';       // 'day' | 'week' | 'month' | 'year'
 let currentDate = new Date();
-const userTheme = { Alex: 'dark', Jamie: 'light' };
+let userTheme = {};          // { [profileName]: 'dark' | 'light' }
 const appHistory = { undo: [], redo: [] };
 
 // Set by drag logic
@@ -71,8 +73,7 @@ function restoreSnapshot(snap) {
   activeUser = snap.activeUser;
   viewMode = snap.viewMode;
   currentDate = new Date(snap.currentDate);
-  userTheme.Alex = snap.userTheme.Alex;
-  userTheme.Jamie = snap.userTheme.Jamie;
+  USERS.forEach(u => { if (snap.userTheme && snap.userTheme[u]) userTheme[u] = snap.userTheme[u]; });
   applyTheme();
   render();
 }
@@ -170,8 +171,9 @@ function applyParsedData(parsed, applyViewState) {
   }
 
   if (parsed.userTheme) {
-    if (parsed.userTheme.Alex) userTheme.Alex = parsed.userTheme.Alex;
-    if (parsed.userTheme.Jamie) userTheme.Jamie = parsed.userTheme.Jamie;
+    USERS.forEach(u => {
+      if (parsed.userTheme[u]) userTheme[u] = parsed.userTheme[u];
+    });
   }
 }
 
@@ -192,8 +194,7 @@ function migrateWeekFormat(allWeeks) {
       const date = new Date(monday);
       date.setDate(monday.getDate() + i);
       const dk = getDateKey(date);
-      ensureDateUser(dk, 'Alex');
-      ensureDateUser(dk, 'Jamie');
+      USERS.forEach(u => ensureDateUser(dk, u));
       USERS.forEach(u => {
         const src = weekData[u] && Array.isArray(weekData[u][dayName]) ? weekData[u][dayName] : [];
         const existingIds = new Set(allData[dk][u].map(e => e.id));
