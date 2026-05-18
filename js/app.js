@@ -54,18 +54,24 @@ function renderViewSwitch() {
 function renderUserSwitcher() {
   const c = document.getElementById('user-switcher');
   c.innerHTML = '';
-  USERS.forEach(u => {
+  // Index-based class (user-0 / user-1) so styling works for any profile names.
+  USERS.forEach((u, idx) => {
     const b = document.createElement('button');
-    b.className = 'user-tab ' + u + (u === activeUser ? ' active' : '');
-    b.innerHTML = `<span class="user-dot"></span>${u}`;
+    b.className = 'user-tab user-' + idx + (u === activeUser ? ' active' : '');
+    b.innerHTML = `<span class="user-dot"></span>${escHtml(u)}`;
     b.onclick = () => {
       activeUser = u;
-            applyTheme();
+      applyTheme();
       render();
       if (notesOpen) renderNotes();
     };
     c.appendChild(b);
   });
+}
+
+function renderUserPill() {
+  const nameEl = document.getElementById('user-pill-name');
+  if (nameEl && currentAccount) nameEl.textContent = currentAccount.username;
 }
 
 function render() {
@@ -81,98 +87,106 @@ function render() {
   saveToLocalStorage();
 }
 
-// ── Event listeners ───────────────────────────────────────────────────────────
-document.getElementById('btn-prev').onclick  = () => navigate(-1);
-document.getElementById('btn-next').onclick  = () => navigate(1);
-document.getElementById('btn-today').onclick = gotoToday;
+// ── Boot: called by auth.js once an account is active ────────────────────────
+function bootApp() {
+  renderUserPill();
 
-document.getElementById('btn-theme').onclick = () => {
-  userTheme[activeUser] = userTheme[activeUser] === 'dark' ? 'light' : 'dark';
-  applyTheme();
-  render();
-};
+  // Button listeners
+  document.getElementById('btn-prev').onclick  = () => navigate(-1);
+  document.getElementById('btn-next').onclick  = () => navigate(1);
+  document.getElementById('btn-today').onclick = gotoToday;
 
-document.getElementById('btn-undo').onclick = undoAction;
-document.getElementById('btn-redo').onclick = redoAction;
-
-document.getElementById('btn-add').onclick = () => openModal({ dateKey: getDateKey(currentDate) });
-
-document.getElementById('btn-search').onclick   = () => toggleSearch();
-document.getElementById('search-close').onclick  = () => toggleSearch(false);
-document.getElementById('search-input').addEventListener('input', function () {
-  onSearchInput(this.value);
-});
-document.getElementById('search-input').addEventListener('keydown', e => {
-  if (e.key === 'Escape') toggleSearch(false);
-});
-
-document.getElementById('btn-notes').onclick  = () => toggleNotes();
-document.getElementById('notes-close').onclick = () => toggleNotes(false);
-document.getElementById('notes-send').onclick  = addNote;
-
-document.getElementById('notes-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); }
-});
-document.getElementById('notes-input').addEventListener('input', function () {
-  this.style.height = '34px';
-  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
-});
-
-document.addEventListener('mousemove', onDragMove);
-document.addEventListener('mouseup', onDragEnd);
-
-document.addEventListener('keydown', e => {
-  const meta = e.metaKey || e.ctrlKey;
-  if (meta && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoAction(); return; }
-  if (meta && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoAction(); return; }
-  if (e.key === 'Escape') { const m = document.querySelector('.modal-bg'); if (m) m.remove(); }
-  const inInput = e.target.closest('input, textarea, select');
-  if (!document.querySelector('.modal-bg') && !inInput) {
-    if (e.key === 'ArrowLeft')  navigate(-1);
-    if (e.key === 'ArrowRight') navigate(1);
-    if (e.key === 'd') { viewMode = 'day';   render(); }
-    if (e.key === 'w') { viewMode = 'week';  render(); }
-    if (e.key === 'm') { viewMode = 'month'; render(); }
-    if (e.key === 'y') { viewMode = 'year';  render(); }
-    if (e.key === '/') { e.preventDefault(); toggleSearch(); }
-  }
-});
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-loadFromLocalStorage();
-loadNotes();
-applyTheme();
-render();
-
-// Firestore: initial fetch (prefer cloud if newer than local)
-FIRESTORE_DOC.get().then(snap => {
-  if (!snap.exists) return;
-  const data = snap.data();
-  const localRaw = localStorage.getItem(STORAGE_KEY);
-  const localSaved = localRaw ? (JSON.parse(localRaw).savedAt || 0) : 0;
-  if (data.savedAt && data.savedAt > localSaved) {
-    _isLoadingFromFirestore = true;
-    applyParsedData(data, false);
+  document.getElementById('btn-theme').onclick = () => {
+    userTheme[activeUser] = userTheme[activeUser] === 'dark' ? 'light' : 'dark';
     applyTheme();
     render();
-    _isLoadingFromFirestore = false;
-  }
-}).catch(e => console.warn('Initial Firestore load failed:', e));
+  };
 
-db.collection('schedules').doc('shared-notes').get().then(snap => {
-  if (!snap.exists) return;
-  const data = snap.data();
-  const localRaw = localStorage.getItem(NOTES_KEY);
-  const localSaved = localRaw ? (JSON.parse(localRaw)._savedAt || 0) : 0;
-  if (data.savedAt && data.savedAt > localSaved && data.notes) {
-    if (Array.isArray(data.notes.jeff))  userNotes.jeff  = data.notes.jeff;
-    if (Array.isArray(data.notes.helen)) userNotes.helen = data.notes.helen;
-    if (notesOpen) renderNotes();
-  }
-}).catch(() => {});
+  document.getElementById('btn-undo').onclick = undoAction;
+  document.getElementById('btn-redo').onclick = redoAction;
 
-startFirestoreListener();
-startNotesListener();
+  document.getElementById('btn-add').onclick = () => openModal({ dateKey: getDateKey(currentDate) });
 
-setInterval(positionNowLine, 30000);
-window.addEventListener('beforeunload', saveToLocalStorage);
+  document.getElementById('btn-search').onclick   = () => toggleSearch();
+  document.getElementById('search-close').onclick  = () => toggleSearch(false);
+  document.getElementById('search-input').addEventListener('input', function () {
+    onSearchInput(this.value);
+  });
+  document.getElementById('search-input').addEventListener('keydown', e => {
+    if (e.key === 'Escape') toggleSearch(false);
+  });
+
+  document.getElementById('btn-notes').onclick  = () => toggleNotes();
+  document.getElementById('notes-close').onclick = () => toggleNotes(false);
+  document.getElementById('notes-send').onclick  = addNote;
+
+  document.getElementById('notes-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); }
+  });
+  document.getElementById('notes-input').addEventListener('input', function () {
+    this.style.height = '34px';
+    this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+  });
+
+  document.getElementById('btn-logout').onclick = logout;
+
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragEnd);
+
+  document.addEventListener('keydown', e => {
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoAction(); return; }
+    if (meta && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoAction(); return; }
+    if (e.key === 'Escape') { const m = document.querySelector('.modal-bg'); if (m) m.remove(); }
+    const inInput = e.target.closest('input, textarea, select');
+    if (!document.querySelector('.modal-bg') && !inInput) {
+      if (e.key === 'ArrowLeft')  navigate(-1);
+      if (e.key === 'ArrowRight') navigate(1);
+      if (e.key === 'd') { viewMode = 'day';   render(); }
+      if (e.key === 'w') { viewMode = 'week';  render(); }
+      if (e.key === 'm') { viewMode = 'month'; render(); }
+      if (e.key === 'y') { viewMode = 'year';  render(); }
+      if (e.key === '/') { e.preventDefault(); toggleSearch(); }
+    }
+  });
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  loadFromLocalStorage();
+  loadNotes();
+  applyTheme();
+  render();
+
+  // Firestore: initial fetch (prefer cloud if newer than local)
+  FIRESTORE_DOC.get().then(snap => {
+    if (!snap.exists) return;
+    const data = snap.data();
+    const localRaw = localStorage.getItem(STORAGE_KEY);
+    const localSaved = localRaw ? (JSON.parse(localRaw).savedAt || 0) : 0;
+    if (data.savedAt && data.savedAt > localSaved) {
+      _isLoadingFromFirestore = true;
+      applyParsedData(data, false);
+      applyTheme();
+      render();
+      _isLoadingFromFirestore = false;
+    }
+  }).catch(e => console.warn('Initial Firestore load failed:', e));
+
+  NOTES_DOC.get().then(snap => {
+    if (!snap.exists) return;
+    const data = snap.data();
+    const localRaw = localStorage.getItem(NOTES_KEY);
+    const localSaved = localRaw ? (JSON.parse(localRaw)._savedAt || 0) : 0;
+    if (data.savedAt && data.savedAt > localSaved && data.notes) {
+      USERS.forEach(u => {
+        if (Array.isArray(data.notes[u])) userNotes[u] = data.notes[u];
+      });
+      if (notesOpen) renderNotes();
+    }
+  }).catch(() => {});
+
+  startFirestoreListener();
+  startNotesListener();
+
+  setInterval(positionNowLine, 30000);
+  window.addEventListener('beforeunload', saveToLocalStorage);
+}

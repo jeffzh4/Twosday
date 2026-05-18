@@ -5,7 +5,11 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function getTheme() { return document.documentElement.getAttribute('data-theme'); }
-function getOtherUser(user) { return user === 'jeff' ? 'helen' : 'jeff'; }
+function getOtherUser(user) {
+  // Returns the *other* profile in the current account (works for any name pair)
+  const i = USERS.indexOf(user);
+  return USERS[i === 0 ? 1 : 0];
+}
 function clampTime(h) { return Math.max(START_H, Math.min(END_H, Math.round(h * 2) / 2)); }
 function overlaps(aS, aE, bS, bE) { return aS < bE && bS < aE; }
 

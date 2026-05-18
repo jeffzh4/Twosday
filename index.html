@@ -9,7 +9,37 @@
 </head>
 <body>
 
-<div class="app">
+<!-- Auth overlay (shown until logged in) -->
+<div class="auth-overlay" id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-title">twosday</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">log in</button>
+      <button class="auth-tab" data-tab="signup">sign up</button>
+    </div>
+
+    <form class="auth-form" id="login-form" autocomplete="on">
+      <input type="text" id="login-username" placeholder="username" autocomplete="username" />
+      <input type="password" id="login-password" placeholder="password" autocomplete="current-password" />
+      <div class="auth-error" id="login-error"></div>
+      <button type="submit">log in</button>
+    </form>
+
+    <form class="auth-form hidden" id="signup-form" autocomplete="off">
+      <input type="text" id="signup-username" placeholder="choose a username" autocomplete="username" />
+      <input type="password" id="signup-password" placeholder="choose a password" autocomplete="new-password" />
+      <input type="password" id="signup-password-confirm" placeholder="confirm password" autocomplete="new-password" />
+      <input type="text" id="signup-profile1" placeholder="first profile name (e.g. jeff)" />
+      <input type="text" id="signup-profile2" placeholder="second profile name (e.g. helen)" />
+      <div class="auth-error" id="signup-error"></div>
+      <button type="submit">create account</button>
+      <div class="auth-hint">both profile names appear as tabs in your calendar</div>
+    </form>
+  </div>
+</div>
+
+<!-- Main app (hidden until logged in) -->
+<div class="app" style="display:none">
   <div class="header">
     <div class="header-left">
       <div class="title">twosday</div>
@@ -21,6 +51,10 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="user-pill" id="user-pill">
+        <span class="user-pill-name" id="user-pill-name"></span>
+        <button class="user-pill-logout" id="btn-logout">log out</button>
+      </div>
       <button class="btn-icon" id="btn-search" title="Search events (/)">&#128269;</button>
       <button class="btn-icon" id="btn-theme" title="Toggle theme">&#9790;</button>
       <button class="btn-icon" id="btn-undo" title="Undo">&#8630;</button>
@@ -76,6 +110,8 @@
 <script src="js/views/year.js"></script>
 <script src="js/notes.js"></script>
 <script src="js/app.js"></script>
+<!-- auth.js last: defines DOMContentLoaded handler that calls bootApp() -->
+<script src="js/auth.js"></script>
 
 </body>
 </html>

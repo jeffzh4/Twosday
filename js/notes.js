@@ -1,10 +1,11 @@
-const userNotes = { jeff: [], helen: [] };
+// userNotes is keyed by profile name. Initialized fresh per-account in auth.js.
+let userNotes = {};
 let notesOpen = false;
 
 function saveNotes() {
   try { localStorage.setItem(NOTES_KEY, JSON.stringify(userNotes)); } catch (e) {}
   try {
-    db.collection('schedules').doc('shared-notes').set({
+    NOTES_DOC.set({
       notes: JSON.parse(JSON.stringify(userNotes)),
       savedAt: Date.now(),
     }).catch(() => {});
@@ -16,19 +17,21 @@ function loadNotes() {
     const raw = localStorage.getItem(NOTES_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.jeff))  userNotes.jeff  = parsed.jeff;
-    if (Array.isArray(parsed.helen)) userNotes.helen = parsed.helen;
+    USERS.forEach(u => {
+      if (Array.isArray(parsed[u])) userNotes[u] = parsed[u];
+    });
   } catch (e) {}
 }
 
 function startNotesListener() {
-  db.collection('schedules').doc('shared-notes').onSnapshot(snap => {
+  NOTES_DOC.onSnapshot(snap => {
     if (!snap.exists) return;
     const data = snap.data();
     if (data.savedAt && Math.abs(Date.now() - data.savedAt) < 1500) return;
     if (data.notes) {
-      if (Array.isArray(data.notes.jeff))  userNotes.jeff  = data.notes.jeff;
-      if (Array.isArray(data.notes.helen)) userNotes.helen = data.notes.helen;
+      USERS.forEach(u => {
+        if (Array.isArray(data.notes[u])) userNotes[u] = data.notes[u];
+      });
       if (notesOpen) renderNotes();
     }
   }, () => {});

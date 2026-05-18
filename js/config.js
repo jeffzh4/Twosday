@@ -9,17 +9,21 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const FIRESTORE_DOC = db.collection('schedules').doc('shared-schedule');
 
-// App constants
+// These are populated by auth.js after the user logs in. Declared with `let`
+// (not `const`) so they can be reassigned per-account.
+let FIRESTORE_DOC = null;
+let NOTES_DOC     = null;
+let STORAGE_KEY   = null;
+let NOTES_KEY     = null;
+let USERS         = []; // profile names for the logged-in account
+
+// App constants (unchanged across accounts)
 const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
-const USERS = ['jeff', 'helen'];
 const START_H = 0;
 const END_H = 24;
 const STEP_H = 0.5;
 const PX_PER_HOUR = 60;
-const STORAGE_KEY = 'twosday_v2';
-const NOTES_KEY = 'twosday_notes_v2';
 
 const COLOR_PRESETS = [
   { name: 'purple', dark: { bg:'rgba(167,139,250,0.12)', text:'#c4b5fd' }, light: { bg:'rgba(139,92,246,0.13)', text:'#7c3aed' } },

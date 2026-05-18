@@ -224,18 +224,18 @@ html, body {
   gap: 6px;
 }
 .user-tab:hover { color: var(--text); }
-.user-tab.active.jeff { background: rgba(96,165,250,0.15); color: #60a5fa; }
-.user-tab.active.helen { background: rgba(244,114,182,0.15); color: #f472b6; }
-[data-theme="light"] .user-tab.active.jeff { background: rgba(96,165,250,0.15); color: #2563eb; }
-[data-theme="light"] .user-tab.active.helen { background: rgba(244,114,182,0.15); color: #db2777; }
+.user-tab.active.user-0 { background: rgba(96,165,250,0.15); color: #60a5fa; }
+.user-tab.active.user-1 { background: rgba(244,114,182,0.15); color: #f472b6; }
+[data-theme="light"] .user-tab.active.user-0 { background: rgba(96,165,250,0.15); color: #2563eb; }
+[data-theme="light"] .user-tab.active.user-1 { background: rgba(244,114,182,0.15); color: #db2777; }
 
 .user-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.user-tab.jeff .user-dot { background: #60a5fa; }
-.user-tab.helen .user-dot { background: #f472b6; }
+.user-tab.user-0 .user-dot { background: #60a5fa; }
+.user-tab.user-1 .user-dot { background: #f472b6; }
 
 /* ── main content area ── */
 .main-content {
@@ -1146,3 +1146,156 @@ html, body {
   min-height: 34px;
 }
 .repeat-preview-box.warn { color: #f87171; }
+
+/* ══════════════════════════════════════
+   AUTH OVERLAY
+══════════════════════════════════════ */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border-hover);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+.auth-title span { color: var(--text-dim); font-weight: 400; font-size: 16px; }
+
+.auth-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+
+.auth-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 7px 0;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+}
+.auth-tab:hover { color: var(--text); }
+.auth-tab.active {
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-form.hidden { display: none; }
+
+.auth-form input {
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.auth-form input:focus { border-color: var(--accent); }
+.auth-form input::placeholder { color: var(--text-dim); }
+
+.auth-form button[type="submit"] {
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 4px;
+  transition: filter 0.15s;
+}
+[data-theme="dark"] .auth-form button[type="submit"] { color: #0e0e10; }
+.auth-form button[type="submit"]:hover { filter: brightness(1.1); }
+
+.auth-error {
+  font-size: 12px;
+  color: #f87171;
+  min-height: 14px;
+  text-align: center;
+}
+
+.auth-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.5;
+}
+.auth-hint code {
+  font-family: var(--mono);
+  background: var(--surface2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+/* ══════════════════════════════════════
+   USER PILL (logged-in indicator + logout)
+══════════════════════════════════════ */
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 3px 3px 10px;
+  font-size: 11px;
+  margin-right: 4px;
+}
+
+.user-pill-name {
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.user-pill-logout {
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.user-pill-logout:hover { color: #f87171; background: rgba(248,113,113,0.1); }
