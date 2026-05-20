@@ -1,80 +1,56 @@
 // ── Auth module ───────────────────────────────────────────────────────────────
-// Two built-in accounts + Firestore-backed signups.
-//
-// NOTE: Passwords are stored in plaintext. This is intentional for a small
-// trusted-circle app with shared accounts. For real security, swap to Firebase
-// Auth with hashed passwords.
+// All accounts live in Firestore (schedules/accounts).
+// Passwords are plaintext — intentional for a small trusted-circle app.
+// localStorage is used as a cache/fallback for fast loads and offline support.
 
 const ACCOUNTS_CACHE_KEY = 'twosday_accounts_v1';
 const SESSION_KEY        = 'twosday_session_v1';
 const ACCOUNTS_DOC       = () => db.collection('schedules').doc('accounts');
 
-// Built-in accounts always available, regardless of Firestore state.
-// JHadmin points at the legacy 'shared-schedule' doc so the existing data is
-// preserved for the original user.
-const BUILTIN_ACCOUNTS = {
-  JHadmin: {
-    password: 'admin',
-    profiles: ['jeff', 'helen'],
-    firestoreDoc: 'shared-schedule',
-    notesDoc: 'shared-notes',
-    builtin: true,
-  },
-  testing: {
-    password: 'testing',
-    profiles: ['tester1', 'tester2'],
-    firestoreDoc: 'testing',
-    notesDoc: 'testing-notes',
-    builtin: true,
-  },
-};
+let currentAccount = null;   // { username, profiles, firestoreDoc, notesDoc }
 
-let currentAccount = null;          // { username, profiles, firestoreDoc, notesDoc }
-let _accountsCache = null;          // merged map { username → accountData }
+// ── Account loading ───────────────────────────────────────────────────────────
 
 function getCachedAccounts() {
-  // Built-ins always first; Firestore-loaded custom accounts overlay on top
-  // (custom accounts cannot reuse a built-in username — guarded in signup).
-  let custom = {};
-  try { custom = JSON.parse(localStorage.getItem(ACCOUNTS_CACHE_KEY) || '{}'); } catch (e) {}
-  return { ...BUILTIN_ACCOUNTS, ...custom };
+  try { return JSON.parse(localStorage.getItem(ACCOUNTS_CACHE_KEY) || '{}'); } catch (e) { return {}; }
 }
 
-// Refresh the cache from Firestore (with localStorage fallback).
+// Fetch accounts from Firestore and update the local cache.
 async function refreshAccountsFromFirestore() {
   try {
     const snap = await ACCOUNTS_DOC().get();
     if (snap.exists && snap.data() && snap.data().accounts) {
-      const custom = snap.data().accounts;
-      localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(custom));
-      _accountsCache = { ...BUILTIN_ACCOUNTS, ...custom };
-      return _accountsCache;
+      const accounts = snap.data().accounts;
+      localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(accounts));
+      return accounts;
     }
   } catch (e) {
     console.warn('Failed to refresh accounts from Firestore:', e);
   }
-  _accountsCache = getCachedAccounts();
-  return _accountsCache;
+  // Fall back to cache if Firestore is unavailable.
+  return getCachedAccounts();
 }
+
+// ── Account activation ────────────────────────────────────────────────────────
 
 // Configure all the per-account globals that other modules read.
 function activateAccount(username, account) {
   currentAccount = { username, ...account };
 
-  // USERS is declared with `let` in config.js so we can reassign it.
   USERS = account.profiles.slice();
   STORAGE_KEY    = `twosday_v2_${username}`;
   NOTES_KEY      = `twosday_notes_v2_${username}`;
   FIRESTORE_DOC  = db.collection('schedules').doc(account.firestoreDoc);
   NOTES_DOC      = db.collection('schedules').doc(account.notesDoc);
 
-  // Reset per-profile state objects (defaults if no saved data).
   activeUser = USERS[0];
   userTheme = {};
   USERS.forEach((u, i) => { userTheme[u] = i === 0 ? 'dark' : 'light'; });
   userNotes = {};
   USERS.forEach(u => { userNotes[u] = []; });
 }
+
+// ── Session helpers ───────────────────────────────────────────────────────────
 
 function saveSession(username) {
   localStorage.setItem(SESSION_KEY, JSON.stringify({ username, savedAt: Date.now() }));
@@ -91,6 +67,7 @@ function logout() {
 }
 
 // ── Auth UI ───────────────────────────────────────────────────────────────────
+
 function showAuth() {
   document.getElementById('auth-overlay').style.display = 'flex';
   document.querySelector('.app').style.display = 'none';
@@ -106,7 +83,7 @@ function setError(formId, msg) {
 }
 
 function setupAuthListeners() {
-  // Tab switching between log-in and sign-up
+  // Tab switching
   document.querySelectorAll('.auth-tab').forEach(tab => {
     tab.onclick = () => {
       document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
@@ -126,7 +103,6 @@ function setupAuthListeners() {
     const password = document.getElementById('login-password').value;
     if (!username || !password) { setError('login', 'username and password required'); return; }
 
-    // Use the cache, but try a refresh first for accuracy across devices.
     setError('login', 'checking…');
     const accounts = await refreshAccountsFromFirestore();
     const account = accounts[username];
@@ -164,6 +140,9 @@ function setupAuthListeners() {
     }
 
     setError('signup', 'creating account…');
+
+    // Always read the latest accounts from Firestore before writing,
+    // so we don't accidentally clobber existing accounts.
     const accounts = await refreshAccountsFromFirestore();
     if (accounts[username]) {
       setError('signup', 'that username is taken');
@@ -178,18 +157,14 @@ function setupAuthListeners() {
       createdAt: Date.now(),
     };
 
-    // Merge with existing custom accounts and write back to Firestore.
-    let custom = {};
-    try { custom = JSON.parse(localStorage.getItem(ACCOUNTS_CACHE_KEY) || '{}'); } catch (err) {}
-    custom[username] = newAccount;
-
+    const merged = { ...accounts, [username]: newAccount };
     try {
-      await ACCOUNTS_DOC().set({ accounts: custom, savedAt: Date.now() });
+      await ACCOUNTS_DOC().set({ accounts: merged, savedAt: Date.now() });
     } catch (err) {
       setError('signup', 'failed to save: ' + err.message);
       return;
     }
-    localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(custom));
+    localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(merged));
 
     activateAccount(username, newAccount);
     saveSession(username);
@@ -205,18 +180,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   const session = getSession();
   if (session && session.username) {
-    // Quick path: try cached accounts first so we can show the calendar fast,
-    // then refresh from Firestore in the background.
-    const accounts = getCachedAccounts();
-    if (accounts[session.username]) {
-      activateAccount(session.username, accounts[session.username]);
+    // Fast path: try the local cache first so the calendar appears immediately.
+    const cached = getCachedAccounts();
+    if (cached[session.username]) {
+      activateAccount(session.username, cached[session.username]);
       hideAuth();
       bootApp();
-      // Background refresh — picks up any password/profile changes
+      // Background refresh — picks up any changes made on other devices.
       refreshAccountsFromFirestore();
       return;
     }
-    // Cache miss; fall through to fresh load below.
+    // Cache miss — fetch from Firestore before proceeding.
     const fresh = await refreshAccountsFromFirestore();
     if (fresh[session.username]) {
       activateAccount(session.username, fresh[session.username]);
@@ -224,12 +198,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       bootApp();
       return;
     }
-    // Session points at a deleted account → drop it.
+    // Session points at a deleted/unknown account — clear it.
     localStorage.removeItem(SESSION_KEY);
   }
 
-  // No (valid) session — show the auth UI.
   showAuth();
-  // Pre-warm the accounts cache for snappier login.
+  // Pre-warm the cache so login feels instant.
   refreshAccountsFromFirestore();
 });
