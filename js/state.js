@@ -190,7 +190,9 @@ function migrateWeekFormat(allWeeks) {
     monday.setDate(jan4.getDate() - (jan4Day - 1) + (weekNum - 1) * 7);
 
     const weekData = allWeeks[weekKey];
-    DAYS.forEach((dayName, i) => {
+    // Use the original Mon-first order — legacy data was keyed this way.
+    const LEGACY_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+    LEGACY_DAYS.forEach((dayName, i) => {
       const date = new Date(monday);
       date.setDate(monday.getDate() + i);
       const dk = getDateKey(date);

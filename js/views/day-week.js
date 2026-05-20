@@ -55,7 +55,7 @@ function renderDayColumn(date) {
   const dateKey = getDateKey(date);
   const todayKey = getDateKey(new Date());
   const isToday = dateKey === todayKey;
-  const dayName = DAYS[(date.getDay() + 6) % 7];
+  const dayName = DAYS[date.getDay()];
 
   const col = document.createElement('div');
   col.className = 'col';
