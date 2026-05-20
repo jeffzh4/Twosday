@@ -78,37 +78,35 @@ function parseDateKey(key) {
   return date;
 }
 
-// Returns the Monday of the week containing `date`
-function getMondayOfWeek(date) {
+// Returns the Sunday of the week containing `date`
+function getSundayOfWeek(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() - d.getDay()); // getDay() 0=Sun, so this always lands on Sunday
   return d;
 }
 
-// 7 Date objects Mon–Sun for the week containing `date`
+// 7 Date objects Sun–Sat for the week containing `date`
 function getWeekDates(date) {
-  const mon = getMondayOfWeek(date);
+  const sun = getSundayOfWeek(date);
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(mon);
-    d.setDate(mon.getDate() + i);
+    const d = new Date(sun);
+    d.setDate(sun.getDate() + i);
     return d;
   });
 }
 
-// 0=Mon … 6=Sun
+// 0=Sun … 6=Sat  (matches DAYS array order)
 function getDayIdx(date) {
-  return (date.getDay() + 6) % 7;
+  return date.getDay();
 }
 
 // Returns array of weeks (each week = 7 Date objects) covering a full month.
-// Weeks start on Monday; includes leading/trailing days from adjacent months.
+// Weeks start on Sunday; includes leading/trailing days from adjacent months.
 function getMonthGrid(year, month) {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
-  const startDate = getMondayOfWeek(firstDay);
+  const startDate = getSundayOfWeek(firstDay);
   const current = new Date(startDate);
   const weeks = [];
   while (current <= lastDay || weeks.length === 0) {

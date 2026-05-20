@@ -19,7 +19,7 @@ let NOTES_KEY     = null;
 let USERS         = []; // profile names for the logged-in account
 
 // App constants (unchanged across accounts)
-const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const START_H = 0;
 const END_H = 24;
 const STEP_H = 0.5;
