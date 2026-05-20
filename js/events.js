@@ -60,12 +60,13 @@ function syncSharedEvent(user, sharedId, dateKey, action, updates) {
 }
 
 // ── Conflict detection ────────────────────────────────────────────────────────
-function detectConflicts({ user, dateKey, start, end, excludeId, shared }) {
+function detectConflicts({ user, dateKey, start, end, excludeId, excludeSharedId, shared }) {
   const own = getEventsForDate(dateKey, user)
     .filter(ev => ev.id !== excludeId && overlaps(start, end, ev.start, ev.end));
   const other = shared
     ? getEventsForDate(dateKey, getOtherUser(user))
-        .filter(ev => overlaps(start, end, ev.start, ev.end))
+        // Exclude the mirrored copy of this very event (same sharedId, different id).
+        .filter(ev => (!excludeSharedId || ev.sharedId !== excludeSharedId) && overlaps(start, end, ev.start, ev.end))
     : [];
   return { own, other, hasConflict: own.length > 0 || other.length > 0 };
 }
@@ -73,7 +74,7 @@ function detectConflicts({ user, dateKey, start, end, excludeId, shared }) {
 function hasConflict(user, dateKey, ev) {
   return detectConflicts({
     user, dateKey, start: ev.start, end: ev.end,
-    excludeId: ev.id, shared: ev.shared,
+    excludeId: ev.id, excludeSharedId: ev.sharedId || null, shared: ev.shared,
   }).hasConflict;
 }
 
