@@ -101,7 +101,9 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
     const shared = document.getElementById('m-shared').checked;
     const res = detectConflicts({
       user: activeUser, dateKey: dk, start: s, end: en,
-      excludeId: editEv ? editEv.id : null, shared,
+      excludeId: editEv ? editEv.id : null,
+      excludeSharedId: editEv ? (editEv.sharedId || null) : null,
+      shared,
     });
     if (!res.hasConflict) { conflictNode.textContent = ''; return; }
     let msg = `conflict: overlaps ${res.own.length} event${res.own.length !== 1 ? 's' : ''} on your calendar`;
