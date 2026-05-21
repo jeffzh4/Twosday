@@ -28,7 +28,6 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
         <label>date</label>
         <input type="date" id="m-date" value="${dateKey}" />
       </div>
-      ${!isEdit ? `
       <div class="field">
         <label>repeat this week</label>
         <div class="shared-toggle">
@@ -42,7 +41,6 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
           ${DAYS.map(d => `<label class="repeat-day"><input type="checkbox" value="${d}"> ${d}</label>`).join('')}
         </div>
       </div>
-      ` : ''}
       <div class="field">
         <label>color</label>
         <div class="color-picker-row" id="m-colors"></div>
@@ -117,13 +115,11 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
   updateConflict();
 
   // Repeat toggle
-  if (!isEdit) {
-    const repeatToggle = document.getElementById('m-repeat');
-    const repeatDays = document.getElementById('m-repeat-days');
-    repeatToggle.onchange = () => {
-      repeatDays.style.display = repeatToggle.checked ? 'flex' : 'none';
-    };
-  }
+  const repeatToggle = document.getElementById('m-repeat');
+  const repeatDays = document.getElementById('m-repeat-days');
+  repeatToggle.onchange = () => {
+    repeatDays.style.display = repeatToggle.checked ? 'flex' : 'none';
+  };
 
   document.getElementById('m-cancel').onclick = () => bg.remove();
 
@@ -176,6 +172,34 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
 
       sortDateUser(oldDk, activeUser);
       sortDateUser(dk, activeUser);
+
+      // Repeat: copy the (now-edited) event to additional selected days
+      if (repeatToggle.checked) {
+        const checked = Array.from(document.querySelectorAll('#m-repeat-days input:checked')).map(el => el.value);
+        if (checked.length) {
+          const base = parseDateKey(dk);
+          const weekDates = getWeekDates(base);
+          checked.forEach(dayName => {
+            const copyDk = getDateKey(weekDates[DAYS.indexOf(dayName)]);
+            if (copyDk === dk) return; // skip the event's own day
+            const sharedId = isShared ? uid() : null;
+            const copy = normalizeEvent({
+              id: uid(), text: editEv.text, start: editEv.start, end: editEv.end,
+              done: false, shared: isShared, sharedId,
+              color: editEv.color, recurrenceId: editEv.recurrenceId || null,
+            });
+            ensureDateUser(copyDk, activeUser);
+            allData[copyDk][activeUser].push(copy);
+            sortDateUser(copyDk, activeUser);
+            if (isShared) {
+              syncSharedEvent(activeUser, sharedId, copyDk, 'add', {
+                ...clone(copy), id: uid(), shared: true, sharedId,
+              });
+            }
+          });
+        }
+      }
+
       currentDate = parseDateKey(dk);
       bg.remove();
       render();
