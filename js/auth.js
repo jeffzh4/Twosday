@@ -37,11 +37,12 @@ async function refreshAccountsFromFirestore() {
 function activateAccount(username, account) {
   currentAccount = { username, ...account };
 
-  USERS = account.profiles.slice();
-  STORAGE_KEY    = `twosday_v2_${username}`;
-  NOTES_KEY      = `twosday_notes_v2_${username}`;
-  FIRESTORE_DOC  = db.collection('schedules').doc(account.firestoreDoc);
-  NOTES_DOC      = db.collection('schedules').doc(account.notesDoc);
+  USERS               = account.profiles.slice();
+  STORAGE_KEY         = `twosday_v2_${username}`;
+  NOTES_KEY           = `twosday_notes_v2_${username}`;
+  CUSTOM_COLORS_KEY   = `twosday_colors_v1_${username}`;
+  FIRESTORE_DOC       = db.collection('schedules').doc(account.firestoreDoc);
+  NOTES_DOC           = db.collection('schedules').doc(account.notesDoc);
 
   activeUser = USERS[0];
   userTheme = {};

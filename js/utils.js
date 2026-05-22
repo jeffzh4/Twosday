@@ -13,9 +13,20 @@ function getOtherUser(user) {
 function clampTime(h) { return Math.max(START_H, Math.min(END_H, Math.round(h * 2) / 2)); }
 function overlaps(aS, aE, bS, bE) { return aS < bE && bS < aE; }
 
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function getColor(name) {
+  if (!name) return COLOR_PRESETS.find(c => c.name === 'gray')[getTheme()];
+  // Custom hex color (saved from the palette picker)
+  if (name.startsWith('#')) return { bg: hexToRgba(name, 0.18), text: name };
   const p = COLOR_PRESETS.find(c => c.name === name);
-  return p ? p[getTheme()] : COLOR_PRESETS[8][getTheme()];
+  // Fallback for legacy preset names (pink, cyan, purple) that were retired
+  return p ? p[getTheme()] : COLOR_PRESETS.find(c => c.name === 'gray')[getTheme()];
 }
 function getSharedColor() { return SHARED_COLOR[getTheme()]; }
 

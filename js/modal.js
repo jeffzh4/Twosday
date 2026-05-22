@@ -43,7 +43,7 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
       </div>
       <div class="field">
         <label>color</label>
-        <div class="color-picker-row" id="m-colors"></div>
+        <div id="m-color-section"></div>
       </div>
       <div class="shared-toggle">
         <label class="toggle-switch">
@@ -63,31 +63,108 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
   bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
   document.body.appendChild(bg);
 
-  // Color swatches
-  const colorRow = document.getElementById('m-colors');
-  const autoSwatch = document.createElement('div');
-  autoSwatch.className = 'color-swatch' + (selectedColor === null ? ' active' : '');
-  autoSwatch.title = 'auto';
-  autoSwatch.style.background = 'linear-gradient(135deg,#a78bfa 0%,#34d399 50%,#fb923c 100%)';
-  autoSwatch.onclick = () => {
-    selectedColor = null;
-    colorRow.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-    autoSwatch.classList.add('active');
-  };
-  colorRow.appendChild(autoSwatch);
+  // ── Color picker ─────────────────────────────────────────────────────────────
+  function loadCustomColors() {
+    if (!CUSTOM_COLORS_KEY) return [];
+    try { return JSON.parse(localStorage.getItem(CUSTOM_COLORS_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveCustomColors(colors) {
+    if (!CUSTOM_COLORS_KEY) return;
+    try { localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(colors.slice(0, 7))); } catch (e) {}
+  }
 
-  COLOR_PRESETS.forEach(preset => {
-    const s = document.createElement('div');
-    s.className = 'color-swatch' + (selectedColor === preset.name ? ' active' : '');
-    s.title = preset.name;
-    s.style.cssText = `background:${preset.dark.text};opacity:0.8`;
-    s.onclick = () => {
-      selectedColor = preset.name;
-      colorRow.querySelectorAll('.color-swatch').forEach(sw => sw.classList.remove('active'));
-      s.classList.add('active');
-    };
-    colorRow.appendChild(s);
-  });
+  function buildColorPicker() {
+    const section = document.getElementById('m-color-section');
+    section.innerHTML = '';
+
+    // ── Row 1: ROYGBIV presets ──
+    const presetRow = document.createElement('div');
+    presetRow.className = 'color-picker-row';
+
+    // Auto swatch (rainbow gradient)
+    const autoSwatch = document.createElement('div');
+    autoSwatch.className = 'color-swatch' + (selectedColor === null ? ' active' : '');
+    autoSwatch.title = 'auto';
+    autoSwatch.style.background = 'linear-gradient(135deg,#f87171 0%,#fb923c 17%,#fde047 34%,#6ee7b7 50%,#93c5fd 67%,#a5b4fc 83%,#d8b4fe 100%)';
+    autoSwatch.onclick = () => { selectedColor = null; buildColorPicker(); };
+    presetRow.appendChild(autoSwatch);
+
+    COLOR_PRESETS.filter(p => p.name !== 'gray').forEach(preset => {
+      const s = document.createElement('div');
+      s.className = 'color-swatch' + (selectedColor === preset.name ? ' active' : '');
+      s.title = preset.name;
+      s.style.cssText = `background:${preset.dark.text}`;
+      s.onclick = () => { selectedColor = preset.name; buildColorPicker(); };
+      presetRow.appendChild(s);
+    });
+    section.appendChild(presetRow);
+
+    // ── Row 2: saved custom colors + add button ──
+    const customColors = loadCustomColors();
+    const customRow = document.createElement('div');
+    customRow.className = 'color-picker-row color-custom-row';
+
+    customColors.forEach((hex, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'color-swatch-custom' + (selectedColor === hex ? ' active' : '');
+
+      const inner = document.createElement('div');
+      inner.className = 'color-swatch-inner';
+      inner.style.background = hex;
+      inner.title = hex;
+      inner.onclick = () => { selectedColor = hex; buildColorPicker(); };
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'color-swatch-del';
+      delBtn.innerHTML = '&times;';
+      delBtn.title = 'Remove';
+      delBtn.onclick = e => {
+        e.stopPropagation();
+        const colors = loadCustomColors();
+        colors.splice(i, 1);
+        saveCustomColors(colors);
+        if (selectedColor === hex) selectedColor = null;
+        buildColorPicker();
+      };
+
+      wrapper.appendChild(inner);
+      wrapper.appendChild(delBtn);
+      customRow.appendChild(wrapper);
+    });
+
+    // "+" add button (hidden once 7 custom colors are saved)
+    if (customColors.length < 7) {
+      const addBtn = document.createElement('div');
+      addBtn.className = 'color-add-btn';
+      addBtn.title = 'Add custom color';
+      addBtn.textContent = '+';
+
+      // Hidden native color input — clicking addBtn triggers it
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = '#7c3aed';
+      colorInput.style.cssText = 'position:absolute;width:0;height:0;opacity:0;pointer-events:none';
+      colorInput.onchange = () => {
+        const hex = colorInput.value;
+        const colors = loadCustomColors();
+        if (colors.length < 7) {
+          // Replace if hex already exists, otherwise append
+          if (!colors.includes(hex)) colors.push(hex);
+          saveCustomColors(colors);
+          selectedColor = hex;
+          buildColorPicker();
+        }
+      };
+
+      addBtn.onclick = () => colorInput.click();
+      customRow.appendChild(colorInput);
+      customRow.appendChild(addBtn);
+    }
+
+    section.appendChild(customRow);
+  }
+
+  buildColorPicker();
 
   // Conflict warning
   const conflictNode = document.getElementById('m-conflict');
