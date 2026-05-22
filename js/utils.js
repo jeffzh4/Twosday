@@ -40,8 +40,8 @@ function categorize(text) {
 }
 
 function palette(ev) {
-  if (ev.shared) return getSharedColor();
-  if (ev.color) return getColor(ev.color);
+  if (ev.color) return getColor(ev.color);          // explicit color always wins, even for shared events
+  if (ev.shared) return getSharedColor();           // shared + no explicit color → shared indicator
   return getColor(categoryColors[categorize(ev.text)] || 'gray');
 }
 
