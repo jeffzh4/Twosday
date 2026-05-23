@@ -110,10 +110,14 @@ function renderDayColumn(date) {
 
   const events = getEventsForDate(dateKey, activeUser);
 
-  if (!events.length && viewMode === 'day') {
+  if (!events.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.innerHTML = 'no events yet<span>double-click to add, or use + button</span>';
+    if (viewMode === 'day') {
+      empty.innerHTML = 'no events yet<span>double-click to add, or use + button</span>';
+    } else {
+      empty.innerHTML = '<span>empty</span>';
+    }
     body.appendChild(empty);
   }
 

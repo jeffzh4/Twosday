@@ -25,7 +25,7 @@ function renderYearView() {
     // Day letter headers
     const dayRow = document.createElement('div');
     dayRow.className = 'mini-day-headers';
-    ['m','t','w','t','f','s','s'].forEach(letter => {
+    ['s','m','t','w','t','f','s'].forEach(letter => {
       const span = document.createElement('span');
       span.textContent = letter;
       dayRow.appendChild(span);

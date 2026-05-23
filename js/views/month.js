@@ -10,10 +10,10 @@ function renderMonthView() {
   const container = document.createElement('div');
   container.className = 'month-view';
 
-  // Day-of-week header row
+  // Day-of-week header row (Sun-first to match the grid, which starts on Sunday)
   const dayHeaders = document.createElement('div');
   dayHeaders.className = 'month-day-headers';
-  ['mon','tue','wed','thu','fri','sat','sun'].forEach(d => {
+  ['sun','mon','tue','wed','thu','fri','sat'].forEach(d => {
     const h = document.createElement('div');
     h.className = 'month-day-header';
     h.textContent = d;
@@ -86,6 +86,17 @@ function renderMonthView() {
 
     body.appendChild(row);
   });
+
+  // Empty state: shown when the current month has no events at all
+  const monthHasEvents = weeks.some(week =>
+    week.some(date => date.getMonth() === month && getEventsForDate(getDateKey(date), activeUser).length > 0)
+  );
+  if (!monthHasEvents) {
+    const empty = document.createElement('div');
+    empty.className = 'month-empty-state';
+    empty.innerHTML = 'nothing this month<span>click any day to add your first event</span>';
+    body.appendChild(empty);
+  }
 
   container.appendChild(body);
   content.appendChild(container);
