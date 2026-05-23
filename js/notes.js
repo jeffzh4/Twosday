@@ -8,7 +8,7 @@ function saveNotes() {
     NOTES_DOC.set({
       notes: JSON.parse(JSON.stringify(userNotes)),
       savedAt: Date.now(),
-    }).catch(() => {});
+    }).catch(() => showToast("couldn't sync notes — check your connection"));
   } catch (e) {}
 }
 

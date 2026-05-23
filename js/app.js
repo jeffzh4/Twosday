@@ -153,11 +153,18 @@ function bootApp() {
   // ── Init ────────────────────────────────────────────────────────────────────
   loadFromLocalStorage();
   loadNotes();
+
+  // Mobile: default to day view (week view is too cramped on small screens)
+  if (window.innerWidth <= 640 && viewMode === 'week') viewMode = 'day';
+
   applyTheme();
   render();
 
   // Firestore: initial fetch (prefer cloud if newer than local)
+  const syncBar = document.getElementById('sync-bar');
+  if (syncBar) syncBar.style.display = 'block';
   FIRESTORE_DOC.get().then(snap => {
+    if (syncBar) syncBar.style.display = 'none';
     if (!snap.exists) return;
     const data = snap.data();
     const localRaw = localStorage.getItem(STORAGE_KEY);
@@ -169,7 +176,10 @@ function bootApp() {
       render();
       _isLoadingFromFirestore = false;
     }
-  }).catch(e => console.warn('Initial Firestore load failed:', e));
+  }).catch(e => {
+    if (syncBar) syncBar.style.display = 'none';
+    console.warn('Initial Firestore load failed:', e);
+  });
 
   NOTES_DOC.get().then(snap => {
     if (!snap.exists) return;
