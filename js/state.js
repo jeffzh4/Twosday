@@ -136,8 +136,13 @@ function saveToFirestore() {
       allData: clone(allData),
       userTheme: clone(userTheme),
       savedAt: Date.now(),
-    }).catch(e => console.warn('Firestore save failed:', e));
-  } catch (e) {}
+    }).catch(e => {
+      console.warn('Firestore save failed:', e);
+      showToast("couldn't sync — check your connection");
+    });
+  } catch (e) {
+    showToast("couldn't sync — check your connection");
+  }
 }
 
 function applyParsedData(parsed, applyViewState) {

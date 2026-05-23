@@ -1379,4 +1379,110 @@ html, body {
   cursor: pointer;
   transition: all 0.15s;
 }
+
+/* ══════════════════════════════════════
+   TOAST NOTIFICATIONS
+══════════════════════════════════════ */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--surface);
+  color: var(--text);
+  border: 0.5px solid var(--border-hover);
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  font-size: 13px;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.25s ease, opacity 0.25s;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.toast-error  { border-color: rgba(248,113,113,0.5); color: #f87171; }
+.toast.toast-success{ border-color: rgba(52,211,153,0.4);  color: #6ee7b7; }
+.toast.toast-info   { border-color: var(--border-hover); }
+
+/* ══════════════════════════════════════
+   SYNC BAR (top loading indicator)
+══════════════════════════════════════ */
+.sync-bar {
+  position: fixed;
+  top: 0; left: 0;
+  width: 40%;
+  height: 2px;
+  background: var(--accent);
+  z-index: 9998;
+  animation: sync-slide 1.2s ease-in-out infinite alternate;
+  border-radius: 0 2px 2px 0;
+}
+@keyframes sync-slide {
+  0%   { left: 0;   width: 30%; opacity: 0.8; }
+  100% { left: 70%; width: 30%; opacity: 1;   }
+}
+
+/* ══════════════════════════════════════
+   MONTH EMPTY STATE
+══════════════════════════════════════ */
+.month-empty-state {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+  pointer-events: none;
+  width: 100%;
+}
+.month-empty-state span {
+  display: block;
+  font-size: 11px;
+  margin-top: 6px;
+  opacity: 0.6;
+}
+
+/* ══════════════════════════════════════
+   MOBILE RESPONSIVE  (≤ 640px)
+══════════════════════════════════════ */
+@media (max-width: 640px) {
+  .app { padding: 12px 10px 0; }
+
+  /* Header: wrap into two rows */
+  .header { flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .header-left { flex: 1; gap: 8px; min-width: 0; }
+  .header-right { width: 100%; gap: 4px; overflow-x: auto; padding-bottom: 2px; flex-wrap: nowrap; }
+
+  .title { font-size: 15px; }
+  .nav-label { min-width: 120px; font-size: 12px; }
+
+  /* Hide undo/redo on mobile — covered by the swipe-friendly tap flow */
+  #btn-undo, #btn-redo { display: none; }
+
+  /* Bigger tap targets for event action buttons; always visible (no hover on touch) */
+  .ev .ev-actions { opacity: 1; gap: 3px; }
+  .ev-act { padding: 3px 7px; font-size: 13px; }
+
+  /* Allow week grid to scroll horizontally so all 7 columns are reachable */
+  .grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .grid { min-width: 520px; }
+
+  /* Tighter month cells */
+  .month-row { min-height: 64px; }
+  .month-cell { padding: 3px; }
+  .month-ev-pill { font-size: 10px; padding: 1px 3px; }
+  .month-day-header { font-size: 10px; }
+
+  /* Modal: full-width */
+  .modal { width: calc(100vw - 24px); }
+
+  /* Notes panel: full width */
+  .notes-panel { width: 100%; right: -100%; }
+  .notes-panel.open { right: 0; }
+
+  /* Hide username in pill — just show logout button */
+  .user-pill-name { display: none; }
+}
 .user-pill-logout:hover { color: #f87171; background: rgba(248,113,113,0.1); }

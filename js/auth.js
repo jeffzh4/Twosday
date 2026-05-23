@@ -139,6 +139,12 @@ function setupAuthListeners() {
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
       setError('signup', 'username can only contain letters, numbers, _ and -'); return;
     }
+    if (!/^[a-zA-Z0-9]+$/.test(profile1) || !/^[a-zA-Z0-9]+$/.test(profile2)) {
+      setError('signup', 'profile names: letters and numbers only'); return;
+    }
+    if (profile1.length > 15 || profile2.length > 15) {
+      setError('signup', 'profile names must be 15 characters or less'); return;
+    }
 
     setError('signup', 'creating account…');
 

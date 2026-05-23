@@ -1,5 +1,18 @@
 let _idCounter = 0;
 function uid() { return 'ev_' + Date.now() + '_' + (++_idCounter); }
+
+// ── Toast notifications ───────────────────────────────────────────────────────
+function showToast(msg, type = 'error') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 4000);
+}
 function clone(v) { return JSON.parse(JSON.stringify(v)); }
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
