@@ -39,7 +39,7 @@ function startNotesListener() {
 
 function renderNotes() {
   const list = document.getElementById('notes-list');
-  const notes = userNotes[activeUser];
+  const notes = userNotes[activeUser] || [];
 
   if (!notes.length) {
     list.innerHTML = '<div class="notes-empty">no notes yet</div>';
