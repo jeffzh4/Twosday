@@ -292,7 +292,9 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
       if (checked.length) {
         const base = parseDateKey(dk);
         const weekDates = getWeekDates(base);
-        datesToCreate = checked.map(dayName => getDateKey(weekDates[DAYS.indexOf(dayName)]));
+        const extraDates = checked.map(dayName => getDateKey(weekDates[DAYS.indexOf(dayName)]));
+        // Always include the original date; deduplicate in case the user also checked it
+        datesToCreate = [...new Set([dk, ...extraDates])];
         recurrenceId = uid();
       }
     }
