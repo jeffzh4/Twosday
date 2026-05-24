@@ -267,8 +267,8 @@ function openSettingsModal() {
 
     if (!newUsername)                            { setMsg('s-username-msg', 'username required'); return; }
     if (!pwd)                                    { setMsg('s-username-msg', 'current password required'); return; }
-    if (pwd !== currentAccount.password)         { setMsg('s-username-msg', 'incorrect password'); return; }
     if (newUsername === currentAccount.username)  { setMsg('s-username-msg', 'same as current username'); return; }
+    if (!(await verifyPassword(pwd, currentAccount.password))) { setMsg('s-username-msg', 'incorrect password'); return; }
     if (!/^[a-zA-Z0-9_-]+$/.test(newUsername))  { setMsg('s-username-msg', 'letters, numbers, _ and - only'); return; }
     if (newUsername.length > 30)                 { setMsg('s-username-msg', 'max 30 characters'); return; }
 
@@ -318,16 +318,17 @@ function openSettingsModal() {
     const confirm = document.getElementById('s-confirm-pwd').value;
 
     if (!cur || !newPwd || !confirm) { setMsg('s-password-msg', 'all fields required'); return; }
-    if (cur !== currentAccount.password) { setMsg('s-password-msg', 'incorrect current password'); return; }
+    if (!(await verifyPassword(cur, currentAccount.password))) { setMsg('s-password-msg', 'incorrect current password'); return; }
     if (newPwd !== confirm)              { setMsg('s-password-msg', 'passwords do not match'); return; }
     if (newPwd.length < 4)              { setMsg('s-password-msg', 'min 4 characters'); return; }
 
     setMsg('s-password-msg', 'saving…', false);
 
+    const hashed   = await hashPassword(newPwd);
     const accounts = await refreshAccountsFromFirestore();
     const updatedAccounts = {
       ...accounts,
-      [currentAccount.username]: { ...accounts[currentAccount.username], password: newPwd },
+      [currentAccount.username]: { ...accounts[currentAccount.username], password: hashed },
     };
 
     try {
@@ -337,7 +338,7 @@ function openSettingsModal() {
     }
 
     localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
-    currentAccount = { ...currentAccount, password: newPwd };
+    currentAccount = { ...currentAccount, password: hashed };
 
     document.getElementById('s-cur-pwd').value     = '';
     document.getElementById('s-new-pwd').value     = '';
