@@ -1236,32 +1236,59 @@ html, body {
   inset: 0;
   background: var(--bg);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 32px;
   z-index: 1000;
-  padding: 24px;
+  padding: 32px 24px;
+  overflow-y: auto;
+}
+
+/* ── Landing hero ── */
+.auth-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  animation: auth-in 0.4s ease both;
+}
+
+.auth-wordmark {
+  font-size: 52px;
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 80px rgba(167,139,250,0.18);
+}
+
+.auth-tagline {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+@keyframes auth-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
 
 .auth-card {
   background: var(--surface);
   border: 0.5px solid var(--border-hover);
   border-radius: var(--radius);
-  padding: 32px 28px;
+  padding: 28px 28px;
   width: 100%;
   max-width: 360px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  animation: auth-in 0.4s ease 0.1s both;
 }
-
-.auth-title {
-  font-size: 22px;
-  font-weight: 500;
-  text-align: center;
-  letter-spacing: -0.02em;
-}
-.auth-title span { color: var(--text-dim); font-weight: 400; font-size: 16px; }
 
 .auth-tabs {
   display: flex;
@@ -1548,6 +1575,11 @@ html, body {
 
   /* Hide username in pill — just show logout button */
   .user-pill-name { display: none; }
+
+  /* Landing: tighter on small screens */
+  .auth-overlay { gap: 24px; padding: 24px 16px; }
+  .auth-wordmark { font-size: 40px; }
+  .auth-tagline  { font-size: 13px; }
 }
 .user-pill-logout:hover { color: #f87171; background: rgba(248,113,113,0.1); }
 
@@ -1638,24 +1670,68 @@ html, body {
   flex: 1;
 }
 
-.emoji-input {
-  width: 36px !important;
-  min-width: 36px;
-  height: 34px;
-  font-size: 18px;
-  text-align: center;
-  background: var(--surface2);
-  border: 0.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  padding: 0 2px;
-  outline: none;
-  cursor: pointer;
+.emoji-picker-wrap {
+  position: relative;
   flex-shrink: 0;
-  font-family: var(--font);
-  transition: border-color 0.15s;
 }
-.emoji-input:focus { border-color: var(--accent); }
+
+.emoji-picker-btn {
+  width: 36px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border);
+  background: var(--surface2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: border-color 0.15s, background 0.15s;
+  color: var(--text-muted);  /* for the '+' placeholder */
+}
+.emoji-picker-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+
+.emoji-picker-popover {
+  position: fixed;
+  background: var(--surface);
+  border: 0.5px solid var(--border-hover);
+  border-radius: var(--radius);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.emoji-picker-popover.open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.emoji-opt {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid transparent;
+  background: transparent;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.1s, border-color 0.1s;
+}
+.emoji-opt:hover  { background: var(--surface2); }
+.emoji-opt.active { border-color: var(--accent); background: var(--accent-dim); }
 
 .user-emoji {
   font-size: 14px;
