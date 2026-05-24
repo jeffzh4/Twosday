@@ -55,10 +55,12 @@ function renderUserSwitcher() {
   const c = document.getElementById('user-switcher');
   c.innerHTML = '';
   // Index-based class (user-0 / user-1) so styling works for any profile names.
+  const emojis = (currentAccount && currentAccount.profileEmojis) || [];
   USERS.forEach((u, idx) => {
     const b = document.createElement('button');
     b.className = 'user-tab user-' + idx + (u === activeUser ? ' active' : '');
-    b.innerHTML = `<span class="user-dot"></span>${escHtml(u)}`;
+    const emoji = emojis[idx] ? `<span class="user-emoji">${escHtml(emojis[idx])}</span>` : '';
+    b.innerHTML = `<span class="user-dot"></span>${emoji}${escHtml(u)}`;
     b.onclick = () => {
       activeUser = u;
       applyTheme();
@@ -128,6 +130,7 @@ function bootApp() {
     this.style.height = Math.min(this.scrollHeight, 80) + 'px';
   });
 
+  document.getElementById('btn-settings').onclick = () => openSettingsModal();
   document.getElementById('btn-logout').onclick = logout;
 
   document.addEventListener('mousemove', onDragMove);
