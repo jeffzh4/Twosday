@@ -1,5 +1,7 @@
 // ── Account settings modal ────────────────────────────────────────────────────
 
+const EMOJI_PRESETS = ['☕','🌙','🌸','😎','🏃','⭐','🎯','🦋','🌿','💫','🎵','🍀','🔥','✨','🌊'];
+
 // ── Compute stats across both profiles ───────────────────────────────────────
 function computeStats() {
   const now = new Date();
@@ -125,6 +127,9 @@ function openSettingsModal() {
 
   const stats  = computeStats();
   const emojis = currentAccount.profileEmojis || ['', ''];
+  const emojiOptsHTML = EMOJI_PRESETS
+    .map(e => `<button class="emoji-opt" type="button" data-emoji="${e}">${e}</button>`)
+    .join('');
 
   const extrasHTML = stats.total > 0 ? `
     <div class="stat-extras">
@@ -203,14 +208,18 @@ function openSettingsModal() {
       <div class="settings-section">
         <div class="settings-section-title">profile names</div>
         <div class="field profile-field">
-          <input class="emoji-input" id="s-emoji1" placeholder="😊"
-            value="${escHtml(emojis[0])}" title="Pick an emoji for this profile" />
+          <div class="emoji-picker-wrap">
+            <button class="emoji-picker-btn" id="s-emoji-btn1" type="button" title="pick an emoji">${escHtml(emojis[0]) || '+'}</button>
+            <div class="emoji-picker-popover" id="s-emoji-popover1">${emojiOptsHTML}</div>
+          </div>
           <label>profile 1</label>
           <input id="s-profile1" value="${escHtml(USERS[0])}" autocomplete="off" />
         </div>
         <div class="field profile-field">
-          <input class="emoji-input" id="s-emoji2" placeholder="😊"
-            value="${escHtml(emojis[1])}" title="Pick an emoji for this profile" />
+          <div class="emoji-picker-wrap">
+            <button class="emoji-picker-btn" id="s-emoji-btn2" type="button" title="pick an emoji">${escHtml(emojis[1]) || '+'}</button>
+            <div class="emoji-picker-popover" id="s-emoji-popover2">${emojiOptsHTML}</div>
+          </div>
           <label>profile 2</label>
           <input id="s-profile2" value="${escHtml(USERS[1])}" autocomplete="off" />
         </div>
@@ -248,10 +257,63 @@ function openSettingsModal() {
     </div>
   `;
 
-  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
-  document.body.appendChild(bg);
+  // Close popovers when clicking outside a picker wrap
+  function _closePopovers(e) {
+    if (e && e.target.closest && e.target.closest('.emoji-picker-wrap')) return;
+    bg.querySelectorAll('.emoji-picker-popover.open').forEach(p => p.classList.remove('open'));
+  }
+  function _closeModal() {
+    document.removeEventListener('click', _closePopovers);
+    bg.remove();
+  }
 
-  document.getElementById('s-close').onclick = () => bg.remove();
+  bg.addEventListener('click', e => { if (e.target === bg) _closeModal(); });
+  document.body.appendChild(bg);
+  document.addEventListener('click', _closePopovers);
+
+  document.getElementById('s-close').onclick = _closeModal;
+
+  // ── Emoji picker setup ────────────────────────────────────────────────────
+  function setupEmojiPicker(btnId, popoverId) {
+    const btn     = document.getElementById(btnId);
+    const popover = document.getElementById(popoverId);
+
+    // Highlight the already-selected emoji (if any)
+    const current = btn.textContent.trim();
+    popover.querySelectorAll('.emoji-opt').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.emoji === current);
+    });
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const isOpen = popover.classList.contains('open');
+      bg.querySelectorAll('.emoji-picker-popover.open').forEach(p => p.classList.remove('open'));
+      if (!isOpen) {
+        const r = btn.getBoundingClientRect();
+        popover.style.top  = (r.bottom + 6) + 'px';
+        popover.style.left = r.left + 'px';
+        popover.classList.add('open');
+      }
+    });
+
+    popover.querySelectorAll('.emoji-opt').forEach(opt => {
+      opt.addEventListener('click', e => {
+        e.stopPropagation();
+        btn.textContent = opt.dataset.emoji;
+        popover.querySelectorAll('.emoji-opt').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        popover.classList.remove('open');
+      });
+    });
+  }
+
+  // Close popovers if the modal is scrolled (picker would detach from button)
+  bg.querySelector('.settings-modal').addEventListener('scroll', () => {
+    bg.querySelectorAll('.emoji-picker-popover.open').forEach(p => p.classList.remove('open'));
+  });
+
+  setupEmojiPicker('s-emoji-btn1', 's-emoji-popover1');
+  setupEmojiPicker('s-emoji-btn2', 's-emoji-popover2');
 
   // ── Inline message helper ─────────────────────────────────────────────────
   function setMsg(id, text, isError = true) {
@@ -348,10 +410,12 @@ function openSettingsModal() {
 
   // ── Save profile names + emojis ───────────────────────────────────────────
   document.getElementById('s-save-profiles').onclick = async () => {
-    const p1 = document.getElementById('s-profile1').value.trim().toLowerCase();
-    const p2 = document.getElementById('s-profile2').value.trim().toLowerCase();
-    const e1 = document.getElementById('s-emoji1').value.trim();
-    const e2 = document.getElementById('s-emoji2').value.trim();
+    const p1    = document.getElementById('s-profile1').value.trim().toLowerCase();
+    const p2    = document.getElementById('s-profile2').value.trim().toLowerCase();
+    const e1raw = document.getElementById('s-emoji-btn1').textContent.trim();
+    const e2raw = document.getElementById('s-emoji-btn2').textContent.trim();
+    const e1    = e1raw === '+' ? '' : e1raw;
+    const e2    = e2raw === '+' ? '' : e2raw;
 
     if (!p1 || !p2)                                                             { setMsg('s-profiles-msg', 'both names required'); return; }
     if (p1 === p2)                                                              { setMsg('s-profiles-msg', 'names must differ'); return; }
