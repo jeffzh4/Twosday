@@ -106,11 +106,22 @@ function setupAuthListeners() {
 
     setError('login', 'checking…');
     const accounts = await refreshAccountsFromFirestore();
-    const account = accounts[username];
-    if (!account || account.password !== password) {
+    const account  = accounts[username];
+
+    if (!account || !(await verifyPassword(password, account.password))) {
       setError('login', 'invalid username or password');
       return;
     }
+
+    // Silently migrate legacy plaintext password to a hash on first successful login.
+    if (!isHashed(account.password)) {
+      const hashed = await hashPassword(password);
+      const migrated = { ...accounts, [username]: { ...account, password: hashed } };
+      ACCOUNTS_DOC().set({ accounts: migrated, savedAt: Date.now() }).catch(() => {});
+      localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(migrated));
+      account.password = hashed;
+    }
+
     activateAccount(username, account);
     saveSession(username);
     setError('login', '');
@@ -157,7 +168,7 @@ function setupAuthListeners() {
     }
 
     const newAccount = {
-      password,
+      password: await hashPassword(password),
       profiles: [profile1, profile2],
       firestoreDoc: username,
       notesDoc: username + '-notes',

@@ -1,6 +1,24 @@
 let _idCounter = 0;
 function uid() { return 'ev_' + Date.now() + '_' + (++_idCounter); }
 
+// ── Password hashing (Web Crypto API — SHA-256) ───────────────────────────────
+async function hashPassword(password) {
+  const data = new TextEncoder().encode(password);
+  const buf  = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Returns true if the string looks like a SHA-256 hex digest (64 hex chars).
+function isHashed(str) {
+  return typeof str === 'string' && /^[0-9a-f]{64}$/.test(str);
+}
+
+// Verify a plaintext input against either a stored hash or a legacy plaintext value.
+async function verifyPassword(input, stored) {
+  if (isHashed(stored)) return (await hashPassword(input)) === stored;
+  return input === stored; // legacy plaintext fallback
+}
+
 // ── Toast notifications ───────────────────────────────────────────────────────
 function showToast(msg, type = 'error') {
   const el = document.createElement('div');
