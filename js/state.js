@@ -12,6 +12,7 @@ const appHistory = { undo: [], redo: [] };
 
 // Set by drag logic
 let dragState = null;
+let createDrag = null;  // drag-to-create state (set by day-week.js)
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 function getEventsForDate(dateKey, user) {

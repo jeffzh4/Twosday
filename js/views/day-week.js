@@ -1,3 +1,40 @@
+// ── Column layout for overlapping events ──────────────────────────────────────
+// Returns a map of eventId → { col, total } so overlapping events are split
+// into side-by-side columns instead of stacking on top of each other.
+function computeLayout(events) {
+  if (!events.length) return {};
+
+  const sorted = [...events].sort((a, b) => a.start - b.start);
+  const layout = {};
+
+  // Build overlap clusters (transitive: A-B and B-C → one cluster even if A∩C=∅)
+  const clusters = [];
+  for (const ev of sorted) {
+    const idx = clusters.findIndex(c =>
+      c.some(other => overlaps(ev.start, ev.end, other.start, other.end))
+    );
+    if (idx >= 0) clusters[idx].push(ev);
+    else clusters.push([ev]);
+  }
+
+  // Assign columns greedily within each cluster
+  for (const cluster of clusters) {
+    const colEnds = [];   // end time of last event in each column
+    const cols    = {};   // eventId → column index
+    for (const ev of cluster) {
+      let placed = false;
+      for (let c = 0; c < colEnds.length; c++) {
+        if (ev.start >= colEnds[c]) { cols[ev.id] = c; colEnds[c] = ev.end; placed = true; break; }
+      }
+      if (!placed) { cols[ev.id] = colEnds.length; colEnds.push(ev.end); }
+    }
+    const total = colEnds.length;
+    cluster.forEach(ev => { layout[ev.id] = { col: cols[ev.id], total }; });
+  }
+
+  return layout;
+}
+
 // Renders the day or week time-grid into #main-content
 function renderGrid() {
   const content = document.getElementById('main-content');
@@ -110,6 +147,20 @@ function renderDayColumn(date) {
   nowLine.dataset.datekey = dateKey;
   body.appendChild(nowLine);
 
+  // Mousedown on empty space → drag-to-create
+  body.addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.target.closest('.ev') || e.target.closest('.resize-handle')) return;
+    e.preventDefault();
+    const y = e.clientY - body.getBoundingClientRect().top;
+    const startH = clampTime(Math.round((y / PX_PER_HOUR + START_H) / STEP_H) * STEP_H);
+    const ghost = document.createElement('div');
+    ghost.className = 'ev-create-ghost';
+    ghost.style.top    = ((startH - START_H) * PX_PER_HOUR) + 'px';
+    ghost.style.height = (STEP_H * PX_PER_HOUR) + 'px';
+    body.appendChild(ghost);
+    createDrag = { dateKey, startH, endH: startH + STEP_H, ghostEl: ghost, bodyEl: body };
+  });
+
   // Double-click to add event — snaps to STEP_H (15 min)
   body.addEventListener('dblclick', e => {
     if (e.target.closest('.ev')) return;
@@ -119,12 +170,13 @@ function renderDayColumn(date) {
   });
 
   const events = getEventsForDate(dateKey, activeUser);
+  const layout = computeLayout(events);
 
   if (!events.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
     if (viewMode === 'day') {
-      empty.innerHTML = 'no events yet<span>double-click to add, or use + button</span>';
+      empty.innerHTML = 'no events yet<span>click and drag to create, or use + button</span>';
     } else {
       empty.innerHTML = '<span>empty</span>';
     }
@@ -132,22 +184,29 @@ function renderDayColumn(date) {
   }
 
   events.forEach(ev => {
-    body.appendChild(buildEventEl(ev, dateKey));
+    body.appendChild(buildEventEl(ev, dateKey, layout[ev.id] || { col: 0, total: 1 }));
   });
 
   col.appendChild(body);
   return col;
 }
 
-function buildEventEl(ev, dateKey) {
+function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
   const top    = (ev.start - START_H) * PX_PER_HOUR;
   const height = Math.max((ev.end - ev.start) * PX_PER_HOUR, 24);
-  const p       = palette(ev);
+  const p      = palette(ev);
   const conflict = hasConflict(activeUser, dateKey, ev);
 
   const div = document.createElement('div');
   div.className = 'ev' + (ev.done ? ' done' : '') + (conflict ? ' conflict' : '');
-  div.style.cssText = `top:${top}px;height:${height}px;background:${p.bg};`;
+  div.title = `${fmtFull(ev.start)} – ${fmtFull(ev.end)} (${fmtDuration(ev.start, ev.end)})`;
+
+  let posStyle = `top:${top}px;height:${height}px;background:${p.bg};`;
+  if (layout.total > 1) {
+    const pct = 100 / layout.total;
+    posStyle += `left:calc(${layout.col * pct}% + 2px);width:calc(${pct}% - 4px);right:auto;`;
+  }
+  div.style.cssText = posStyle;
   div.dataset.id = ev.id;
 
   const badge = ev.shared ? `<span class="ev-shared">shared</span>` : '';
@@ -155,7 +214,11 @@ function buildEventEl(ev, dateKey) {
     '<div class="resize-handle top" data-r="top"></div>' +
     '<div class="resize-handle bottom" data-r="bottom"></div>' +
     `<div class="ev-title" style="color:${p.text}">${escHtml(ev.text)}${badge}</div>` +
-    (height >= 40 ? `<div class="ev-time" style="color:${p.text}">${fmtFull(ev.start)} – ${fmtFull(ev.end)}</div>` : '') +
+    (height >= 40
+      ? `<div class="ev-time" style="color:${p.text}">${fmtFull(ev.start)} – ${fmtFull(ev.end)} · ${fmtDuration(ev.start, ev.end)}</div>`
+      : height >= 28
+        ? `<div class="ev-time" style="color:${p.text}">${fmtDuration(ev.start, ev.end)}</div>`
+        : '') +
     `<div class="ev-actions">` +
       `<button class="ev-act" data-a="dup"  style="color:${p.text}" title="Repeat event…">&#10697;</button>` +
       `<button class="ev-act" data-a="edit" style="color:${p.text}" title="Edit">&#9998;</button>` +
