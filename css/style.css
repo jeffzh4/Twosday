@@ -16,6 +16,7 @@
   --ev-act-hover: rgba(0,0,0,0.5);
   --shared-badge-bg: rgba(255,255,255,0.08);
   --half-line: rgba(255,255,255,0.03);
+  --quarter-line: rgba(255,255,255,0.015);
   --month-cell-hover: rgba(255,255,255,0.03);
   --today-ring: rgba(167,139,250,0.5);
 }
@@ -38,6 +39,7 @@
   --ev-act-hover: rgba(255,255,255,0.8);
   --shared-badge-bg: rgba(0,0,0,0.06);
   --half-line: rgba(0,0,0,0.04);
+  --quarter-line: rgba(0,0,0,0.02);
   --month-cell-hover: rgba(0,0,0,0.02);
   --today-ring: rgba(124,58,237,0.4);
 }
@@ -311,6 +313,9 @@ html, body {
 }
 .hour-line.half {
   border-top: 0.5px dashed var(--half-line);
+}
+.hour-line.quarter {
+  border-top: 0.5px dashed var(--quarter-line);
 }
 
 /* ── events ── */
@@ -663,7 +668,10 @@ html, body {
   outline: none;
   transition: border-color 0.15s;
 }
-.field input[type="date"] { font-family: var(--mono); font-size: 13px; }
+.field input[type="date"],
+.field input[type="time"] { font-family: var(--mono); font-size: 13px; }
+.field input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.5; }
+.field input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 .field input:focus, .field select:focus { border-color: var(--accent); }
 .field select option { background: var(--surface2); color: var(--text); }
 

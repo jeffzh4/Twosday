@@ -23,7 +23,7 @@ let USERS               = []; // profile names for the logged-in account
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const START_H = 0;
 const END_H = 24;
-const STEP_H = 0.5;
+const STEP_H = 0.25;  // 15-minute snap
 const PX_PER_HOUR = 60;
 
 // First 7 are shown in the picker (ROYGBIV order). 'gray' is hidden — used
