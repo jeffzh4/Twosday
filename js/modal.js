@@ -1,4 +1,4 @@
-function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
+function openModal({ dateKey, editEvId = null, startH = 9, endH = null } = {}) {
   if (document.querySelector('.modal-bg')) return;
   if (!dateKey) dateKey = getDateKey(currentDate);
 
@@ -8,7 +8,7 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
   let selectedColor = isEdit ? (editEv.color || null) : null;
 
   const startVal = isEdit ? editEv.start : startH;
-  const endVal   = isEdit ? editEv.end   : Math.min(startH + 1, END_H);
+  const endVal   = isEdit ? editEv.end   : Math.min(endH !== null ? endH : startH + 1, END_H);
   const sharedVal = isEdit ? editEv.shared : false;
 
   const bg = document.createElement('div');

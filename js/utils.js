@@ -41,7 +41,8 @@ function getOtherUser(user) {
   const i = USERS.indexOf(user);
   return USERS[i === 0 ? 1 : 0];
 }
-function clampTime(h) { return Math.max(START_H, Math.min(END_H, Math.round(h * 2) / 2)); }
+// Clamps h to [START_H, END_H] with no rounding — drag callers snap independently.
+function clampTime(h) { return Math.max(START_H, Math.min(END_H, h)); }
 function overlaps(aS, aE, bS, bE) { return aS < bE && bS < aE; }
 
 function hexToRgba(hex, alpha) {
@@ -74,6 +75,14 @@ function palette(ev) {
   if (ev.color) return getColor(ev.color);          // explicit color always wins, even for shared events
   if (ev.shared) return getSharedColor();           // shared + no explicit color → shared indicator
   return getColor(categoryColors[categorize(ev.text)] || 'gray');
+}
+
+function fmtDuration(start, end) {
+  const mins = Math.round((end - start) * 60);
+  if (mins < 60) return mins + 'm';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? h + 'h' : h + 'h ' + m + 'm';
 }
 
 // ── Time input helpers (for <input type="time"> ↔ decimal hours) ──────────────
