@@ -76,6 +76,19 @@ function palette(ev) {
   return getColor(categoryColors[categorize(ev.text)] || 'gray');
 }
 
+// ── Time input helpers (for <input type="time"> ↔ decimal hours) ──────────────
+function decimalToTimeInput(h) {
+  const hh = Math.floor(h) % 24;
+  const mm = Math.round((h - Math.floor(h)) * 60);
+  return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+}
+
+function timeInputToDecimal(str) {
+  if (!str) return 0;
+  const [hh, mm] = str.split(':').map(Number);
+  return hh + mm / 60;
+}
+
 // Time formatting
 function fmt(h) {
   const hh = Math.floor(h) % 24;
