@@ -96,6 +96,18 @@ function startDrag(e, mode, dateKey, evId) {
 }
 
 function onDragMove(e) {
+  if (createDrag) {
+    const rect = createDrag.bodyEl.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const hAtMouse = clampTime(Math.round((y / PX_PER_HOUR + START_H) / STEP_H) * STEP_H);
+    const endH = Math.max(hAtMouse, createDrag.startH + STEP_H);
+    createDrag.endH = endH;
+    const topPx = (createDrag.startH - START_H) * PX_PER_HOUR;
+    createDrag.ghostEl.style.top    = topPx + 'px';
+    createDrag.ghostEl.style.height = Math.max((endH - createDrag.startH) * PX_PER_HOUR, 15) + 'px';
+    createDrag.ghostEl.textContent  = fmtFull(createDrag.startH) + ' – ' + fmtFull(endH);
+    return;
+  }
   if (!dragState) return;
   let { dateKey, evId } = dragState;
   let arr = getEventsForDate(dateKey, activeUser);
@@ -158,6 +170,13 @@ function onDragMove(e) {
 }
 
 function onDragEnd() {
+  if (createDrag) {
+    const { dateKey, startH, endH, ghostEl } = createDrag;
+    ghostEl.remove();
+    createDrag = null;
+    if (endH > startH) openModal({ dateKey, startH, endH });
+    return;
+  }
   if (!dragState) return;
   dragState = null;
   render();

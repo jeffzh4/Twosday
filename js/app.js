@@ -150,6 +150,7 @@ function bootApp() {
       if (e.key === 'm') { viewMode = 'month'; render(); }
       if (e.key === 'y') { viewMode = 'year';  render(); }
       if (e.key === '/') { e.preventDefault(); toggleSearch(); }
+      if (e.key === 'n') { e.preventDefault(); openModal({ dateKey: getDateKey(currentDate) }); }
     }
   });
 

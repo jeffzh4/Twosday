@@ -1,5 +1,17 @@
 # Twosday — Shared Two-Person Calendar
 
+## Development Guidelines
+
+**Think before coding.** State assumptions explicitly. If multiple interpretations exist, present them — don't pick silently. Push back when a simpler approach exists. Ask only when a wrong guess is expensive or hard to reverse (data loss, public API changes, large rewrites); otherwise state the assumption and proceed.
+
+**Simplicity first.** Minimum code that solves the problem — nothing speculative. No features beyond what was asked, no abstractions for single-use code, no error handling for impossible scenarios. Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+**Surgical changes.** Touch only what you must. Don't improve adjacent code, don't refactor things that aren't broken, match existing style. Remove imports/variables/functions that *your* changes made unused — don't remove pre-existing dead code unless asked. Every changed line should trace directly to the request.
+
+**Don't invent.** Verify functions, methods, and APIs exist before using them. Don't silently swallow errors. Update or remove comments your changes made stale.
+
+**Goal-driven execution.** Define success criteria before starting. For multi-step tasks, state a brief plan with a verifiable check at each step. If no test harness exists, define success as a concrete observable check — a command to run, output to inspect, or state to confirm.
+
 ## What This Is
 A multi-file HTML/JS/CSS web app for two people to manage a shared calendar. No build step; open `index.html` directly in a browser or deploy as a static site (currently on Vercel).
 
