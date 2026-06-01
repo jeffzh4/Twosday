@@ -81,17 +81,27 @@ function renderDayColumn(date) {
   body.dataset.datekey = dateKey;
   body.style.height = ((END_H - START_H) * PX_PER_HOUR) + 'px';
 
-  // Hour & half-hour grid lines
+  // Hour, half-hour, and quarter-hour grid lines
   for (let h = START_H; h < END_H; h++) {
     const line = document.createElement('div');
     line.className = 'hour-line';
     line.style.top = ((h - START_H) * PX_PER_HOUR) + 'px';
     body.appendChild(line);
 
+    const q1 = document.createElement('div');
+    q1.className = 'hour-line quarter';
+    q1.style.top = ((h - START_H + 0.25) * PX_PER_HOUR) + 'px';
+    body.appendChild(q1);
+
     const half = document.createElement('div');
     half.className = 'hour-line half';
     half.style.top = ((h - START_H + 0.5) * PX_PER_HOUR) + 'px';
     body.appendChild(half);
+
+    const q3 = document.createElement('div');
+    q3.className = 'hour-line quarter';
+    q3.style.top = ((h - START_H + 0.75) * PX_PER_HOUR) + 'px';
+    body.appendChild(q3);
   }
 
   // Now line
@@ -100,11 +110,11 @@ function renderDayColumn(date) {
   nowLine.dataset.datekey = dateKey;
   body.appendChild(nowLine);
 
-  // Double-click to add event
+  // Double-click to add event — snaps to STEP_H (15 min)
   body.addEventListener('dblclick', e => {
     if (e.target.closest('.ev')) return;
     const y = e.clientY - body.getBoundingClientRect().top;
-    const startAt = clampTime(Math.round((y / PX_PER_HOUR + START_H) * 2) / 2);
+    const startAt = clampTime(Math.round((y / PX_PER_HOUR + START_H) / STEP_H) * STEP_H);
     openModal({ dateKey, startH: startAt });
   });
 

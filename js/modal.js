@@ -21,8 +21,8 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
         <input id="m-name" value="${isEdit ? escHtml(editEv.text) : ''}" placeholder="e.g. chem lab" autofocus />
       </div>
       <div class="field-row">
-        <div class="field"><label>start</label><select id="m-start">${timeOpts(startVal)}</select></div>
-        <div class="field"><label>end</label><select id="m-end">${timeOpts(endVal)}</select></div>
+        <div class="field"><label>start</label><input type="time" id="m-start" value="${decimalToTimeInput(startVal)}" /></div>
+        <div class="field"><label>end</label><input type="time" id="m-end" value="${decimalToTimeInput(endVal)}" /></div>
       </div>
       <div class="field">
         <label>date</label>
@@ -170,8 +170,8 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
   const conflictNode = document.getElementById('m-conflict');
   function updateConflict() {
     const dk = document.getElementById('m-date').value;
-    const s = parseFloat(document.getElementById('m-start').value);
-    const enRaw = parseFloat(document.getElementById('m-end').value);
+    const s = timeInputToDecimal(document.getElementById('m-start').value);
+    const enRaw = timeInputToDecimal(document.getElementById('m-end').value);
     const en = enRaw > s ? enRaw : s + STEP_H;
     const shared = document.getElementById('m-shared').checked;
     const res = detectConflicts({
@@ -204,8 +204,8 @@ function openModal({ dateKey, editEvId = null, startH = 9 } = {}) {
     const name = document.getElementById('m-name').value.trim();
     if (!name) return;
 
-    const s = parseFloat(document.getElementById('m-start').value);
-    const enRaw = parseFloat(document.getElementById('m-end').value);
+    const s = timeInputToDecimal(document.getElementById('m-start').value);
+    const enRaw = timeInputToDecimal(document.getElementById('m-end').value);
     const endTime = enRaw > s ? enRaw : s + STEP_H;
     const dk = document.getElementById('m-date').value;
     const isShared = document.getElementById('m-shared').checked;
