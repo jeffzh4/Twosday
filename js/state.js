@@ -114,6 +114,11 @@ function applyTheme() {
 let _saveDebounce = null;
 let _isLoadingFromFirestore = false;
 
+// Unique ID for this browser session — written into every Firestore save so the
+// listener can tell "is this my own echo?" and skip it, while still applying
+// saves that came from the other user's session.
+const CLIENT_ID = uid();
+
 function saveToLocalStorage() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -137,6 +142,7 @@ function saveToFirestore() {
       allData: clone(allData),
       userTheme: clone(userTheme),
       savedAt: Date.now(),
+      clientId: CLIENT_ID,
     }).catch(e => {
       console.warn('Firestore save failed:', e);
       showToast("couldn't sync — check your connection");
@@ -228,7 +234,7 @@ function startFirestoreListener() {
   FIRESTORE_DOC.onSnapshot(snap => {
     if (!snap.exists) return;
     const data = snap.data();
-    if (data.savedAt && Math.abs(Date.now() - data.savedAt) < 1500) return;
+    if (data.clientId && data.clientId === CLIENT_ID) return; // own echo — skip
     _isLoadingFromFirestore = true;
     applyParsedData(data, false);
     applyTheme();
