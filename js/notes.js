@@ -8,6 +8,7 @@ function saveNotes() {
     NOTES_DOC.set({
       notes: JSON.parse(JSON.stringify(userNotes)),
       savedAt: Date.now(),
+      clientId: CLIENT_ID,
     }).catch(() => showToast("couldn't sync notes — check your connection"));
   } catch (e) {}
 }
@@ -27,7 +28,7 @@ function startNotesListener() {
   NOTES_DOC.onSnapshot(snap => {
     if (!snap.exists) return;
     const data = snap.data();
-    if (data.savedAt && Math.abs(Date.now() - data.savedAt) < 1500) return;
+    if (data.clientId && data.clientId === CLIENT_ID) return; // own echo — skip
     if (data.notes) {
       USERS.forEach(u => {
         if (Array.isArray(data.notes[u])) userNotes[u] = data.notes[u];
