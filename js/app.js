@@ -108,6 +108,7 @@ function bootApp() {
   document.getElementById('btn-redo').onclick = redoAction;
 
   document.getElementById('btn-add').onclick = () => openModal({ dateKey: getDateKey(currentDate) });
+  document.getElementById('btn-find-time').onclick = () => openFindTimeModal();
 
   document.getElementById('btn-search').onclick   = () => toggleSearch();
   document.getElementById('search-close').onclick  = () => toggleSearch(false);

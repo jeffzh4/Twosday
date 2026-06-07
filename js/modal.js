@@ -1,4 +1,4 @@
-function openModal({ dateKey, editEvId = null, startH = 9, endH = null } = {}) {
+function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDefault = false } = {}) {
   if (document.querySelector('.modal-bg')) return;
   if (!dateKey) dateKey = getDateKey(currentDate);
 
@@ -9,7 +9,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null } = {}) {
 
   const startVal = isEdit ? editEv.start : startH;
   const endVal   = isEdit ? editEv.end   : Math.min(endH !== null ? endH : startH + 1, END_H);
-  const sharedVal = isEdit ? editEv.shared : false;
+  const sharedVal = isEdit ? editEv.shared : sharedDefault;
 
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
