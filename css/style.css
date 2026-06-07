@@ -172,7 +172,7 @@ html, body {
 }
 
 /* ── buttons ── */
-.btn-add, .btn-icon, .notes-toggle {
+.btn-add, .btn-find, .btn-icon, .notes-toggle {
   font-family: var(--font);
   font-size: 13px;
   padding: 6px 14px;
@@ -183,7 +183,7 @@ html, body {
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-add:hover, .btn-icon:hover, .notes-toggle:hover { background: rgba(167,139,250,0.2); }
+.btn-add:hover, .btn-find:hover, .btn-icon:hover, .notes-toggle:hover { background: rgba(167,139,250,0.2); }
 
 .btn-icon {
   padding: 6px 9px;
@@ -897,6 +897,111 @@ html, body {
 [data-theme="dark"] .mbtn-save { color: #0e0e10; }
 .mbtn-save:hover { filter: brightness(1.1); }
 
+/* ── Find time modal ── */
+.find-time-modal {
+  width: 520px;
+  max-height: calc(100vh - 48px);
+}
+
+.find-time-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.find-time-close {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.find-time-close:hover { background: var(--surface2); color: var(--text); }
+
+.find-time-copy {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: -6px;
+}
+
+.find-time-summary {
+  font-size: 12px;
+  color: var(--accent);
+  min-height: 18px;
+}
+
+.find-time-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.find-time-result {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.find-time-result:hover { border-color: var(--border-hover); }
+
+.find-time-date,
+.find-time-slot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.find-time-date strong,
+.find-time-slot strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-time-date span,
+.find-time-slot span {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-time-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.find-time-actions .mbtn {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.find-time-empty {
+  padding: 16px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  border: 0.5px dashed var(--border-hover);
+  border-radius: var(--radius-sm);
+}
+
 /* ══════════════════════════════════════
    NOTES PANEL
 ══════════════════════════════════════ */
@@ -1591,6 +1696,12 @@ html, body {
 
   /* Modal: full-width */
   .modal { width: calc(100vw - 24px); }
+  .find-time-result {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .find-time-actions { justify-content: flex-end; }
 
   /* Notes panel: full width */
   .notes-panel { width: 100%; right: -100%; }
