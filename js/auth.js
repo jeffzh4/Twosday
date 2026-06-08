@@ -40,9 +40,11 @@ function activateAccount(username, account) {
   USERS               = account.profiles.slice();
   STORAGE_KEY         = `twosday_v2_${username}`;
   NOTES_KEY           = `twosday_notes_v2_${username}`;
+  PRESENCE_KEY        = `twosday_presence_v1_${username}`;
   CUSTOM_COLORS_KEY   = `twosday_colors_v1_${username}`;
   FIRESTORE_DOC       = db.collection('schedules').doc(account.firestoreDoc);
   NOTES_DOC           = db.collection('schedules').doc(account.notesDoc);
+  PRESENCE_DOC        = db.collection('schedules').doc(account.firestoreDoc + '-presence');
 
   activeUser = USERS[0];
   userTheme = {};

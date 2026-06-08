@@ -42,7 +42,39 @@ function normalizeEvent(raw) {
     sharedId: raw.sharedId || null,
     color: raw.color || null,
     recurrenceId: raw.recurrenceId || null,
+    updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : null,
+    updatedBy: typeof raw.updatedBy === 'string' ? raw.updatedBy : null,
   };
+}
+
+function markEventUpdated(ev, user = activeUser, ts = Date.now()) {
+  if (!ev) return ev;
+  ev.updatedAt = ts;
+  ev.updatedBy = user;
+  return ev;
+}
+
+function getLatestEventUpdate() {
+  let latest = null;
+  const seenShared = new Set();
+
+  Object.keys(allData).forEach(dateKey => {
+    USERS.forEach(user => {
+      getEventsForDate(dateKey, user).forEach(ev => {
+        if (!ev.updatedAt) return;
+        if (ev.sharedId) {
+          const key = ev.sharedId + ':' + ev.updatedAt;
+          if (seenShared.has(key)) return;
+          seenShared.add(key);
+        }
+        if (!latest || ev.updatedAt > latest.updatedAt) {
+          latest = { dateKey, user, event: ev, updatedAt: ev.updatedAt, updatedBy: ev.updatedBy || user };
+        }
+      });
+    });
+  });
+
+  return latest;
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
