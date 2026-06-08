@@ -352,16 +352,19 @@ function openSettingsModal() {
     }
 
     // Migrate localStorage keys
-    const oldSK = STORAGE_KEY, oldNK = NOTES_KEY, oldCK = CUSTOM_COLORS_KEY;
+    const oldSK = STORAGE_KEY, oldNK = NOTES_KEY, oldPK = PRESENCE_KEY, oldCK = CUSTOM_COLORS_KEY;
     STORAGE_KEY       = `twosday_v2_${newUsername}`;
     NOTES_KEY         = `twosday_notes_v2_${newUsername}`;
+    PRESENCE_KEY      = `twosday_presence_v1_${newUsername}`;
     CUSTOM_COLORS_KEY = `twosday_colors_v1_${newUsername}`;
 
     const ev = localStorage.getItem(oldSK);
     const nt = localStorage.getItem(oldNK);
+    const pr = localStorage.getItem(oldPK);
     const cl = localStorage.getItem(oldCK);
     if (ev) { localStorage.setItem(STORAGE_KEY, ev);       localStorage.removeItem(oldSK); }
     if (nt) { localStorage.setItem(NOTES_KEY, nt);         localStorage.removeItem(oldNK); }
+    if (pr) { localStorage.setItem(PRESENCE_KEY, pr);      localStorage.removeItem(oldPK); }
     if (cl) { localStorage.setItem(CUSTOM_COLORS_KEY, cl); localStorage.removeItem(oldCK); }
 
     localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
@@ -492,9 +495,10 @@ function openSettingsModal() {
     // Best-effort deletion of event + notes documents
     try { await FIRESTORE_DOC.delete(); } catch (e) {}
     try { await NOTES_DOC.delete();     } catch (e) {}
+    try { await PRESENCE_DOC.delete();  } catch (e) {}
 
     // Clear all account-scoped localStorage
-    [STORAGE_KEY, NOTES_KEY, CUSTOM_COLORS_KEY].forEach(k => { if (k) localStorage.removeItem(k); });
+    [STORAGE_KEY, NOTES_KEY, PRESENCE_KEY, CUSTOM_COLORS_KEY].forEach(k => { if (k) localStorage.removeItem(k); });
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(ACCOUNTS_CACHE_KEY);
 

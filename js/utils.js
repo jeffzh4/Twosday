@@ -85,6 +85,21 @@ function fmtDuration(start, end) {
   return m === 0 ? h + 'h' : h + 'h ' + m + 'm';
 }
 
+function fmtRelativeTime(ts) {
+  if (!ts) return 'never';
+  const diff = Math.max(0, Date.now() - ts);
+  const sec = Math.floor(diff / 1000);
+  if (sec < 10) return 'just now';
+  if (sec < 60) return sec + 's ago';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return min + 'm ago';
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + 'd ago';
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toLowerCase();
+}
+
 // ── Time input helpers (for <input type="time"> ↔ decimal hours) ──────────────
 function decimalToTimeInput(h) {
   const hh = Math.floor(h) % 24;

@@ -14,7 +14,12 @@ function toggleDone(dateKey, user, evId) {
   const ev = arr.find(e => e.id === evId);
   if (!ev) return;
   ev.done = !ev.done;
-  if (ev.shared) syncSharedEvent(user, ev.sharedId, dateKey, 'toggle-done', { done: ev.done });
+  markEventUpdated(ev, user);
+  if (ev.shared) {
+    syncSharedEvent(user, ev.sharedId, dateKey, 'toggle-done', {
+      done: ev.done, updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
+    });
+  }
 }
 
 function duplicateEvent(srcDateKey, ev) {
@@ -26,6 +31,7 @@ function duplicateEvent(srcDateKey, ev) {
 
   ensureDateUser(nextKey, activeUser);
   const copy = { ...clone(ev), id: uid(), done: false };
+  markEventUpdated(copy, activeUser);
   if (copy.shared) copy.sharedId = uid();
   allData[nextKey][activeUser].push(copy);
   sortDateUser(nextKey, activeUser);
@@ -53,6 +59,8 @@ function syncSharedEvent(user, sharedId, dateKey, action, updates) {
     arr.splice(idx, 1);
   } else if (action === 'toggle-done' && idx !== -1) {
     arr[idx].done = updates.done;
+    arr[idx].updatedAt = updates.updatedAt || Date.now();
+    arr[idx].updatedBy = updates.updatedBy || user;
   } else if (action === 'edit' && idx !== -1) {
     Object.assign(arr[idx], updates);
     sortDateUser(dateKey, other);
@@ -158,11 +166,13 @@ function onDragMove(e) {
     ev.end = Math.max(ev.start + STEP_H, clampTime(dragState.origin.end + deltaH));
   }
 
+  markEventUpdated(ev, activeUser);
   sortDateUser(dragState.dateKey, activeUser);
 
   if (ev.shared) {
     syncSharedEvent(activeUser, ev.sharedId, dragState.dateKey, 'edit', {
       start: ev.start, end: ev.end, text: ev.text, color: ev.color,
+      updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
     });
   }
 
