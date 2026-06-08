@@ -14,8 +14,10 @@ const db = firebase.firestore();
 // (not `const`) so they can be reassigned per-account.
 let FIRESTORE_DOC       = null;
 let NOTES_DOC           = null;
+let PRESENCE_DOC        = null;
 let STORAGE_KEY         = null;
 let NOTES_KEY           = null;
+let PRESENCE_KEY        = null;
 let CUSTOM_COLORS_KEY   = null;  // localStorage key for saved custom palette colors
 let USERS               = []; // profile names for the logged-in account
 

@@ -10,6 +10,9 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   const startVal = isEdit ? editEv.start : startH;
   const endVal   = isEdit ? editEv.end   : Math.min(endH !== null ? endH : startH + 1, END_H);
   const sharedVal = isEdit ? editEv.shared : sharedDefault;
+  const metaHTML = isEdit && editEv.updatedAt
+    ? `<div class="event-meta">last updated ${fmtRelativeTime(editEv.updatedAt)} by ${escHtml(editEv.updatedBy || activeUser)}</div>`
+    : '';
 
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
@@ -53,6 +56,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         <label for="m-shared" style="cursor:pointer">shared with ${getOtherUser(activeUser)}</label>
       </div>
       <div class="conflict-warning" id="m-conflict"></div>
+      ${metaHTML}
       <div class="modal-btns">
         <button class="mbtn mbtn-cancel" id="m-cancel">cancel</button>
         <button class="mbtn mbtn-save" id="m-save">${isEdit ? 'save changes' : 'add event'}</button>
@@ -228,6 +232,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
       editEv.start = s;
       editEv.end = endTime;
       editEv.color = selectedColor;
+      markEventUpdated(editEv, activeUser);
 
       if (wasShared && !isShared) {
         syncSharedEvent(activeUser, oldSharedId, oldDk, 'delete');
@@ -242,7 +247,10 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
           syncSharedEvent(activeUser, oldSharedId, oldDk, 'delete');
           syncSharedEvent(activeUser, oldSharedId, dk, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: oldSharedId });
         } else {
-          syncSharedEvent(activeUser, oldSharedId, dk, 'edit', { text: name, start: s, end: endTime, color: selectedColor });
+          syncSharedEvent(activeUser, oldSharedId, dk, 'edit', {
+            text: name, start: s, end: endTime, color: selectedColor,
+            updatedAt: editEv.updatedAt, updatedBy: editEv.updatedBy,
+          });
         }
       }
       editEv.shared = isShared;
@@ -265,6 +273,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
               done: false, shared: isShared, sharedId,
               color: editEv.color, recurrenceId: editEv.recurrenceId || null,
             });
+            markEventUpdated(copy, activeUser);
             ensureDateUser(copyDk, activeUser);
             allData[copyDk][activeUser].push(copy);
             sortDateUser(copyDk, activeUser);
@@ -306,6 +315,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         done: false, shared: isShared, sharedId,
         color: selectedColor, recurrenceId,
       });
+      markEventUpdated(newEv, activeUser);
       ensureDateUser(dKey, activeUser);
       allData[dKey][activeUser].push(newEv);
       sortDateUser(dKey, activeUser);

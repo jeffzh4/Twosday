@@ -200,6 +200,7 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
   const div = document.createElement('div');
   div.className = 'ev' + (ev.done ? ' done' : '') + (conflict ? ' conflict' : '');
   div.title = `${fmtFull(ev.start)} – ${fmtFull(ev.end)} (${fmtDuration(ev.start, ev.end)})`;
+  if (ev.updatedAt) div.title += `\nupdated ${fmtRelativeTime(ev.updatedAt)} by ${ev.updatedBy || activeUser}`;
 
   let posStyle = `top:${top}px;height:${height}px;background:${p.bg};`;
   if (layout.total > 1) {
@@ -219,6 +220,9 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
       : height >= 28
         ? `<div class="ev-time" style="color:${p.text}">${fmtDuration(ev.start, ev.end)}</div>`
         : '') +
+    (height >= 58 && ev.updatedAt
+      ? `<div class="ev-meta" style="color:${p.text}">updated ${escHtml(fmtRelativeTime(ev.updatedAt))}</div>`
+      : '') +
     `<div class="ev-actions">` +
       `<button class="ev-act" data-a="dup"  style="color:${p.text}" title="Repeat event…">&#10697;</button>` +
       `<button class="ev-act" data-a="edit" style="color:${p.text}" title="Edit">&#9998;</button>` +

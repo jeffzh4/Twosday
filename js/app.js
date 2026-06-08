@@ -56,11 +56,13 @@ function renderUserSwitcher() {
   c.innerHTML = '';
   // Index-based class (user-0 / user-1) so styling works for any profile names.
   const emojis = (currentAccount && currentAccount.profileEmojis) || [];
+  const viewingProfiles = typeof getActivePresenceProfiles === 'function' ? getActivePresenceProfiles() : new Set();
   USERS.forEach((u, idx) => {
     const b = document.createElement('button');
-    b.className = 'user-tab user-' + idx + (u === activeUser ? ' active' : '');
+    b.className = 'user-tab user-' + idx + (u === activeUser ? ' active' : '') + (viewingProfiles.has(u) ? ' viewing' : '');
     const emoji = emojis[idx] ? `<span class="user-emoji">${escHtml(emojis[idx])}</span>` : '';
-    b.innerHTML = `<span class="user-dot"></span>${emoji}${escHtml(u)}`;
+    const presence = viewingProfiles.has(u) ? '<span class="user-presence-dot" title="viewing now"></span>' : '';
+    b.innerHTML = `<span class="user-dot"></span>${emoji}${escHtml(u)}${presence}`;
     b.onclick = () => {
       activeUser = u;
       applyTheme();
@@ -86,6 +88,8 @@ function render() {
   else if (viewMode === 'month') renderMonthView();
   else if (viewMode === 'year')  renderYearView();
 
+  if (typeof renderPresence === 'function') renderPresence();
+  if (typeof queuePresenceUpdate === 'function') queuePresenceUpdate();
   saveToLocalStorage();
 }
 
@@ -201,7 +205,9 @@ function bootApp() {
 
   startFirestoreListener();
   startNotesListener();
+  if (typeof startPresence === 'function') startPresence();
 
   setInterval(positionNowLine, 30000);
+  setInterval(() => { if (typeof renderPresence === 'function') renderPresence(); }, 30000);
   window.addEventListener('beforeunload', saveToLocalStorage);
 }
