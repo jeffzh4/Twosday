@@ -4,6 +4,8 @@ A real-time shared calendar built for two people. Each account has two named pro
 
 **Live:** [twosday-five.vercel.app](https://twosday-five.vercel.app) &nbsp;·&nbsp; try it with `testing` / `testing`
 
+The demo account is preloaded with a full-year sample calendar so the collaboration, search, free-window finder, and insights dashboard all have realistic data to explore.
+
 ---
 
 ## Features
@@ -25,6 +27,7 @@ Switch with the header buttons or keyboard shortcuts `d / w / m / y`.
 - **Shared events** — toggle "shared" to mirror an event to both profiles and keep edits in sync automatically
 - **Live presence** — see when the other profile is actively viewing the calendar, including their current view and date range
 - **Update metadata** — event edits record who last updated them and when, visible in event details and hover context
+- **Insights dashboard** — analyze scheduled hours, completion rate, shared time, category mix, weekly load, daypart rhythm, and profile balance
 - **Repeat** — copy an event hourly, daily, weekly, or monthly with a live preview and checkbox selection before confirming
 - **Conflict detection** — overlapping events on the same profile show a red inset shadow
 - **Undo / Redo** — full history stack up to 80 snapshots (`Cmd+Z` / `Cmd+Y`)
