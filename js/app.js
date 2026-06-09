@@ -113,6 +113,7 @@ function bootApp() {
 
   document.getElementById('btn-add').onclick = () => openModal({ dateKey: getDateKey(currentDate) });
   document.getElementById('btn-find-time').onclick = () => openFindTimeModal();
+  document.getElementById('btn-insights').onclick = () => openAnalyticsModal();
 
   document.getElementById('btn-search').onclick   = () => toggleSearch();
   document.getElementById('search-close').onclick  = () => toggleSearch(false);
@@ -162,6 +163,7 @@ function bootApp() {
   // ── Init ────────────────────────────────────────────────────────────────────
   loadFromLocalStorage();
   loadNotes();
+  if (typeof applyTestingDemoSeed === 'function') applyTestingDemoSeed();
 
   // Mobile: default to day view (week view is too cramped on small screens)
   if (window.innerWidth <= 640 && viewMode === 'week') viewMode = 'day';
@@ -182,8 +184,12 @@ function bootApp() {
       _isLoadingFromFirestore = true;
       applyParsedData(data, false);
       applyTheme();
-      render();
       _isLoadingFromFirestore = false;
+      if (typeof applyTestingDemoSeed === 'function') applyTestingDemoSeed();
+      render();
+    }
+    if (!(data.savedAt && data.savedAt > localSaved) && typeof applyTestingDemoSeed === 'function' && applyTestingDemoSeed()) {
+      render();
     }
   }).catch(e => {
     if (syncBar) syncBar.style.display = 'none';
