@@ -30,6 +30,7 @@ Switch with the header buttons or keyboard shortcuts `d / w / m / y`.
 - **Insights dashboard** — analyze scheduled hours, completion rate, shared time, category mix, weekly load, daypart rhythm, and profile balance
 - **Repeat** — copy an event hourly, daily, weekly, or monthly with a live preview and checkbox selection before confirming
 - **Conflict detection** — overlapping events on the same profile show a red inset shadow
+- **Conflict center** — review all upcoming overlaps, jump to the day, edit the event, or open the free-window finder
 - **Undo / Redo** — full history stack up to 80 snapshots (`Cmd+Z` / `Cmd+Y`)
 
 ### Two-profile system
@@ -53,6 +54,7 @@ Accessible via the ⚙ gear icon in the top-right user pill:
 - **Password** — change with current + new + confirm fields
 - **Profile names & emojis** — rename either profile and pick an emoji from a 15-option picker
 - **Export** — download either profile's events as `.ics` (Google / Apple Calendar) or `.csv` (spreadsheet)
+- **Import** — upload an `.ics` calendar file, preview parsed events, choose a profile, and import as private or shared events
 - **Delete account** — permanently removes all Firestore data and clears local storage (type username to confirm)
 
 ### Real-time sync
@@ -81,6 +83,10 @@ Twosday/
 ├── favicon.svg
 ├── css/
 │   └── style.css           # All styles: themes, grid, modals, mobile
+├── tests/
+│   └── core-tests.js       # Node-based regression tests for core logic
+├── ARCHITECTURE.md         # Data model, sync, and workflow notes
+├── package.json            # Test script
 └── js/
     ├── config.js           # Firebase init, shared constants
     ├── auth.js             # Login, signup, session management
@@ -89,6 +95,8 @@ Twosday/
     ├── events.js           # Create, edit, delete, drag-and-drop, conflict detection
     ├── modal.js            # Add/edit event modal (color picker, shared toggle)
     ├── repeat-modal.js     # Event repeat/duplication modal
+    ├── import.js           # ICS parsing + import preview
+    ├── conflicts.js        # Conflict center and overlap workflows
     ├── search.js           # Cross-date event search
     ├── notes.js            # Notes panel (per-profile, Firestore-synced)
     ├── settings.js         # Account settings modal (stats, export, emoji picker, delete)
@@ -112,6 +120,14 @@ open index.html
 ```
 
 The app connects to Firebase on load. An internet connection is required to log in and sync; cached data is available offline after first load.
+
+## Testing
+
+```bash
+npm test
+```
+
+The core test suite covers date helpers, free-window detection, analytics aggregation, ICS parsing, and conflict collection.
 
 ---
 
