@@ -114,6 +114,7 @@ function bootApp() {
   document.getElementById('btn-add').onclick = () => openModal({ dateKey: getDateKey(currentDate) });
   document.getElementById('btn-find-time').onclick = () => openFindTimeModal();
   document.getElementById('btn-insights').onclick = () => openAnalyticsModal();
+  document.getElementById('btn-conflicts').onclick = () => openConflictsModal();
 
   document.getElementById('btn-search').onclick   = () => toggleSearch();
   document.getElementById('search-close').onclick  = () => toggleSearch(false);
