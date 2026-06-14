@@ -243,6 +243,20 @@ function openSettingsModal() {
         <div class="settings-msg" id="s-export-msg"></div>
       </div>
 
+      <!-- ── Import ── -->
+      <div class="settings-section">
+        <div class="settings-section-title">import events</div>
+        <div class="export-row">
+          <label class="export-label">profile</label>
+          <select class="export-select" id="s-import-user">
+            ${USERS.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('')}
+          </select>
+        </div>
+        <input type="file" id="s-import-file" accept=".ics,text/calendar" style="display:none" />
+        <button class="mbtn export-btn" id="s-import-ics">choose .ics file</button>
+        <div class="settings-msg" id="s-import-msg"></div>
+      </div>
+
       <!-- ── Danger zone ── -->
       <div class="settings-section settings-danger-zone">
         <div class="settings-section-title danger-title">danger zone</div>
@@ -473,6 +487,16 @@ function openSettingsModal() {
     const user = document.getElementById('s-export-user').value;
     exportCSV(user);
     setMsg('s-export-msg', `downloaded ${user}'s events as .csv`, false);
+  };
+
+  // ── Import ────────────────────────────────────────────────────────────────
+  document.getElementById('s-import-ics').onclick = () => {
+    document.getElementById('s-import-file').click();
+  };
+  document.getElementById('s-import-file').onchange = e => {
+    const user = document.getElementById('s-import-user').value;
+    handleICSFileInput(e.target.files[0], user, setMsg);
+    e.target.value = '';
   };
 
   // ── Delete account ────────────────────────────────────────────────────────
