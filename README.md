@@ -19,7 +19,8 @@ The demo account is preloaded with a full-year sample calendar so the collaborat
 Switch with the header buttons or keyboard shortcuts `d / w / m / y`.
 
 ### Events
-- **Create** — click any time slot or the `+ add event` button; double-click on the grid to create at that exact time
+- **Create** — click any time slot; double-click on the grid to create at that exact time
+- **Import / Export** — main-header calendar tools make it easy to import `.ics` files from existing calendar apps or export `.ics` / `.csv` backups
 - **Drag & drop** — move events freely across times and days
 - **Resize** — drag the top or bottom handle to adjust start/end
 - **Done** — mark events complete with a strikethrough; undo at any time
@@ -50,11 +51,10 @@ Press `/` or click the search icon to search all events by text across all dates
 Accessible via the ⚙ gear icon in the top-right user pill:
 
 - **Stats** — total events, this month, shared, completed, busiest day, top color
+- **Insights** — open the calendar insights dashboard from the stats section
 - **Username** — change with password confirmation
 - **Password** — change with current + new + confirm fields
 - **Profile names & emojis** — rename either profile and pick an emoji from a 15-option picker
-- **Export** — download either profile's events as `.ics` (Google / Apple Calendar) or `.csv` (spreadsheet)
-- **Import** — upload an `.ics` calendar file, preview parsed events, choose a profile, and import as private or shared events
 - **Delete account** — permanently removes all Firestore data and clears local storage (type username to confirm)
 
 ### Real-time sync

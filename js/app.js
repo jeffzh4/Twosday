@@ -111,9 +111,8 @@ function bootApp() {
   document.getElementById('btn-undo').onclick = undoAction;
   document.getElementById('btn-redo').onclick = redoAction;
 
-  document.getElementById('btn-add').onclick = () => openModal({ dateKey: getDateKey(currentDate) });
   document.getElementById('btn-find-time').onclick = () => openFindTimeModal();
-  document.getElementById('btn-insights').onclick = () => openAnalyticsModal();
+  document.getElementById('btn-calendar-tools').onclick = () => openCalendarToolsModal();
   document.getElementById('btn-conflicts').onclick = () => openConflictsModal();
 
   document.getElementById('btn-search').onclick   = () => toggleSearch();

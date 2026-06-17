@@ -168,6 +168,7 @@ function openSettingsModal() {
           </div>
         </div>
         ${extrasHTML}
+        <button class="mbtn settings-insights-btn" id="s-open-insights">open calendar insights</button>
       </div>
 
       <!-- ── Username ── -->
@@ -225,36 +226,6 @@ function openSettingsModal() {
         </div>
         <div class="settings-msg" id="s-profiles-msg"></div>
         <button class="mbtn mbtn-save settings-save-btn" id="s-save-profiles">save</button>
-      </div>
-
-      <!-- ── Export ── -->
-      <div class="settings-section">
-        <div class="settings-section-title">export events</div>
-        <div class="export-row">
-          <label class="export-label">profile</label>
-          <select class="export-select" id="s-export-user">
-            ${USERS.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="export-btns">
-          <button class="mbtn export-btn" id="s-export-ics">↓ .ics &nbsp;(google / apple calendar)</button>
-          <button class="mbtn export-btn" id="s-export-csv">↓ .csv &nbsp;(spreadsheet)</button>
-        </div>
-        <div class="settings-msg" id="s-export-msg"></div>
-      </div>
-
-      <!-- ── Import ── -->
-      <div class="settings-section">
-        <div class="settings-section-title">import events</div>
-        <div class="export-row">
-          <label class="export-label">profile</label>
-          <select class="export-select" id="s-import-user">
-            ${USERS.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('')}
-          </select>
-        </div>
-        <input type="file" id="s-import-file" accept=".ics,text/calendar" style="display:none" />
-        <button class="mbtn export-btn" id="s-import-ics">choose .ics file</button>
-        <div class="settings-msg" id="s-import-msg"></div>
       </div>
 
       <!-- ── Danger zone ── -->
@@ -328,6 +299,11 @@ function openSettingsModal() {
 
   setupEmojiPicker('s-emoji-btn1', 's-emoji-popover1');
   setupEmojiPicker('s-emoji-btn2', 's-emoji-popover2');
+
+  document.getElementById('s-open-insights').onclick = () => {
+    _closeModal();
+    openAnalyticsModal();
+  };
 
   // ── Inline message helper ─────────────────────────────────────────────────
   function setMsg(id, text, isError = true) {
@@ -474,29 +450,6 @@ function openSettingsModal() {
     render();
 
     setMsg('s-profiles-msg', 'profiles updated!', false);
-  };
-
-  // ── Export ────────────────────────────────────────────────────────────────
-  document.getElementById('s-export-ics').onclick = () => {
-    const user = document.getElementById('s-export-user').value;
-    exportICS(user);
-    setMsg('s-export-msg', `downloaded ${user}'s events as .ics`, false);
-  };
-
-  document.getElementById('s-export-csv').onclick = () => {
-    const user = document.getElementById('s-export-user').value;
-    exportCSV(user);
-    setMsg('s-export-msg', `downloaded ${user}'s events as .csv`, false);
-  };
-
-  // ── Import ────────────────────────────────────────────────────────────────
-  document.getElementById('s-import-ics').onclick = () => {
-    document.getElementById('s-import-file').click();
-  };
-  document.getElementById('s-import-file').onchange = e => {
-    const user = document.getElementById('s-import-user').value;
-    handleICSFileInput(e.target.files[0], user, setMsg);
-    e.target.value = '';
   };
 
   // ── Delete account ────────────────────────────────────────────────────────
