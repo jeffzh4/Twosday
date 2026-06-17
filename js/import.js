@@ -136,7 +136,7 @@ function openICSImportPreview(fileName, parsedEvents, defaultUser) {
       <div class="import-preview-head">
         <div>
           <h3>import calendar</h3>
-          <p>${escHtml(fileName)} · ${parsedEvents.length} event${parsedEvents.length === 1 ? '' : 's'} parsed</p>
+          <p>${escHtml(fileName)} &middot; ${parsedEvents.length} event${parsedEvents.length === 1 ? '' : 's'} parsed</p>
         </div>
         <button class="import-preview-close" id="i-close">&times;</button>
       </div>
@@ -163,7 +163,7 @@ function openICSImportPreview(fileName, parsedEvents, defaultUser) {
               <input type="checkbox" value="${escHtml(ev.importId)}" checked>
               <span>
                 <strong>${escHtml(ev.text)}</strong>
-                <em>${escHtml(MONTH_SHORT[d.getMonth()])} ${d.getDate()} · ${fmtFull(ev.start)} - ${fmtFull(ev.end)}</em>
+                <em>${escHtml(MONTH_SHORT[d.getMonth()])} ${d.getDate()} &middot; ${fmtFull(ev.start)} - ${fmtFull(ev.end)}</em>
               </span>
             </label>
           `;
@@ -198,18 +198,102 @@ function openICSImportPreview(fileName, parsedEvents, defaultUser) {
   };
 }
 
-function handleICSFileInput(file, user, setMsg) {
+function handleICSFileInput(file, user, setMsg, msgId = 's-import-msg') {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     const parsed = parseICSEvents(String(reader.result || ''));
     if (!parsed.length) {
-      setMsg('s-import-msg', 'no importable events found');
+      setMsg(msgId, 'no importable events found');
       return;
     }
-    setMsg('s-import-msg', `${parsed.length} event${parsed.length === 1 ? '' : 's'} ready to preview`, false);
+    setMsg(msgId, `${parsed.length} event${parsed.length === 1 ? '' : 's'} ready to preview`, false);
     openICSImportPreview(file.name, parsed, user);
   };
-  reader.onerror = () => setMsg('s-import-msg', 'failed to read file');
+  reader.onerror = () => setMsg(msgId, 'failed to read file');
   reader.readAsText(file);
+}
+
+function openCalendarToolsModal() {
+  if (document.querySelector('.modal-bg')) return;
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal calendar-tools-modal">
+      <div class="calendar-tools-head">
+        <div>
+          <h3>import / export</h3>
+          <p>bring existing calendars into twosday or take your data elsewhere</p>
+        </div>
+        <button class="calendar-tools-close" id="ct-close">&times;</button>
+      </div>
+      <div class="calendar-tools-grid">
+        <section class="calendar-tools-panel">
+          <div class="calendar-tools-panel-head">
+            <h4>import calendar</h4>
+            <span>.ics from google, apple, outlook</span>
+          </div>
+          <div class="field">
+            <label>profile</label>
+            <select id="ct-import-user">
+              ${USERS.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('')}
+            </select>
+          </div>
+          <input type="file" id="ct-import-file" accept=".ics,text/calendar" style="display:none" />
+          <button class="calendar-tools-primary" id="ct-import-btn">choose .ics file</button>
+          <div class="calendar-tools-hint">Preview events before importing them as private or shared.</div>
+          <div class="settings-msg" id="ct-import-msg"></div>
+        </section>
+        <section class="calendar-tools-panel">
+          <div class="calendar-tools-panel-head">
+            <h4>export events</h4>
+            <span>backup or move your calendar</span>
+          </div>
+          <div class="field">
+            <label>profile</label>
+            <select id="ct-export-user">
+              ${USERS.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="calendar-tools-actions">
+            <button class="mbtn export-btn" id="ct-export-ics">download .ics</button>
+            <button class="mbtn export-btn" id="ct-export-csv">download .csv</button>
+          </div>
+          <div class="calendar-tools-hint">Use .ics for calendar apps, .csv for spreadsheets.</div>
+          <div class="settings-msg" id="ct-export-msg"></div>
+        </section>
+      </div>
+    </div>
+  `;
+
+  function close() { bg.remove(); }
+  function setMsg(id, text, isError = true) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'settings-msg ' + (isError ? 'settings-msg-error' : 'settings-msg-ok');
+  }
+
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  document.body.appendChild(bg);
+  document.getElementById('ct-close').onclick = close;
+
+  document.getElementById('ct-import-btn').onclick = () => {
+    document.getElementById('ct-import-file').click();
+  };
+  document.getElementById('ct-import-file').onchange = e => {
+    const user = document.getElementById('ct-import-user').value;
+    handleICSFileInput(e.target.files[0], user, setMsg, 'ct-import-msg');
+    e.target.value = '';
+  };
+  document.getElementById('ct-export-ics').onclick = () => {
+    const user = document.getElementById('ct-export-user').value;
+    exportICS(user);
+    setMsg('ct-export-msg', `downloaded ${user}'s events as .ics`, false);
+  };
+  document.getElementById('ct-export-csv').onclick = () => {
+    const user = document.getElementById('ct-export-user').value;
+    exportCSV(user);
+    setMsg('ct-export-msg', `downloaded ${user}'s events as .csv`, false);
+  };
 }
