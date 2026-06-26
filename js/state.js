@@ -145,6 +145,7 @@ function applyTheme() {
 // ── Persistence ───────────────────────────────────────────────────────────────
 let _saveDebounce = null;
 let _isLoadingFromFirestore = false;
+let _lastSyncedSig = null;   // signature of the data last sent to Firestore
 
 // Unique ID for this browser session — written into every Firestore save so the
 // listener can tell "is this my own echo?" and skip it, while still applying
@@ -153,12 +154,14 @@ const CLIENT_ID = uid();
 
 function saveToLocalStorage() {
   try {
+    // No deep-clone needed: stringifying the live objects yields the same result
+    // as cloning first, and skips a redundant serialize+parse pass every render.
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      allData: clone(allData),
+      allData,
       activeUser,
       viewMode,
       currentDate: currentDate.toISOString(),
-      userTheme: clone(userTheme),
+      userTheme,
       savedAt: Date.now(),
     }));
   } catch (e) {}
@@ -168,18 +171,29 @@ function saveToLocalStorage() {
   _saveDebounce = setTimeout(saveToFirestore, 400);
 }
 
+// Signature of the syncable data, used to skip no-op Firestore writes — e.g. when
+// the user is only navigating dates/views, which mutates no event data.
+function _syncSig() {
+  return JSON.stringify(allData) + '|' + JSON.stringify(userTheme);
+}
+
 function saveToFirestore() {
+  const sig = _syncSig();
+  if (sig === _lastSyncedSig) return;   // nothing changed since the last sync
+  _lastSyncedSig = sig;
   try {
     FIRESTORE_DOC.set({
-      allData: clone(allData),
-      userTheme: clone(userTheme),
+      allData,
+      userTheme,
       savedAt: Date.now(),
       clientId: CLIENT_ID,
     }).catch(e => {
+      _lastSyncedSig = null;            // allow the next render to retry the write
       console.warn('Firestore save failed:', e);
       showToast("couldn't sync — check your connection");
     });
   } catch (e) {
+    _lastSyncedSig = null;
     showToast("couldn't sync — check your connection");
   }
 }
@@ -269,6 +283,7 @@ function startFirestoreListener() {
     if (data.clientId && data.clientId === CLIENT_ID) return; // own echo — skip
     _isLoadingFromFirestore = true;
     applyParsedData(data, false);
+    _lastSyncedSig = _syncSig();   // remote state is now the baseline — don't echo it back
     applyTheme();
     render();
     _isLoadingFromFirestore = false;
