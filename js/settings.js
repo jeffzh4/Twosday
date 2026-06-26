@@ -244,6 +244,9 @@ function openSettingsModal() {
 
   // Close popovers when clicking outside a picker wrap
   function _closePopovers(e) {
+    // Self-heal: if the modal was dismissed via Escape (which calls .remove()
+    // directly, bypassing _closeModal), detach this stray document listener.
+    if (!bg.isConnected) { document.removeEventListener('click', _closePopovers); return; }
     if (e && e.target.closest && e.target.closest('.emoji-picker-wrap')) return;
     bg.querySelectorAll('.emoji-picker-popover.open').forEach(p => p.classList.remove('open'));
   }

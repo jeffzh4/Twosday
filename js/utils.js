@@ -130,18 +130,6 @@ function fmtFull(h) {
   return d + ':' + String(mm).padStart(2,'0') + ap;
 }
 
-function timeOpts(sel) {
-  let o = '';
-  for (let h = START_H; h <= END_H; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const v = h + m / 60;
-      if (v > END_H) break;
-      o += `<option value="${v}"${Math.abs(v - sel) < 0.01 ? ' selected' : ''}>${fmtFull(v)}</option>`;
-    }
-  }
-  return o;
-}
-
 // Date key: "YYYY-MM-DD"
 function getDateKey(date) {
   const y = date.getFullYear();
@@ -173,11 +161,6 @@ function getWeekDates(date) {
     d.setDate(sun.getDate() + i);
     return d;
   });
-}
-
-// 0=Sun … 6=Sat  (matches DAYS array order)
-function getDayIdx(date) {
-  return date.getDay();
 }
 
 // Returns array of weeks (each week = 7 Date objects) covering a full month.
