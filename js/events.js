@@ -22,29 +22,6 @@ function toggleDone(dateKey, user, evId) {
   }
 }
 
-function duplicateEvent(srcDateKey, ev) {
-  pushHistory();
-  const srcDate = parseDateKey(srcDateKey);
-  const nextDate = new Date(srcDate);
-  nextDate.setDate(srcDate.getDate() + 1);
-  const nextKey = getDateKey(nextDate);
-
-  ensureDateUser(nextKey, activeUser);
-  const copy = { ...clone(ev), id: uid(), done: false };
-  markEventUpdated(copy, activeUser);
-  if (copy.shared) copy.sharedId = uid();
-  allData[nextKey][activeUser].push(copy);
-  sortDateUser(nextKey, activeUser);
-
-  if (copy.shared) {
-    syncSharedEvent(activeUser, copy.sharedId, nextKey, 'add', {
-      ...clone(copy), id: uid(), shared: true,
-    });
-  }
-  currentDate = nextDate;
-  render();
-}
-
 // ── Shared event sync ─────────────────────────────────────────────────────────
 function syncSharedEvent(user, sharedId, dateKey, action, updates) {
   const other = getOtherUser(user);
