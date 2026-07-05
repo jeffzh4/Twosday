@@ -262,6 +262,18 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
   return div;
 }
 
+// Rebuild just the one dragged event in place instead of re-rendering the whole
+// grid on every mousemove. Reuses buildEventEl so rendering logic never drifts;
+// recomputes the day's layout so the dragged block's overlap column stays correct.
+// Returns false if the element wasn't found (caller should fall back to renderGrid).
+function refreshDraggedEl(ev, dateKey) {
+  const old = document.querySelector(`.ev[data-id="${ev.id}"]`);
+  if (!old) return false;
+  const layout = computeLayout(getEventsForDate(dateKey, activeUser));
+  old.replaceWith(buildEventEl(ev, dateKey, layout[ev.id] || { col: 0, total: 1 }));
+  return true;
+}
+
 function positionNowLine() {
   const now = new Date();
   const h = now.getHours() + now.getMinutes() / 60;

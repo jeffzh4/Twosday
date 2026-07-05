@@ -145,4 +145,77 @@ run('conflict center finds own and shared conflicts', () => {
   assert(conflicts.some(c => c.kind === 'shared'));
 });
 
+run('shared events mirror add/edit/toggle/delete across profiles', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ensureDateUser('2026-06-14', 'alex');
+    ensureDateUser('2026-06-14', 'jamie');
+    allData['2026-06-14'].alex.push({ id:'a1', text:'dinner', start:18, end:20, done:false, shared:true, sharedId:'sh1', color:null });
+    syncSharedEvent('alex', 'sh1', '2026-06-14', 'add', { id:'m1', text:'dinner', start:18, end:20, done:false, shared:true, sharedId:'sh1', color:null });
+  `);
+  assert.strictEqual(exec(`allData['2026-06-14'].jamie.length`), 1);
+  assert.strictEqual(exec(`allData['2026-06-14'].jamie[0].sharedId`), 'sh1');
+
+  exec(`syncSharedEvent('alex', 'sh1', '2026-06-14', 'edit', { start:19, end:21, text:'late dinner', color:'red' });`);
+  assert.strictEqual(exec(`allData['2026-06-14'].jamie[0].start`), 19);
+  assert.strictEqual(exec(`allData['2026-06-14'].jamie[0].text`), 'late dinner');
+
+  exec(`syncSharedEvent('alex', 'sh1', '2026-06-14', 'toggle-done', { done:true });`);
+  assert.strictEqual(exec(`allData['2026-06-14'].jamie[0].done`), true);
+
+  exec(`syncSharedEvent('alex', 'sh1', '2026-06-14', 'delete');`);
+  assert.strictEqual(exec(`allData['2026-06-14'].jamie.length`), 0);
+});
+
+run('deleting a shared event removes its mirror', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ensureDateUser('2026-06-15', 'alex');
+    ensureDateUser('2026-06-15', 'jamie');
+    allData['2026-06-15'].alex.push({ id:'a1', text:'call', start:9, end:10, done:false, shared:true, sharedId:'sh2', color:null });
+    allData['2026-06-15'].jamie.push({ id:'m1', text:'call', start:9, end:10, done:false, shared:true, sharedId:'sh2', color:null });
+    deleteEvent('2026-06-15', 'alex', 'a1');
+  `);
+  assert.strictEqual(exec(`allData['2026-06-15'].alex.length`), 0);
+  assert.strictEqual(exec(`allData['2026-06-15'].jamie.length`), 0);
+});
+
+run('undo and redo restore event snapshots', () => {
+  exec(`
+    render = function () {};                                    // view layer isn't loaded here
+    document.documentElement = { setAttribute: function () {} }; // let applyTheme() run
+    appHistory.undo.length = 0; appHistory.redo.length = 0;
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ensureDateUser('2026-06-16', 'alex');
+    allData['2026-06-16'].alex.push({ id:'e1', text:'gym', start:7, end:8, done:false, shared:false, sharedId:null, color:null });
+    pushHistory();
+    allData['2026-06-16'].alex.push({ id:'e2', text:'lunch', start:12, end:13, done:false, shared:false, sharedId:null, color:null });
+  `);
+  assert.strictEqual(exec(`allData['2026-06-16'].alex.length`), 2);
+  exec(`undoAction();`);
+  assert.strictEqual(exec(`allData['2026-06-16'].alex.length`), 1);
+  assert.strictEqual(exec(`allData['2026-06-16'].alex[0].id`), 'e1');
+  exec(`redoAction();`);
+  assert.strictEqual(exec(`allData['2026-06-16'].alex.length`), 2);
+});
+
+run('sync signature changes only when event data changes', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ensureDateUser('2026-06-17', 'alex');
+    allData['2026-06-17'].alex.push({ id:'e1', text:'run', start:7, end:8, done:false, shared:false, sharedId:null, color:null });
+  `);
+  const sig1 = exec(`_syncSig()`);
+  assert.strictEqual(sig1, exec(`_syncSig()`));            // stable when nothing changes
+  exec(`allData['2026-06-17'].alex[0].text = 'sprint';`);
+  assert.notStrictEqual(sig1, exec(`_syncSig()`));         // changes on mutation
+});
+
+run('isHashed recognizes sha-256 digests, rejects plaintext', () => {
+  assert.strictEqual(exec(`isHashed('${'a'.repeat(64)}')`), true);
+  assert.strictEqual(exec(`isHashed('hunter2')`), false);
+  assert.strictEqual(exec(`isHashed('${'a'.repeat(63)}')`), false);  // too short
+  assert.strictEqual(exec(`isHashed('${'g'.repeat(64)}')`), false);  // non-hex
+});
+
 console.log('all core tests passed');
