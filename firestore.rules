@@ -1,0 +1,50 @@
+rules_version = '2';
+
+// ── Twosday Firestore security rules ─────────────────────────────────────────
+//
+// SCOPE — what these rules do and do NOT do.
+//
+// Twosday authenticates with a custom username/password scheme, NOT Firebase
+// Auth, so `request.auth` is always null and the rules layer has no notion of
+// "the signed-in owner." True per-account access control is therefore not
+// possible here — these rules are DEFENSE-IN-DEPTH against abuse and corruption,
+// not a privacy boundary. Concretely they:
+//
+//   • confine every read/write to the /schedules collection (deny everything else),
+//   • validate document shape so malformed/junk writes are rejected,
+//   • forbid deleting the shared `accounts` registry — the catastrophic
+//     "wipe every account" case — while still allowing normal updates.
+//
+// They do NOT prevent a determined actor who reads the public client code from
+// reading the accounts document or overwriting a calendar. Closing that gap
+// requires migrating to Firebase Auth so rules can key on request.auth.uid
+// (tracked in PUBLIC_LAUNCH_NOTES.md).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Per-account event, notes, and presence documents:
+    //   schedules/{user}, schedules/{user}-notes, schedules/{user}-presence
+    // Each carries exactly one of these top-level maps; require it so shapeless
+    // junk writes are rejected. The accounts registry is handled separately.
+    function validAccountDoc() {
+      let d = request.resource.data;
+      return d.allData is map || d.notes is map || d.sessions is map;
+    }
+
+    match /schedules/{docId} {
+      allow read: if true;
+      allow create, update: if docId != 'accounts' && validAccountDoc();
+      allow delete: if docId != 'accounts';
+    }
+
+    // The shared accounts registry: schedules/accounts = { accounts: {...}, ... }.
+    // Every write must keep `accounts` a map (blocks corruption / empty-wipe),
+    // and it can never be deleted.
+    match /schedules/accounts {
+      allow read: if true;
+      allow create, update: if request.resource.data.accounts is map;
+      allow delete: if false;
+    }
+  }
+}
