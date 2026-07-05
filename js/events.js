@@ -109,6 +109,7 @@ function onDragMove(e) {
   dragState.moved = true;
 
   const deltaH = Math.round(((e.clientY - dragState.startY) / (PX_PER_HOUR * STEP_H))) * STEP_H;
+  let crossedDay = false;
 
   if (dragState.mode === 'move') {
     const len = dragState.origin.end - dragState.origin.start;
@@ -135,6 +136,7 @@ function onDragMove(e) {
         }
         dragState.dateKey = newDk;
         dateKey = newDk;
+        crossedDay = true;
       }
     }
   } else if (dragState.mode === 'resize-start') {
@@ -153,7 +155,10 @@ function onDragMove(e) {
     });
   }
 
-  renderGrid();
+  // Cross-day moves change the DOM structure (event switches columns) — full
+  // rebuild. Same-day drags only reposition one block, so patch it in place;
+  // fall back to a full render if the element can't be located.
+  if (crossedDay || !refreshDraggedEl(ev, dragState.dateKey)) renderGrid();
 }
 
 function onDragEnd() {
