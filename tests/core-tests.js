@@ -58,6 +58,8 @@ load('js/find-time.js');
 load('js/analytics.js');
 load('js/import.js');
 load('js/conflicts.js');
+load('js/settings.js');
+load('js/demo-data.js');
 
 function run(name, fn) {
   try {
@@ -216,6 +218,110 @@ run('isHashed recognizes sha-256 digests, rejects plaintext', () => {
   assert.strictEqual(exec(`isHashed('hunter2')`), false);
   assert.strictEqual(exec(`isHashed('${'a'.repeat(63)}')`), false);  // too short
   assert.strictEqual(exec(`isHashed('${'g'.repeat(64)}')`), false);  // non-hex
+});
+
+run('computeStats aggregates totals, shared, done, top color, and busiest day', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ensureDateUser('2026-06-15', 'alex');
+    ensureDateUser('2026-06-15', 'jamie');
+    ensureDateUser('2026-06-16', 'alex');
+    ensureDateUser('2026-06-16', 'jamie');
+    allData['2026-06-15'].alex.push({ id:'a1', text:'gym', start:7, end:8, done:true, shared:false, sharedId:null, color:'green' });
+    allData['2026-06-15'].alex.push({ id:'a2', text:'dinner', start:18, end:20, done:false, shared:true, sharedId:'sh1', color:'red' });
+    allData['2026-06-15'].jamie.push({ id:'m1', text:'dinner', start:18, end:20, done:false, shared:true, sharedId:'sh1', color:'red' });
+    allData['2026-06-16'].alex.push({ id:'a3', text:'lunch', start:12, end:13, done:true, shared:false, sharedId:null, color:'green' });
+  `);
+  const stats = exec(`computeStats()`);
+  assert.strictEqual(stats.total, 3);   // shared event counted once, from profile index 0 only
+  assert.strictEqual(stats.shared, 1);
+  assert.strictEqual(stats.done, 2);
+  assert.strictEqual(stats.topColor, 'green');
+  assert.strictEqual(stats.busiestDay, exec(`DAY_NAMES_LONG[parseDateKey('2026-06-15').getDay()]`));
+});
+
+run('computeStats counts only events in the current calendar month', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    const todayKey = getDateKey(new Date());
+    ensureDateUser(todayKey, 'alex');
+    allData[todayKey].alex.push({ id:'t1', text:'today event', start:9, end:10, done:false, shared:false, sharedId:null, color:null });
+    ensureDateUser('2020-01-01', 'alex');
+    allData['2020-01-01'].alex.push({ id:'t2', text:'old event', start:9, end:10, done:false, shared:false, sharedId:null, color:null });
+  `);
+  const stats = exec(`computeStats()`);
+  assert.strictEqual(stats.total, 2);
+  assert.strictEqual(stats.thisMonth, 1);
+});
+
+run('_icsDateTime formats decimal hours into ICS local datetime', () => {
+  assert.strictEqual(exec(`_icsDateTime('2026-06-14', 9.5)`), '20260614T093000');
+  assert.strictEqual(exec(`_icsDateTime('2026-01-05', 23.75)`), '20260105T234500');
+  assert.strictEqual(exec(`_icsDateTime('2026-12-31', 0)`), '20261231T000000');
+});
+
+run('renameProfile migrates allData, notes, and theme keys', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    USERS = ['alex', 'jamie'];
+    activeUser = 'alex';
+    userNotes = { alex: [{ text:'note', time: 1 }], jamie: [] };
+    userTheme = { alex: 'dark', jamie: 'light' };
+    ensureDateUser('2026-06-14', 'alex');
+    allData['2026-06-14'].alex.push({ id:'e1', text:'gym', start:7, end:8, done:false, shared:false, sharedId:null, color:null });
+    renameProfile('alex', 'sam');
+  `);
+  assert.deepStrictEqual(plain(exec(`USERS`)), ['sam', 'jamie']);
+  assert.strictEqual(exec(`activeUser`), 'sam');
+  assert.strictEqual(exec(`allData['2026-06-14'].sam.length`), 1);
+  assert.strictEqual(exec(`allData['2026-06-14'].alex`), undefined);
+  assert.strictEqual(exec(`userNotes.sam.length`), 1);
+  assert.strictEqual(exec(`userTheme.sam`), 'dark');
+  exec(`renameProfile('sam', 'alex');`);  // restore for any tests that follow
+});
+
+run('getDemoSeedDefinitions expands weekly patterns and preserves event shape', () => {
+  const defs = exec(`getDemoSeedDefinitions()`);
+  assert(defs.length > exec(`DEMO_SEED_EVENTS.length`));
+  assert(defs.every(d => typeof d.date === 'string' && typeof d.text === 'string' && typeof d.start === 'number' && typeof d.end === 'number'));
+});
+
+run('hasDemoSeedEvent finds an id only once it has been added', () => {
+  exec(`Object.keys(allData).forEach(k => delete allData[k]); ensureDateUser('2026-06-14', 'alex');`);
+  assert.strictEqual(exec(`hasDemoSeedEvent('demo_2026_0_a')`), false);
+  exec(`allData['2026-06-14'].alex.push({ id:'demo_2026_0_a', text:'x', start:9, end:10, done:false, shared:false, sharedId:null, color:null });`);
+  assert.strictEqual(exec(`hasDemoSeedEvent('demo_2026_0_a')`), true);
+});
+
+run('applyTestingDemoSeed populates once and is idempotent on rerun', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    USERS = ['alex', 'jamie'];
+    currentAccount = { username: 'testing' };
+  `);
+  assert.strictEqual(exec(`applyTestingDemoSeed()`), true);
+  const countAfterFirst = exec(`
+    Object.keys(allData).reduce((sum, dk) => sum + getEventsForDate(dk, 'alex').length + getEventsForDate(dk, 'jamie').length, 0)
+  `);
+  assert(countAfterFirst > 0);
+
+  assert.strictEqual(exec(`applyTestingDemoSeed()`), false);  // rerun adds nothing new
+  const countAfterSecond = exec(`
+    Object.keys(allData).reduce((sum, dk) => sum + getEventsForDate(dk, 'alex').length + getEventsForDate(dk, 'jamie').length, 0)
+  `);
+  assert.strictEqual(countAfterSecond, countAfterFirst);
+
+  const sharedPairFound = exec(`
+    let found = false;
+    Object.keys(allData).forEach(dk => {
+      const a = getEventsForDate(dk, 'alex').find(e => e.shared);
+      if (a && getEventsForDate(dk, 'jamie').some(e => e.shared && e.sharedId === a.sharedId)) found = true;
+    });
+    found;
+  `);
+  assert.strictEqual(sharedPairFound, true);  // shared seed events mirror onto both profiles
+
+  exec(`Object.keys(allData).forEach(k => delete allData[k]); currentAccount = null;`);
 });
 
 console.log('all core tests passed');

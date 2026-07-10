@@ -398,6 +398,13 @@ function openSettingsModal() {
     localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
     currentAccount = { ...currentAccount, password: hashed };
 
+    // Keep the Firebase Auth credential in sync for claimed accounts. Best-effort:
+    // the hash above remains the source of truth for login either way.
+    if (currentAccount.authClaimed && firebase.auth().currentUser) {
+      firebase.auth().currentUser.updatePassword(newPwd).catch(err =>
+        console.warn('Firebase Auth password sync failed:', err));
+    }
+
     document.getElementById('s-cur-pwd').value     = '';
     document.getElementById('s-new-pwd').value     = '';
     document.getElementById('s-confirm-pwd').value = '';
@@ -476,6 +483,9 @@ function openSettingsModal() {
     try { await FIRESTORE_DOC.delete(); } catch (e) {}
     try { await NOTES_DOC.delete();     } catch (e) {}
     try { await PRESENCE_DOC.delete();  } catch (e) {}
+    if (currentAccount.authClaimed && firebase.auth().currentUser) {
+      try { await firebase.auth().currentUser.delete(); } catch (e) {}
+    }
 
     // Clear all account-scoped localStorage
     [STORAGE_KEY, NOTES_KEY, PRESENCE_KEY, CUSTOM_COLORS_KEY].forEach(k => { if (k) localStorage.removeItem(k); });

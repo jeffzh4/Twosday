@@ -38,6 +38,10 @@ The calendar listener ignores its own client echo, while applying remote saves f
 `tests/core-tests.js` runs pure logic checks in Node using the browser modules inside a VM context. It focuses on logic that is easy to regress:
 
 - date keys and month grids
+- shared-event mirroring (add/edit/toggle-done/delete) and undo/redo
+- Firestore sync-signature dedup and password-hash guard
+- account stats aggregation, ICS datetime formatting, profile rename
+- demo-seed idempotency (safe to call `applyTestingDemoSeed()` repeatedly)
 - busy interval merging and free-window search
 - analytics aggregation
 - ICS parsing
