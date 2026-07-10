@@ -1,128 +1,83 @@
 # Twosday
 
-A real-time shared calendar built for two people. Each account has two named profiles with independent themes — all synced instantly across devices via Firebase Firestore.
+**A real-time shared calendar for two people, built with vanilla JavaScript and Firebase.**
 
-**Live:** [twosday-five.vercel.app](https://twosday-five.vercel.app) &nbsp;·&nbsp; try it with `testing` / `testing`
+Twosday helps two people coordinate individual plans, shared events, conflicts, and open time without turning a personal calendar into a cluttered group workspace.
 
-The demo account is preloaded with a full-year sample calendar so the collaboration, search, free-window finder, and insights dashboard all have realistic data to explore.
+[Live project](https://twosday-five.vercel.app) · [Architecture notes](ARCHITECTURE.md) · [Run the test suite](#testing)
 
----
+<!-- Add assets/twosday-demo.gif here after recording the README walkthrough. -->
+
+## Why It Stands Out
+
+| Collaboration | Scheduling intelligence | Engineering depth |
+| --- | --- | --- |
+| Two independent profiles with mirrored shared events, live presence, and per-event update metadata. | Conflict Center and mutual free-window search make coordination visible and actionable. | Firebase Auth ownership, Firestore authorization tests, offline cache, accessibility support, and real-time listeners. |
+
+## Product Walkthrough
+
+The recorded walkthrough will follow one complete coordination flow:
+
+1. Navigate a populated week with two profile calendars and real-time presence.
+2. Create or reschedule a shared event and show its synchronized mirror.
+3. Resolve an overlap through Conflict Center, then find a mutual opening.
+4. Open calendar insights to compare workload, shared time, and scheduling patterns.
+5. Preview calendar import/export and keyboard-accessible event editing.
+
+The walkthrough uses the seeded `testing` account locally. Its credentials are intentionally not published here; the live link is secondary to the recorded product demonstration.
 
 ## Features
 
-### Calendar views
-- **Day** — single-day time grid, full 24 hours
-- **Week** — 7-column grid, Sun–Sat
-- **Month** — traditional monthly overview with event pills
-- **Year** — 12 mini-months at a glance
+### Calendar and collaboration
 
-Switch with the header buttons or keyboard shortcuts `d / w / m / y`.
+- Day, week, month, and year views across a full 24-hour schedule
+- Two named profiles with independent themes, notes, and optional emoji identifiers
+- Shared events mirrored automatically between profiles
+- Drag, resize, duplicate, repeat, complete, undo, and redo event workflows
+- Live presence showing who is viewing and their current calendar context
+- Event update metadata showing the latest editor and timestamp
 
-### Events
-- **Create** — click any time slot; double-click on the grid to create at that exact time
-- **Import / Export** — main-header calendar tools make it easy to import `.ics` files from existing calendar apps or export `.ics` / `.csv` backups
-- **Drag & drop** — move events freely across times and days
-- **Resize** — drag the top or bottom handle to adjust start/end
-- **Done** — mark events complete with a strikethrough; undo at any time
-- **Colors** — 7 named presets (ROYGBIV), up to 7 saved custom hex colors per account, or auto-color based on keywords in the event title (`class` → violet, `meal` → green, `work` → blue, etc.)
-- **Shared events** — toggle "shared" to mirror an event to both profiles and keep edits in sync automatically
-- **Live presence** — see when the other profile is actively viewing the calendar, including their current view and date range
-- **Update metadata** — event edits record who last updated them and when, visible in event details and hover context
-- **Insights dashboard** — analyze scheduled hours, completion rate, shared time, category mix, weekly load, daypart rhythm, and profile balance
-- **Repeat** — copy an event hourly, daily, weekly, or monthly with a live preview and checkbox selection before confirming
-- **Conflict detection** — overlapping events on the same profile show a red inset shadow
-- **Conflict center** — review all upcoming overlaps, jump to the day, edit the event, or open the free-window finder
-- **Undo / Redo** — full history stack up to 80 snapshots (`Cmd+Z` / `Cmd+Y`)
+### Scheduling tools
 
-### Two-profile system
-Every account has exactly two named profiles (e.g. alex and jamie). Profiles have:
-- Independent dark / light themes
-- Independent event lists (with opt-in sharing)
-- Optional emoji shown next to the profile tab
-- Per-profile notes panels
+- Mutual free-window finder that merges both profiles' availability
+- Conflict Center for same-profile and shared-event overlaps
+- Cross-date event search
+- Calendar insights for scheduled hours, completion, shared time, category mix, weekly load, and profile balance
+- `.ics` import preview plus `.ics` and `.csv` export
 
-### Notes
-A slide-in panel (per profile) for quick freeform text. Double-click a note to edit it inline. Synced to Firestore alongside events.
+### Quality and resilience
 
-### Search
-Press `/` or click the search icon to search all events by text across all dates. Click a result to jump to that day.
+- Firebase Authentication with owner-scoped account metadata
+- Firestore rules that protect account, calendar, notes, and presence documents
+- Legacy-account migration after verified sign-in
+- Real-time Firestore synchronization with self-echo suppression
+- `localStorage` cache and offline fallback
+- Keyboard-operable calendar controls, focus-managed dialogs, visible focus states, and reduced-motion support
 
-### Account settings
-Accessible via the ⚙ gear icon in the top-right user pill:
+## Technical Design
 
-- **Stats** — total events, this month, shared, completed, busiest day, top color
-- **Insights** — open the calendar insights dashboard from the stats section
-- **Username** — change with password confirmation
-- **Password** — change with current + new + confirm fields
-- **Connect Google** — link a Google account for one-click sign-in on future logins
-- **Profile names & emojis** — rename either profile and pick an emoji from a 15-option picker
-- **Delete account** — permanently removes all Firestore data and clears local storage (type username to confirm)
+Twosday is intentionally framework-free: one HTML shell, a focused CSS layer, and small feature modules loaded in dependency order. Calendar data remains plain JavaScript objects, making state transitions easy to inspect while still supporting real-time persistence.
 
-### Real-time sync
-Changes save to Firestore and propagate to all open sessions within ~1–2 seconds via `onSnapshot`. A thin sync bar appears during the initial load. Offline edits are preserved in `localStorage` and reconciled on reconnect.
+Each account owns three Firestore documents:
 
-### Accessibility
-- Keyboard-operable day, week, month, and year calendars, including events and search results
-- Focus-trapped dialogs that close with `Escape` and restore focus to their trigger
-- Semantic tabs, forms, navigation landmarks, status announcements, and descriptive icon labels
-- High-contrast focus indicators, improved secondary-text contrast, a skip link, and reduced-motion support
+- **Calendar:** events, themes, save metadata, and writer client ID
+- **Notes:** profile-scoped freeform notes
+- **Presence:** short-lived sessions, current view, and heartbeat metadata
 
----
+Firebase Auth establishes the account owner. Firestore rules require that owner UID for all protected reads and writes, while the previous account registry is retained only as an authenticated, read-only migration source. More detail is available in [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Tech stack
+## Testing
 
-| Layer | Choice |
-|---|---|
-| Frontend | Vanilla JS, HTML5, CSS3 — no framework, no build step |
-| Sync | Firebase Firestore (`onSnapshot` real-time listener) |
-| Auth | Firebase Authentication with username-derived email credentials and optional linked Google sign-in |
-| Authorization | Owner-scoped Firestore rules verified through the Firebase Emulator Suite |
-| Persistence | `localStorage` as cache and offline fallback |
-| Hosting | Vercel — auto-deploys on push to `main` |
-| Fonts | DM Sans + DM Mono (Google Fonts) |
-
----
-
-## Project structure
-
-```
-Twosday/
-├── index.html              # App shell, landing screen, auth overlay
-├── favicon.svg
-├── css/
-│   └── style.css           # All styles: themes, grid, modals, mobile
-├── tests/
-│   ├── core-tests.js       # Node-based regression tests for core logic
-│   └── firestore-rules-tests.js # Emulator-backed authorization tests
-├── firestore.rules         # Owner isolation and document-shape validation
-├── firebase.json           # Rules and Firestore Emulator configuration
-├── ARCHITECTURE.md         # Data model, sync, and workflow notes
-├── package.json            # Test script
-└── js/
-    ├── config.js           # Firebase init, shared constants
-    ├── auth.js             # Login, signup, session management
-    ├── state.js            # Global state, undo/redo stack, persistence
-    ├── utils.js            # Date helpers, color logic, password hashing
-    ├── events.js           # Create, edit, delete, drag-and-drop, conflict detection
-    ├── modal.js            # Add/edit event modal (color picker, shared toggle)
-    ├── repeat-modal.js     # Event repeat/duplication modal
-    ├── import.js           # ICS parsing + import preview
-    ├── conflicts.js        # Conflict center and overlap workflows
-    ├── search.js           # Cross-date event search
-    ├── notes.js            # Notes panel (per-profile, Firestore-synced)
-    ├── settings.js         # Account settings modal (stats, export, emoji picker, delete)
-    ├── app.js              # Render loop, navigation, bootApp()
-    └── views/
-        ├── day-week.js     # Day and week time-grid + drag resize
-        ├── month.js        # Month view
-        └── year.js         # Year overview
+```bash
+npm test
 ```
 
----
+The suite combines Node-based core logic tests with Firebase Emulator authorization tests.
 
-## Running locally
+- Core coverage: date helpers, shared-event mirroring, undo/redo, sync deduplication, analytics, import parsing, conflicts, profile rename, and seeded demo data
+- Rules coverage: anonymous denial, account privacy, cross-account isolation, owner immutability, schema validation, and safe legacy migration
 
-No build step is needed for the app. Install the test tooling, then open `index.html`:
+## Run Locally
 
 ```bash
 git clone https://github.com/jeffzh4/Twosday.git
@@ -131,72 +86,38 @@ npm install
 open index.html
 ```
 
-The app connects to Firebase on load. An internet connection is required to log in and sync; cached data is available offline after first load.
+Java is required to run the Firestore Emulator tests. The browser app itself has no build step.
 
-## Testing
+## Project Structure
 
-```bash
-npm test
+```text
+Twosday/
+├── index.html                 # Application shell and authentication UI
+├── css/style.css              # Themes, responsive layout, and accessibility styles
+├── firestore.rules            # Owner-scoped Firestore authorization
+├── firebase.json              # Firebase and Emulator configuration
+├── js/
+│   ├── auth.js                # Authentication, session restore, and migration
+│   ├── state.js               # Calendar state, persistence, and undo/redo
+│   ├── events.js              # Event creation, editing, drag, resize, and mirroring
+│   ├── analytics.js           # Derived scheduling analytics
+│   ├── find-time.js           # Mutual availability search
+│   ├── conflicts.js           # Conflict collection and resolution workflow
+│   ├── import.js              # ICS import preview and calendar tools
+│   └── views/                 # Day/week, month, and year renderers
+└── tests/
+    ├── core-tests.js          # Core behavior regression tests
+    └── firestore-rules-tests.js # Firebase Emulator authorization tests
 ```
 
-`npm test` runs both the core logic suite and the Firestore Emulator authorization suite. The latter requires Java and verifies anonymous denial, account isolation, owner-only writes, immutable ownership, schema validation, and safe legacy migration.
-
----
-
-## Keyboard shortcuts
+## Keyboard Shortcuts
 
 | Key | Action |
-|---|---|
-| `d` / `w` / `m` / `y` | Switch to day / week / month / year view |
-| `←` / `→` | Navigate backward / forward |
+| --- | --- |
+| `d` / `w` / `m` / `y` | Switch day, week, month, or year view |
+| `Left` / `Right` | Move backward or forward through the current view |
 | `/` | Open search |
-| `Cmd+Z` | Undo |
-| `Cmd+Y` or `Cmd+Shift+Z` | Redo |
-| `Escape` | Close any open modal |
-| `Enter` / `Space` | Activate a focused date, event, result, tab, or calendar control |
-
----
-
-## Data model
-
-```js
-// Events — keyed by ISO date string, then profile name
-allData["2026-05-20"]["alex"] = [
-  {
-    id: "ev_...",
-    text: "Team standup",
-    start: 9.5,          // decimal hours: 9.5 = 9:30 am
-    end: 10.0,
-    done: false,
-    shared: false,       // if true, mirrored to the other profile
-    sharedId: null,      // links the two mirrored copies
-    color: null,         // preset name, hex string "#rrggbb", or null (auto)
-    recurrenceId: null,  // non-null when created via the repeat modal
-  }
-]
-
-// Notes — per profile, stored in a separate Firestore document
-userNotes["alex"] = [
-  { text: "remember to...", time: 1716230400000 }
-]
-
-// Account metadata — stored at accounts/{username}
-account = {
-  ownerUid: "firebase-auth-uid",
-  password: "<sha256-hex>",
-  profiles: ["alex", "jamie"],
-  profileEmojis: ["☕", "🌙"],
-  firestoreDoc: "myusername",
-  notesDoc: "myusername-notes",
-  createdAt: 1716230400000,
-}
-
-// Every synchronized data document repeats the ownership boundary
-scheduleDocument = {
-  ownerUid: "firebase-auth-uid",
-  accountId: "myusername",
-  allData: { /* ... */ }, // or notes / sessions for the companion docs
-}
-```
-
-Firestore rules require `request.auth.uid` to match `ownerUid` for account metadata and calendar, notes, and presence documents. The previous shared account registry is authenticated and read-only, and exists only to migrate previously claimed accounts into the owner-scoped model.
+| `n` | Create an event for the current date |
+| `Cmd+Z` / `Cmd+Y` | Undo / redo |
+| `Enter` / `Space` | Activate a focused calendar control |
+| `Escape` | Close an open dialog |
