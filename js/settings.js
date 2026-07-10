@@ -205,6 +205,18 @@ function openSettingsModal() {
         <button class="mbtn mbtn-save settings-save-btn" id="s-save-password">save</button>
       </div>
 
+      <!-- ── Connected accounts ── -->
+      <div class="settings-section">
+        <div class="settings-section-title">connected accounts</div>
+        ${currentAccount.authClaimed ? `
+          <div class="settings-msg">${currentAccount.googleLinked ? 'Google account connected ✓' : 'connect Google to sign in without a password'}</div>
+          <button class="mbtn" id="s-connect-google" ${currentAccount.googleLinked ? 'disabled' : ''}>${currentAccount.googleLinked ? 'connected' : 'connect Google'}</button>
+        ` : `
+          <div class="settings-msg">log out and back in once to enable this, then return here to connect Google</div>
+        `}
+        <div class="settings-msg" id="s-google-msg"></div>
+      </div>
+
       <!-- ── Profile names + emoji ── -->
       <div class="settings-section">
         <div class="settings-section-title">profile names</div>
@@ -308,6 +320,42 @@ function openSettingsModal() {
     openAnalyticsModal();
   };
 
+  // ── Connect Google ────────────────────────────────────────────────────────
+  const connectGoogleBtn = document.getElementById('s-connect-google');
+  if (connectGoogleBtn) {
+    connectGoogleBtn.onclick = async () => {
+      if (!firebase.auth().currentUser) {
+        setMsg('s-google-msg', 'log out and back in first, then try again'); return;
+      }
+      setMsg('s-google-msg', 'connecting…', false);
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await firebase.auth().currentUser.linkWithPopup(provider);
+
+        const accounts = await refreshAccountsFromFirestore();
+        const updatedAccounts = {
+          ...accounts,
+          [currentAccount.username]: { ...accounts[currentAccount.username], googleLinked: true },
+        };
+        await ACCOUNTS_DOC().set({ accounts: updatedAccounts, savedAt: Date.now() });
+        localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
+        currentAccount = { ...currentAccount, googleLinked: true };
+
+        connectGoogleBtn.textContent = 'connected';
+        connectGoogleBtn.disabled = true;
+        setMsg('s-google-msg', 'Google account connected!', false);
+      } catch (err) {
+        if (err.code === 'auth/provider-already-linked' || err.code === 'auth/credential-already-in-use') {
+          setMsg('s-google-msg', 'this Google account is already connected');
+        } else if (err.code === 'auth/popup-closed-by-user') {
+          setMsg('s-google-msg', '');
+        } else {
+          setMsg('s-google-msg', 'connect failed: ' + err.message);
+        }
+      }
+    };
+  }
+
   // ── Inline message helper ─────────────────────────────────────────────────
   function setMsg(id, text, isError = true) {
     const el = document.getElementById(id);
@@ -378,7 +426,7 @@ function openSettingsModal() {
     if (!cur || !newPwd || !confirm) { setMsg('s-password-msg', 'all fields required'); return; }
     if (!(await verifyPassword(cur, currentAccount.password))) { setMsg('s-password-msg', 'incorrect current password'); return; }
     if (newPwd !== confirm)              { setMsg('s-password-msg', 'passwords do not match'); return; }
-    if (newPwd.length < 4)              { setMsg('s-password-msg', 'min 4 characters'); return; }
+    if (newPwd.length < 6)              { setMsg('s-password-msg', 'min 6 characters'); return; }
 
     setMsg('s-password-msg', 'saving…', false);
 

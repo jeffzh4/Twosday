@@ -985,6 +985,7 @@ html, body {
   border: none;
   transition: background 0.15s;
 }
+.mbtn:disabled { opacity: 0.5; cursor: default; }
 .mbtn-cancel { background: var(--surface2); color: var(--text-muted); }
 .mbtn-cancel:hover { color: var(--text); }
 .mbtn-save { background: var(--accent); color: white; font-weight: 500; }
@@ -2167,6 +2168,39 @@ html, body {
 }
 [data-theme="dark"] .auth-form button[type="submit"] { color: #0e0e10; }
 .auth-form button[type="submit"]:hover { filter: brightness(1.1); }
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+  margin: 2px 0;
+}
+.auth-divider::before, .auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 0.5px;
+  background: var(--border);
+}
+
+.auth-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 16px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.auth-google-btn:hover { background: var(--border-hover); }
 
 .auth-error {
   font-size: 12px;
