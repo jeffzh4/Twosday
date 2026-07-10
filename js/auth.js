@@ -1,6 +1,12 @@
 // ── Auth module ───────────────────────────────────────────────────────────────
-// All accounts live in Firestore (schedules/accounts).
-// Passwords are plaintext — intentional for a small trusted-circle app.
+// All accounts live in Firestore (schedules/accounts). Passwords are hashed
+// client-side (SHA-256) before storage. Firebase Authentication is layered on
+// top as the credential verifier: on an account's next successful login it is
+// silently "claimed" — a Firebase Auth user is created with a synthetic email
+// (see syntheticEmail()) and future logins verify through Firebase Auth first,
+// falling back to the legacy hash check for any account not yet claimed. This
+// touches nothing about how calendar/notes/presence documents are stored or
+// addressed — see CLAUDE.md's Auth System section for the full design.
 // localStorage is used as a cache/fallback for fast loads and offline support.
 
 const ACCOUNTS_CACHE_KEY = 'twosday_accounts_v1';
@@ -8,6 +14,27 @@ const SESSION_KEY        = 'twosday_session_v1';
 const ACCOUNTS_DOC       = () => db.collection('schedules').doc('accounts');
 
 let currentAccount = null;   // { username, profiles, firestoreDoc, notesDoc }
+
+// ── Firebase Auth claim layer ─────────────────────────────────────────────────
+// Firebase Auth's email/password provider requires an email; usernames aren't
+// emails, so each account gets a synthetic, never-emailed address. This is
+// fixed at claim time and stored as account.authEmail so a later username
+// rename can't orphan the Firebase Auth login (see renameProfile / settings.js).
+function syntheticEmail(username) {
+  return `${username.toLowerCase()}@twosday.local`;
+}
+
+// Creates the Firebase Auth user for a newly-verified (or newly-created)
+// account. Throws on failure — callers decide whether that's fatal.
+async function claimFirebaseAuth(username, password) {
+  const email = syntheticEmail(username);
+  const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
+  return { authUid: cred.user.uid, authEmail: email };
+}
+
+function firebaseAuthSignIn(authEmail, password) {
+  return firebase.auth().signInWithEmailAndPassword(authEmail, password);
+}
 
 // ── Account loading ───────────────────────────────────────────────────────────
 
@@ -66,6 +93,7 @@ function getSession() {
 
 function logout() {
   localStorage.removeItem(SESSION_KEY);
+  try { firebase.auth().signOut(); } catch (e) {}
   location.reload();
 }
 
@@ -109,19 +137,60 @@ function setupAuthListeners() {
     setError('login', 'checking…');
     const accounts = await refreshAccountsFromFirestore();
     const account  = accounts[username];
+    if (!account) { setError('login', 'invalid username or password'); return; }
 
-    if (!account || !(await verifyPassword(password, account.password))) {
-      setError('login', 'invalid username or password');
-      return;
+    const patch = {};   // fields to persist back to the account record, if any
+
+    if (account.authClaimed) {
+      // Firebase Auth is the source of truth for this account.
+      try {
+        await firebaseAuthSignIn(account.authEmail, password);
+      } catch (err) {
+        setError('login', 'invalid username or password');
+        return;
+      }
+    } else {
+      // Legacy path: verify against the stored hash (or plaintext, pre-migration).
+      if (!(await verifyPassword(password, account.password))) {
+        setError('login', 'invalid username or password');
+        return;
+      }
+      if (!isHashed(account.password)) patch.password = await hashPassword(password);
+
+      // Silently claim the account into Firebase Auth now that the password is
+      // verified. Non-fatal if it fails (e.g. provider not yet enabled in the
+      // Firebase Console) — the account simply stays on the legacy path and
+      // claiming is retried on the next successful login.
+      try {
+        const claim = await claimFirebaseAuth(username, password);
+        patch.authClaimed = true;
+        patch.authUid = claim.authUid;
+        patch.authEmail = claim.authEmail;
+      } catch (err) {
+        if (err.code === 'auth/email-already-in-use') {
+          // A prior claim attempt likely created the Firebase Auth user but the
+          // Firestore write recording it didn't complete (e.g. connection drop).
+          // Self-heal: sign in with the password we just verified and adopt it.
+          try {
+            const email = syntheticEmail(username);
+            const cred = await firebaseAuthSignIn(email, password);
+            patch.authClaimed = true;
+            patch.authUid = cred.user.uid;
+            patch.authEmail = email;
+          } catch (signInErr) {
+            console.warn('Firebase Auth self-heal sign-in failed, staying on legacy login:', signInErr);
+          }
+        } else {
+          console.warn('Firebase Auth claim failed, staying on legacy login:', err);
+        }
+      }
     }
 
-    // Silently migrate legacy plaintext password to a hash on first successful login.
-    if (!isHashed(account.password)) {
-      const hashed = await hashPassword(password);
-      const migrated = { ...accounts, [username]: { ...account, password: hashed } };
-      ACCOUNTS_DOC().set({ accounts: migrated, savedAt: Date.now() }).catch(() => {});
-      localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(migrated));
-      account.password = hashed;
+    if (Object.keys(patch).length) {
+      const updated = { ...accounts, [username]: { ...account, ...patch } };
+      ACCOUNTS_DOC().set({ accounts: updated, savedAt: Date.now() }).catch(() => {});
+      localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updated));
+      Object.assign(account, patch);
     }
 
     activateAccount(username, account);
@@ -176,6 +245,18 @@ function setupAuthListeners() {
       notesDoc: username + '-notes',
       createdAt: Date.now(),
     };
+
+    // Claim into Firebase Auth immediately so new accounts never touch the
+    // legacy hash-check path. Non-fatal if it fails (e.g. provider not yet
+    // enabled) — the account still works, claimed on its next login instead.
+    try {
+      const claim = await claimFirebaseAuth(username, password);
+      newAccount.authClaimed = true;
+      newAccount.authUid = claim.authUid;
+      newAccount.authEmail = claim.authEmail;
+    } catch (err) {
+      console.warn('Firebase Auth claim failed at signup, staying on legacy login:', err);
+    }
 
     const merged = { ...accounts, [username]: newAccount };
     try {
