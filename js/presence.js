@@ -28,10 +28,14 @@ function publishPresence(force = false) {
   if (!PRESENCE_DOC) return;
   PRESENCE_DOC.update({
     ['sessions.' + CLIENT_ID]: session,
+    accountId: currentAccount.username,
+    ownerUid: currentAccount.ownerUid,
     savedAt: session.updatedAt,
   }).catch(() => {
     PRESENCE_DOC.set({
       sessions: { [CLIENT_ID]: session },
+      accountId: currentAccount.username,
+      ownerUid: currentAccount.ownerUid,
       savedAt: session.updatedAt,
     }, { merge: true }).catch(e => console.warn('Presence update failed:', e));
   });
@@ -94,6 +98,8 @@ function clearPresence() {
   try {
     PRESENCE_DOC.update({
       ['sessions.' + CLIENT_ID]: firebase.firestore.FieldValue.delete(),
+      accountId: currentAccount.username,
+      ownerUid: currentAccount.ownerUid,
       savedAt: Date.now(),
     });
   } catch (e) {}

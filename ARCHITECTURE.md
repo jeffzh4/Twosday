@@ -24,6 +24,16 @@ Each account maps to three Firestore documents:
 
 The calendar listener ignores its own client echo, while applying remote saves from other sessions. Local storage is used as a fast cache and offline fallback.
 
+## Authentication and Authorization
+
+Firebase Authentication is the credential source of truth. Account metadata lives at `accounts/{username}` with an immutable `ownerUid`; calendar, notes, and presence documents repeat that UID plus an `accountId`. Firestore rules permit access only when `request.auth.uid` matches the owner and the data document path matches the account metadata.
+
+Previously claimed accounts are migrated after a successful Firebase Auth login. The old `schedules/accounts` registry is available only to authenticated users and is permanently read-only. `tests/firestore-rules-tests.js` verifies account privacy, data isolation, schema checks, owner immutability, and the migration path against the local Firestore Emulator.
+
+## Accessibility
+
+`makeModalAccessible()` supplies dialog semantics, focus trapping, `Escape` handling, and trigger-focus restoration across all modal workflows. Calendar dates, events, search results, profile tabs, and view tabs expose keyboard activation and accessible names. CSS provides consistent `:focus-visible` treatment, stronger text contrast, a skip link, and `prefers-reduced-motion` fallbacks.
+
 ## Core Workflows
 
 - Event editing flows through `modal.js`, `events.js`, and `state.js`.
@@ -47,8 +57,8 @@ The calendar listener ignores its own client echo, while applying remote saves f
 - ICS parsing
 - conflict collection
 
-Run:
+Run both core and Firestore rules tests:
 
 ```bash
-node tests/core-tests.js
+npm test
 ```

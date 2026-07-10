@@ -35,6 +35,84 @@ function clone(v) { return JSON.parse(JSON.stringify(v)); }
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function onKeyboardActivate(el, callback) {
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    callback(e);
+  });
+}
+
+function makeModalAccessible(bg, { titleSelector = 'h3', initialFocusSelector = null, onClose = null } = {}) {
+  const dialog = bg.querySelector('.modal');
+  if (!dialog) return;
+
+  const previousFocus = document.activeElement;
+  const title = dialog.querySelector(titleSelector);
+  if (title) {
+    if (!title.id) title.id = 'dialog-title-' + uid();
+    dialog.setAttribute('aria-labelledby', title.id);
+  } else {
+    dialog.setAttribute('aria-label', 'Dialog');
+  }
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.tabIndex = -1;
+
+  dialog.querySelectorAll('.field').forEach(field => {
+    const label = field.querySelector('label');
+    const control = field.querySelector('input, select, textarea');
+    if (!label || !control) return;
+    if (!control.id) control.id = 'field-' + uid();
+    if (!label.htmlFor) label.htmlFor = control.id;
+  });
+  dialog.querySelectorAll('input, select, textarea').forEach(control => {
+    if (control.labels && control.labels.length) return;
+    if (control.hasAttribute('aria-label') || control.hasAttribute('aria-labelledby')) return;
+    control.setAttribute('aria-label', control.placeholder || control.name || control.type || 'Input');
+  });
+  dialog.querySelectorAll('button').forEach(button => {
+    if (button.hasAttribute('aria-label')) return;
+    if (button.textContent.trim() === '×') button.setAttribute('aria-label', 'Close dialog');
+  });
+  dialog.querySelectorAll('.settings-msg, .conflict-warning, .find-time-summary, .conflict-center-summary')
+    .forEach(node => {
+      node.setAttribute('role', 'status');
+      node.setAttribute('aria-live', 'polite');
+    });
+
+  const close = () => onClose ? onClose() : bg.remove();
+  bg.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const focusable = Array.from(dialog.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )).filter(el => !el.hidden && el.offsetParent !== null);
+    if (!focusable.length) { e.preventDefault(); dialog.focus(); return; }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  const observer = new MutationObserver(() => {
+    if (bg.isConnected) return;
+    observer.disconnect();
+    if (previousFocus && previousFocus.isConnected && previousFocus.focus) previousFocus.focus();
+  });
+  observer.observe(document.body, { childList: true });
+
+  requestAnimationFrame(() => {
+    const initial = initialFocusSelector && dialog.querySelector(initialFocusSelector);
+    (initial || dialog).focus();
+  });
+}
 function getTheme() { return document.documentElement.getAttribute('data-theme'); }
 function getOtherUser(user) {
   // Returns the *other* profile in the current account (works for any name pair)

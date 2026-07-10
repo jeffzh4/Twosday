@@ -5,6 +5,8 @@ function toggleSearch(force) {
   searchOpen = force !== undefined ? force : !searchOpen;
   const container = document.getElementById('search-container');
   container.style.display = searchOpen ? 'flex' : 'none';
+  container.setAttribute('aria-hidden', String(!searchOpen));
+  document.getElementById('btn-search').setAttribute('aria-expanded', String(searchOpen));
   if (searchOpen) {
     const input = document.getElementById('search-input');
     input.value = '';
@@ -61,6 +63,9 @@ function renderSearchResults(query) {
 
     const row = document.createElement('div');
     row.className = 'search-result' + (ev.done ? ' done' : '');
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.setAttribute('aria-label', `${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}, ${dateKey}`);
     row.innerHTML =
       `<span class="search-result-dot" style="background:${p.text}"></span>` +
       `<span class="search-result-date${isToday ? ' today' : ''}">${isToday ? 'today' : `${dayShort}, ${monthShort} ${d.getDate()}`}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''}</span>` +
@@ -77,6 +82,7 @@ function renderSearchResults(query) {
       // Small delay to let the grid paint before opening modal
       setTimeout(() => openModal({ dateKey, editEvId: ev.id }), 80);
     });
+    onKeyboardActivate(row, () => row.click());
 
     resultsEl.appendChild(row);
   });

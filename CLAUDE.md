@@ -21,7 +21,7 @@ A multi-file HTML/JS/CSS web app for two people to manage a shared calendar. No 
 ## Architecture
 - **Multi-file vanilla JS** — no framework, no bundler. Scripts loaded in dependency order in `index.html`.
 - **Backend:** Firebase Firestore for real-time sync. Each account writes to its own Firestore document.
-- **Auth:** Custom username/password. Passwords are hashed client-side with SHA-256 (Web Crypto API) before storage. Legacy plaintext passwords auto-migrate to a hash on next successful login.
+- **Auth:** Firebase Authentication verifies username-derived email/password credentials and optional linked Google sign-in. Firestore rules enforce per-account ownership through `request.auth.uid`.
 - **Local persistence:** `localStorage` as a cache/fallback. App is usable offline after first load.
 - **Hosting:** Vercel — auto-deploys on push to `main`.
 
@@ -29,8 +29,8 @@ A multi-file HTML/JS/CSS web app for two people to manage a shared calendar. No 
 ```
 index.html              # App shell, landing screen, auth overlay
 favicon.svg
-firestore.rules         # Firestore security rules (defense-in-depth; see Auth System)
-firebase.json           # Points the Firebase CLI at firestore.rules
+firestore.rules         # Owner-scoped account and schedule authorization
+firebase.json           # Rules + local Firestore Emulator configuration
 css/
   style.css             # All styles: themes, grid, modals, mobile responsive
 js/
@@ -57,6 +57,7 @@ js/
     year.js             # Year overview (12 mini-months)
 tests/
   core-tests.js         # Node/VM regression tests for pure logic (no DOM)
+  firestore-rules-tests.js # Emulator-backed authorization tests
 scripts/
   seed-demo.html        # One-shot browser script to populate the demo account (gitignored)
 ```
@@ -66,7 +67,7 @@ scripts/
 |---|---|
 | `USERS` | `[profile1, profile2]` — the two profile names for the logged-in account |
 | `activeUser` | Currently selected profile name |
-| `currentAccount` | `{ username, password, profiles, profileEmojis, firestoreDoc, notesDoc, authClaimed?, authUid?, authEmail?, googleLinked? }` |
+| `currentAccount` | `{ username, ownerUid, password, profiles, profileEmojis, firestoreDoc, notesDoc, authUid, authEmail, googleLinked? }` |
 | `FIRESTORE_DOC` | Firestore ref for the account's events doc |
 | `NOTES_DOC` | Firestore ref for the account's notes doc |
 | `PRESENCE_DOC` | Firestore ref for the account's presence doc (`{firestoreDoc}-presence`) |
@@ -108,18 +109,22 @@ userNotes["alex"] = [
   { text: "remember to...", time: 1716230400000 }
 ]
 
-// Account record — stored in Firestore at schedules/accounts
-accounts["myusername"] = {
-  password: "<sha256-hex>",       // always kept in sync; the fallback of record
+// Account record — stored at accounts/{username}
+account = {
+  ownerUid: "abc123...",          // immutable Firebase Auth ownership boundary
+  password: "<sha256-hex>",       // used to confirm sensitive settings changes
   profiles: ["alex", "jamie"],
   profileEmojis: ["☕", "🌙"],   // optional, empty string = no emoji
   firestoreDoc: "myusername",
   notesDoc: "myusername-notes",
   createdAt: 1716230400000,
-  authClaimed: true,              // false/absent until Firebase Auth claims this account
-  authUid: "abc123...",           // Firebase Auth user id, once claimed
-  authEmail: "myusername@twosday.local",  // frozen at claim time — see Auth System
+  authClaimed: true,
+  authUid: "abc123...",
+  authEmail: "myusername@twosday.local",
 }
+
+// Calendar, notes, and presence documents repeat ownership metadata
+scheduleDocument = { ownerUid: "abc123...", accountId: "myusername", /* data map */ }
 ```
 
 ## Core Functions
@@ -138,10 +143,12 @@ accounts["myusername"] = {
 | `showToast(msg, type)` | utils.js | Non-intrusive bottom notification (error / success / info) |
 | `hashPassword(pwd)` | utils.js | SHA-256 hash via Web Crypto API; returns hex string (async) |
 | `verifyPassword(input, stored)` | utils.js | Compares input against stored hash or legacy plaintext (async) |
-| `activateAccount(username, account)` | auth.js | Sets all per-account globals after login |
-| `claimFirebaseAuth(username, password)` | auth.js | Creates the Firebase Auth user for this account; throws on failure (non-fatal for callers) |
-| `firebaseAuthSignIn(authEmail, password)` | auth.js | Signs in via Firebase Auth for already-claimed accounts |
-| `handleGoogleSignIn(formId)` | auth.js | Login/signup "continue with Google" button; only logs in if a claimed account's `authUid` matches |
+| `activateAccount(username, account)` | auth.js | Sets all per-account globals after ownership is verified |
+| `prepareAccount(username, account)` | auth.js | Verifies the Auth UID and claims/migrates the three data documents |
+| `claimFirebaseAuth(username, password)` | auth.js | Creates the Firebase Auth user for a new or cached legacy account |
+| `firebaseAuthSignIn(authEmail, password)` | auth.js | Signs in through Firebase Auth |
+| `handleGoogleSignIn(formId)` | auth.js | Resolves a linked Google identity through an owner-filtered account query |
+| `makeModalAccessible(bg, options)` | utils.js | Adds dialog semantics, focus trap, Escape close, and focus restoration |
 | `openSettingsModal()` | settings.js | Renders the account settings modal (stats, export, emoji, delete) |
 | `computeStats()` | settings.js | Aggregates event counts / busiest day / top color across both profiles |
 | `exportICS(user)` | settings.js | Downloads a profile's events as an RFC 5545 `.ics` file |
@@ -162,27 +169,19 @@ accounts["myusername"] = {
 - `palette(ev)` resolution order: explicit `ev.color` → shared indicator → auto-category
 
 ## Auth System
-- Accounts stored in Firestore `schedules/accounts` as `{ accounts: { [username]: {...} }, savedAt }`
-- Passwords hashed with SHA-256 (Web Crypto API) before storage. `isHashed(str)` checks for a 64-char hex string. `verifyPassword` supports both hashed and legacy plaintext for seamless migration.
-- Each account has two profiles, optional profile emojis, its own Firestore events doc, a separate notes doc, presence doc, and scoped localStorage keys.
-- Session persisted in `localStorage` (`twosday_session_v1`) for instant reload without re-fetching Firestore.
-- `ACCOUNTS_DOC` is a function `() => db.collection('schedules').doc('accounts')` — called fresh each time to avoid stale refs.
-
-### Firebase Auth claim layer
-- Firebase Authentication (email/password provider) sits on top of the account record as the credential verifier, added without touching any calendar/notes/presence document — those still live at the same `schedules/{firestoreDoc}` paths, keyed by username, regardless of auth path.
-- **Synthetic email:** Firebase Auth requires an email; `syntheticEmail(username)` produces `{username}@twosday.local` (never emailed anywhere). This is fixed at claim time and stored as `account.authEmail`, so a later username rename (`renameProfile`) can't orphan the Firebase Auth login — sign-in always uses the frozen `authEmail`, never re-derived from the current username.
-- **Claim on login (existing accounts):** on a successful legacy hash check, `claimFirebaseAuth(username, password)` creates a Firebase Auth user and the account record is patched with `authClaimed: true, authUid, authEmail` in the same Firestore write as any pending plaintext→hash migration. Claiming is **non-fatal** — if it fails (most commonly because the Email/Password provider isn't yet enabled in the Firebase Console), the account simply stays on the legacy path and claiming retries on the next login. The app is fully functional with zero accounts claimed.
-- **Claim on signup (new accounts):** `claimFirebaseAuth` runs immediately after building the new account record, before the single Firestore write — new accounts go straight to Firebase Auth and never touch the legacy hash-check path (unless claiming fails, same non-fatal fallback).
-- **Subsequent logins:** if `account.authClaimed`, sign-in goes through `firebaseAuthSignIn(account.authEmail, password)` exclusively — the legacy hash is not re-checked, though it stays in sync (see below) as the fallback of record.
-- **Password change / delete account** (`settings.js`): the legacy hash is always the field settings.js itself verifies and updates. For claimed accounts, `firebase.auth().currentUser.updatePassword()` / `.delete()` are called as best-effort side effects to keep the Auth user in sync — failures there don't block the primary Firestore write.
-- **One manual step required, not automatable from code:** the Email/Password sign-in provider must be enabled once in the Firebase Console (Authentication → Sign-in method) for project `jhschedule4`. Until then, every claim/sign-in call rejects with `auth/operation-not-allowed` and the app gracefully continues on the legacy path — no user-visible breakage either way.
-- **Password minimum is 6 characters** (signup and settings password-change), matching Firebase Auth's hard, non-configurable floor. An account whose legacy password is shorter than 6 characters will fail to claim (`auth/weak-password`, caught non-fatally) on every login until the password is changed to 6+ characters via Settings — the *next* login after that change completes the claim.
-- **Google sign-in is account-linking only, not a signup path — by design, exactly one Google account per (two-profile) login.** Because Twosday's accounts are shared units, not 1:1 with a person, a fresh Google identity has no way to know which existing account it belongs to, and Firebase Auth's `linkWithPopup` only has room for one linked Google identity per Firebase Auth user anyway. So: `handleGoogleSignIn(formId)` — present as a "continue with Google" button on **both** the login and signup tabs (`formId` routes status text to the right tab's error slot) — looks up `accounts[*].authUid === <signed-in Google uid>` and logs in only if a match exists; a brand-new Google identity gets "no account linked yet" on either tab, never a new account. Linking itself happens from Settings → "connect Google" (`currentAccount.authClaimed` required), via `firebase.auth().currentUser.linkWithPopup(GoogleAuthProvider)`, which attaches Google to the same Firebase Auth user created at claim time — same `authUid`, so the login/signup lookup works either way. Both partners keep normal username/password login regardless of whether Google is connected.
-- **Security posture:** `firestore.rules` confines access to the `schedules` collection, validates document shape, and blocks deletion of the shared `accounts` registry — defense-in-depth against corruption/abuse. Firestore rules still don't enforce per-account ownership (`request.auth.uid`), since document paths are keyed by username, not Firebase Auth UID, and rewriting that path scheme is a separate, deliberately out-of-scope follow-up once accounts are broadly claimed.
+- Account metadata lives at `accounts/{username}` and carries immutable `ownerUid`, `authUid`, and username-derived `authEmail` fields.
+- Firebase Authentication is required before cloud data is loaded. New accounts fail closed if Auth cannot be created; there is no anonymous Firestore fallback.
+- Calendar, notes, and presence documents carry `ownerUid` and `accountId`. Rules verify both the Auth UID and that each document path matches the account's configured data paths.
+- Previously claimed accounts migrate after a successful Firebase Auth login. The old `schedules/accounts` registry is authenticated, permanently read-only, and used only as the migration source.
+- A legacy account cached on the same browser can be verified locally, claimed into Firebase Auth, and migrated without exposing the old registry anonymously.
+- Username and password changes reauthenticate first. Username changes update the synthetic Auth email; password changes update Firebase Auth and the confirmation hash together, with rollback attempts on failed persistence.
+- Google remains an account-linking sign-in path. The current product model links one Google identity to the shared two-profile account; multi-identity and partner-level permissions are deferred product decisions.
+- Session state remains in `localStorage`, but account restoration waits for Firebase Auth and verifies `account.ownerUid === currentUser.uid` before booting.
 
 ## Testing
 - `tests/core-tests.js` loads the browser modules into a Node `vm` context (stubbed `document`, real `Date`) and exercises pure logic only — no DOM assertions.
-- Run with `npm test`. Covers: date helpers, shared-event mirroring, undo/redo, sync-signature dedup, password-hash guard, stats aggregation, ICS formatting, profile rename, demo-seed idempotency, free-window detection, analytics aggregation, ICS parsing, and conflict collection.
+- `tests/firestore-rules-tests.js` runs against the Firestore Emulator and verifies anonymous denial, account privacy, owner-only data access, immutable ownership, schema/path validation, and safe legacy claiming.
+- Run both suites with `npm test` (Java is required for the emulator).
 - Values returned from `exec()` (vm-context objects) live in a separate JS realm from the test file — compare arrays/objects with the `plain()` helper (`JSON.parse(JSON.stringify(...))`) before `assert.deepStrictEqual`, not directly, or the comparison spuriously fails on prototype identity.
 
 ## UI Features

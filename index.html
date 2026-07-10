@@ -6,29 +6,33 @@
   <title>Twosday</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260709-security-a11y">
 </head>
 <body>
+
+<a class="skip-link" href="#main-content">skip to calendar</a>
 
 <!-- Sync indicator: thin bar at top during initial Firestore fetch -->
 <div class="sync-bar" id="sync-bar" style="display:none"></div>
 
 <!-- Auth overlay (shown until logged in) -->
-<div class="auth-overlay" id="auth-overlay">
+<div class="auth-overlay" id="auth-overlay" aria-labelledby="auth-title">
   <div class="auth-hero">
-    <div class="auth-wordmark">twosday</div>
+    <div class="auth-wordmark" id="auth-title">twosday</div>
     <p class="auth-tagline">a shared calendar for the two of you</p>
   </div>
   <div class="auth-card">
-    <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="login">log in</button>
-      <button class="auth-tab" data-tab="signup">sign up</button>
+    <div class="auth-tabs" role="tablist" aria-label="Account access">
+      <button class="auth-tab active" id="login-tab" data-tab="login" role="tab" aria-controls="login-form" aria-selected="true">log in</button>
+      <button class="auth-tab" id="signup-tab" data-tab="signup" role="tab" aria-controls="signup-form" aria-selected="false" tabindex="-1">sign up</button>
     </div>
 
-    <form class="auth-form" id="login-form" autocomplete="on">
+    <form class="auth-form" id="login-form" role="tabpanel" aria-labelledby="login-tab" autocomplete="on">
+      <label class="sr-only" for="login-username">username</label>
       <input type="text" id="login-username" placeholder="username" autocomplete="username" />
+      <label class="sr-only" for="login-password">password</label>
       <input type="password" id="login-password" placeholder="password" autocomplete="current-password" />
-      <div class="auth-error" id="login-error"></div>
+      <div class="auth-error" id="login-error" role="status" aria-live="polite"></div>
       <button type="submit">log in</button>
       <div class="auth-divider"><span>or</span></div>
       <button type="button" class="auth-google-btn" id="btn-google-signin">
@@ -42,13 +46,18 @@
       </button>
     </form>
 
-    <form class="auth-form hidden" id="signup-form" autocomplete="off">
+    <form class="auth-form hidden" id="signup-form" role="tabpanel" aria-labelledby="signup-tab" autocomplete="off" hidden>
+      <label class="sr-only" for="signup-username">choose a username</label>
       <input type="text" id="signup-username" placeholder="choose a username" autocomplete="username" />
+      <label class="sr-only" for="signup-password">choose a password</label>
       <input type="password" id="signup-password" placeholder="choose a password" autocomplete="new-password" />
+      <label class="sr-only" for="signup-password-confirm">confirm password</label>
       <input type="password" id="signup-password-confirm" placeholder="confirm password" autocomplete="new-password" />
+      <label class="sr-only" for="signup-profile1">first profile name</label>
       <input type="text" id="signup-profile1" placeholder="first profile name (e.g. jeff)" />
+      <label class="sr-only" for="signup-profile2">second profile name</label>
       <input type="text" id="signup-profile2" placeholder="second profile name (e.g. helen)" />
-      <div class="auth-error" id="signup-error"></div>
+      <div class="auth-error" id="signup-error" role="status" aria-live="polite"></div>
       <button type="submit">create account</button>
       <div class="auth-hint">both profile names appear as tabs in your calendar</div>
       <div class="auth-divider"><span>or</span></div>
@@ -68,62 +77,64 @@
 
 <!-- Main app (hidden until logged in) -->
 <div class="app" style="display:none">
-  <div class="header">
+  <header class="header">
     <div class="header-left">
-      <div class="title">twosday</div>
-      <div class="nav-controls">
-        <button class="nav-btn" id="btn-prev">&#8249;</button>
-        <div class="nav-label" id="nav-label"></div>
-        <button class="nav-btn" id="btn-next">&#8250;</button>
+      <h1 class="title">twosday</h1>
+      <nav class="nav-controls" aria-label="Calendar date navigation">
+        <button class="nav-btn" id="btn-prev" aria-label="Previous period">&#8249;</button>
+        <div class="nav-label" id="nav-label" aria-live="polite"></div>
+        <button class="nav-btn" id="btn-next" aria-label="Next period">&#8250;</button>
         <button class="nav-today-btn" id="btn-today">today</button>
-      </div>
+      </nav>
     </div>
     <div class="header-right">
       <div class="user-pill" id="user-pill">
         <span class="user-pill-name" id="user-pill-name"></span>
-        <button class="user-pill-settings" id="btn-settings" title="Account settings">&#9881;</button>
+        <button class="user-pill-settings" id="btn-settings" title="Account settings" aria-label="Account settings">&#9881;</button>
         <button class="user-pill-logout" id="btn-logout">log out</button>
       </div>
-      <button class="btn-icon" id="btn-search" title="Search events (/)">&#128269;</button>
-      <button class="btn-icon" id="btn-theme" title="Toggle theme">&#9790;</button>
-      <button class="btn-icon" id="btn-undo" title="Undo">&#8630;</button>
-      <button class="btn-icon" id="btn-redo" title="Redo">&#8631;</button>
-      <div class="view-switch" id="view-switch"></div>
+      <button class="btn-icon" id="btn-search" title="Search events (/)" aria-label="Search events" aria-controls="search-container" aria-expanded="false">&#128269;</button>
+      <button class="btn-icon" id="btn-theme" title="Toggle theme" aria-label="Toggle color theme">&#9790;</button>
+      <button class="btn-icon" id="btn-undo" title="Undo" aria-label="Undo last calendar change">&#8630;</button>
+      <button class="btn-icon" id="btn-redo" title="Redo" aria-label="Redo last calendar change">&#8631;</button>
+      <div class="view-switch" id="view-switch" role="tablist" aria-label="Calendar view"></div>
       <button class="btn-calendar-tools" id="btn-calendar-tools">import/export</button>
       <button class="btn-conflicts" id="btn-conflicts">conflicts</button>
       <button class="btn-find" id="btn-find-time">find time</button>
-      <button class="notes-toggle" id="btn-notes">&#9998; notes</button>
+      <button class="notes-toggle" id="btn-notes" aria-controls="notes-panel" aria-expanded="false">&#9998; notes</button>
     </div>
-  </div>
-  <div class="user-switcher" id="user-switcher"></div>
+  </header>
+  <div class="user-switcher" id="user-switcher" role="tablist" aria-label="Profile calendar"></div>
   <div class="presence-strip" id="presence-strip" aria-live="polite"></div>
 
   <!-- Search bar (hidden by default, slides in below user-switcher) -->
-  <div class="search-container" id="search-container" style="display:none">
+  <div class="search-container" id="search-container" role="search" style="display:none">
     <div class="search-bar-row">
       <span class="search-icon-inline">&#128269;</span>
+      <label class="sr-only" for="search-input">search events across all dates</label>
       <input class="search-input" id="search-input" placeholder="search events across all dates…" autocomplete="off" />
-      <button class="search-close-btn" id="search-close">&#215;</button>
+      <button class="search-close-btn" id="search-close" aria-label="Close search">&#215;</button>
     </div>
     <div class="search-results" id="search-results"></div>
   </div>
 
-  <div class="main-content" id="main-content"></div>
+  <main class="main-content" id="main-content" tabindex="-1"></main>
 </div>
 
-<div class="notes-panel" id="notes-panel">
+<aside class="notes-panel" id="notes-panel" aria-label="Profile notes" aria-hidden="true" inert>
   <div class="notes-header">
     <h3>notes</h3>
-    <button class="notes-close" id="notes-close">&times;</button>
+    <button class="notes-close" id="notes-close" aria-label="Close notes">&times;</button>
   </div>
   <div class="notes-list" id="notes-list"></div>
   <div class="notes-input-area">
     <div class="notes-input-row">
+      <label class="sr-only" for="notes-input">write a note</label>
       <textarea class="notes-input" id="notes-input" placeholder="write a note..." rows="1"></textarea>
       <button class="notes-send" id="notes-send">add</button>
     </div>
   </div>
-</div>
+</aside>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -131,27 +142,27 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
 <!-- App scripts — order matters (global scope, no bundler) -->
-<script src="js/config.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/state.js"></script>
-<script src="js/presence.js"></script>
-<script src="js/demo-data.js"></script>
-<script src="js/events.js"></script>
-<script src="js/modal.js"></script>
-<script src="js/repeat-modal.js"></script>
-<script src="js/find-time.js"></script>
-<script src="js/analytics.js"></script>
-<script src="js/import.js?v=20260617-tools"></script>
-<script src="js/conflicts.js"></script>
-<script src="js/search.js"></script>
-<script src="js/views/day-week.js"></script>
-<script src="js/views/month.js"></script>
-<script src="js/views/year.js"></script>
-<script src="js/notes.js"></script>
-<script src="js/settings.js?v=20260617-tools"></script>
-<script src="js/app.js?v=20260617-tools"></script>
+<script src="js/config.js?v=20260709-security-a11y"></script>
+<script src="js/utils.js?v=20260709-security-a11y"></script>
+<script src="js/state.js?v=20260709-security-a11y"></script>
+<script src="js/presence.js?v=20260709-security-a11y"></script>
+<script src="js/demo-data.js?v=20260709-security-a11y"></script>
+<script src="js/events.js?v=20260709-security-a11y"></script>
+<script src="js/modal.js?v=20260709-security-a11y"></script>
+<script src="js/repeat-modal.js?v=20260709-security-a11y"></script>
+<script src="js/find-time.js?v=20260709-security-a11y"></script>
+<script src="js/analytics.js?v=20260709-security-a11y"></script>
+<script src="js/import.js?v=20260709-security-a11y"></script>
+<script src="js/conflicts.js?v=20260709-security-a11y"></script>
+<script src="js/search.js?v=20260709-security-a11y"></script>
+<script src="js/views/day-week.js?v=20260709-security-a11y"></script>
+<script src="js/views/month.js?v=20260709-security-a11y"></script>
+<script src="js/views/year.js?v=20260709-security-a11y"></script>
+<script src="js/notes.js?v=20260709-security-a11y"></script>
+<script src="js/settings.js?v=20260709-security-a11y"></script>
+<script src="js/app.js?v=20260709-security-a11y"></script>
 <!-- auth.js last: defines DOMContentLoaded handler that calls bootApp() -->
-<script src="js/auth.js"></script>
+<script src="js/auth.js?v=20260709-security-a11y"></script>
 
 </body>
 </html>

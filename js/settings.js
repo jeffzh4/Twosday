@@ -270,6 +270,7 @@ function openSettingsModal() {
   bg.addEventListener('click', e => { if (e.target === bg) _closeModal(); });
   document.body.appendChild(bg);
   document.addEventListener('click', _closePopovers);
+  makeModalAccessible(bg, { initialFocusSelector: '#s-close', onClose: _closeModal });
 
   document.getElementById('s-close').onclick = _closeModal;
 
@@ -332,13 +333,9 @@ function openSettingsModal() {
         const provider = new firebase.auth.GoogleAuthProvider();
         await firebase.auth().currentUser.linkWithPopup(provider);
 
-        const accounts = await refreshAccountsFromFirestore();
-        const updatedAccounts = {
-          ...accounts,
-          [currentAccount.username]: { ...accounts[currentAccount.username], googleLinked: true },
-        };
-        await ACCOUNTS_DOC().set({ accounts: updatedAccounts, savedAt: Date.now() });
-        localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
+        const updatedAccount = { ...currentAccount, googleLinked: true };
+        delete updatedAccount.username;
+        await saveAccountRecord(currentAccount.username, updatedAccount);
         currentAccount = { ...currentAccount, googleLinked: true };
 
         connectGoogleBtn.textContent = 'connected';
@@ -377,19 +374,27 @@ function openSettingsModal() {
 
     setMsg('s-username-msg', 'saving…', false);
 
-    const accounts = await refreshAccountsFromFirestore();
-    if (accounts[newUsername]) { setMsg('s-username-msg', 'username already taken'); return; }
-
-    const oldUsername     = currentAccount.username;
-    const updatedAccount  = { ...accounts[oldUsername] };
-    const updatedAccounts = { ...accounts };
-    delete updatedAccounts[oldUsername];
-    updatedAccounts[newUsername] = updatedAccount;
+    const oldUsername = currentAccount.username;
+    const updatedAccount = { ...currentAccount };
+    delete updatedAccount.username;
+    const authUser = firebase.auth().currentUser;
+    const oldAuthEmail = updatedAccount.authEmail;
+    const newAuthEmail = syntheticEmail(newUsername);
 
     try {
-      await ACCOUNTS_DOC().set({ accounts: updatedAccounts, savedAt: Date.now() });
+      if (!authUser) throw new Error('sign in again before changing your username');
+      const credential = firebase.auth.EmailAuthProvider.credential(authUser.email, pwd);
+      await authUser.reauthenticateWithCredential(credential);
+      await authUser.updateEmail(newAuthEmail);
+      updatedAccount.authEmail = newAuthEmail;
+      await saveAccountRecord(newUsername, updatedAccount);
+      await ACCOUNT_DOC(oldUsername).delete();
     } catch (err) {
-      setMsg('s-username-msg', 'save failed: ' + err.message); return;
+      if (authUser && oldAuthEmail && authUser.email === newAuthEmail) {
+        try { await authUser.updateEmail(oldAuthEmail); } catch (rollbackError) {}
+      }
+      removeCachedAccount(newUsername);
+      setMsg('s-username-msg', 'username unavailable or save failed'); return;
     }
 
     // Migrate localStorage keys
@@ -408,8 +413,9 @@ function openSettingsModal() {
     if (pr) { localStorage.setItem(PRESENCE_KEY, pr);      localStorage.removeItem(oldPK); }
     if (cl) { localStorage.setItem(CUSTOM_COLORS_KEY, cl); localStorage.removeItem(oldCK); }
 
-    localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
-    currentAccount = { ...currentAccount, username: newUsername };
+    removeCachedAccount(oldUsername);
+    cacheAccount(newUsername, updatedAccount);
+    currentAccount = { ...currentAccount, username: newUsername, authEmail: newAuthEmail };
     saveSession(newUsername);
     renderUserPill();
 
@@ -430,28 +436,26 @@ function openSettingsModal() {
 
     setMsg('s-password-msg', 'saving…', false);
 
-    const hashed   = await hashPassword(newPwd);
-    const accounts = await refreshAccountsFromFirestore();
-    const updatedAccounts = {
-      ...accounts,
-      [currentAccount.username]: { ...accounts[currentAccount.username], password: hashed },
-    };
+    const hashed = await hashPassword(newPwd);
+    const updatedAccount = { ...currentAccount, password: hashed };
+    delete updatedAccount.username;
 
     try {
-      await ACCOUNTS_DOC().set({ accounts: updatedAccounts, savedAt: Date.now() });
+      const authUser = firebase.auth().currentUser;
+      if (!authUser) throw new Error('sign in again before changing your password');
+      const credential = firebase.auth.EmailAuthProvider.credential(authUser.email, cur);
+      await authUser.reauthenticateWithCredential(credential);
+      await authUser.updatePassword(newPwd);
+      await saveAccountRecord(currentAccount.username, updatedAccount);
     } catch (err) {
+      const authUser = firebase.auth().currentUser;
+      if (authUser) {
+        try { await authUser.updatePassword(cur); } catch (rollbackError) {}
+      }
       setMsg('s-password-msg', 'save failed: ' + err.message); return;
     }
 
-    localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
     currentAccount = { ...currentAccount, password: hashed };
-
-    // Keep the Firebase Auth credential in sync for claimed accounts. Best-effort:
-    // the hash above remains the source of truth for login either way.
-    if (currentAccount.authClaimed && firebase.auth().currentUser) {
-      firebase.auth().currentUser.updatePassword(newPwd).catch(err =>
-        console.warn('Firebase Auth password sync failed:', err));
-    }
 
     document.getElementById('s-cur-pwd').value     = '';
     document.getElementById('s-new-pwd').value     = '';
@@ -484,23 +488,19 @@ function openSettingsModal() {
     if (p1 !== old1) renameProfile(old1, p1);
     if (p2 !== old2) renameProfile(old2, p2);
 
-    const accounts = await refreshAccountsFromFirestore();
-    const updatedAccounts = {
-      ...accounts,
-      [currentAccount.username]: {
-        ...accounts[currentAccount.username],
-        profiles: [p1, p2],
-        profileEmojis: [e1, e2],
-      },
+    const updatedAccount = {
+      ...currentAccount,
+      profiles: [p1, p2],
+      profileEmojis: [e1, e2],
     };
+    delete updatedAccount.username;
 
     try {
-      await ACCOUNTS_DOC().set({ accounts: updatedAccounts, savedAt: Date.now() });
+      await saveAccountRecord(currentAccount.username, updatedAccount);
     } catch (err) {
       setMsg('s-profiles-msg', 'save failed: ' + err.message); return;
     }
 
-    localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updatedAccounts));
     currentAccount = { ...currentAccount, profiles: [p1, p2], profileEmojis: [e1, e2] };
 
     saveToLocalStorage();
@@ -518,19 +518,12 @@ function openSettingsModal() {
 
     setMsg('s-delete-msg', 'deleting…', false);
 
-    try {
-      const accounts = await refreshAccountsFromFirestore();
-      const updatedAccounts = { ...accounts };
-      delete updatedAccounts[currentAccount.username];
-      await ACCOUNTS_DOC().set({ accounts: updatedAccounts, savedAt: Date.now() });
-    } catch (err) {
-      setMsg('s-delete-msg', 'failed: ' + err.message); return;
-    }
-
-    // Best-effort deletion of event + notes documents
+    // Delete owned data before removing the account document that authorizes it.
     try { await FIRESTORE_DOC.delete(); } catch (e) {}
     try { await NOTES_DOC.delete();     } catch (e) {}
     try { await PRESENCE_DOC.delete();  } catch (e) {}
+    try { await ACCOUNT_DOC(currentAccount.username).delete(); }
+    catch (err) { setMsg('s-delete-msg', 'failed: ' + err.message); return; }
     if (currentAccount.authClaimed && firebase.auth().currentUser) {
       try { await firebase.auth().currentUser.delete(); } catch (e) {}
     }

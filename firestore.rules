@@ -1,50 +1,83 @@
 rules_version = '2';
 
-// ── Twosday Firestore security rules ─────────────────────────────────────────
-//
-// SCOPE — what these rules do and do NOT do.
-//
-// Twosday authenticates with a custom username/password scheme, NOT Firebase
-// Auth, so `request.auth` is always null and the rules layer has no notion of
-// "the signed-in owner." True per-account access control is therefore not
-// possible here — these rules are DEFENSE-IN-DEPTH against abuse and corruption,
-// not a privacy boundary. Concretely they:
-//
-//   • confine every read/write to the /schedules collection (deny everything else),
-//   • validate document shape so malformed/junk writes are rejected,
-//   • forbid deleting the shared `accounts` registry — the catastrophic
-//     "wipe every account" case — while still allowing normal updates.
-//
-// They do NOT prevent a determined actor who reads the public client code from
-// reading the accounts document or overwriting a calendar. Closing that gap
-// requires migrating to Firebase Auth so rules can key on request.auth.uid
-// (tracked in PUBLIC_LAUNCH_NOTES.md).
-
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
 
-    // Per-account event, notes, and presence documents:
-    //   schedules/{user}, schedules/{user}-notes, schedules/{user}-presence
-    // Each carries exactly one of these top-level maps; require it so shapeless
-    // junk writes are rejected. The accounts registry is handled separately.
-    function validAccountDoc() {
-      let d = request.resource.data;
-      return d.allData is map || d.notes is map || d.sessions is map;
+    function ownsAccount(username) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/accounts/$(username))
+        && get(/databases/$(database)/documents/accounts/$(username)).data.ownerUid == request.auth.uid;
+    }
+
+    function validAccount(data) {
+      return data.ownerUid is string
+        && data.profiles is list
+        && data.profiles.size() == 2
+        && data.firestoreDoc is string
+        && data.notesDoc is string;
+    }
+
+    function validScheduleShape(data) {
+      return (data.keys().hasAny(['allData']) && data.allData is map)
+        || (data.keys().hasAny(['notes']) && data.notes is map)
+        || (data.keys().hasAny(['sessions']) && data.sessions is map);
+    }
+
+    function linkedScheduleDocument(docId, data) {
+      let account = get(/databases/$(database)/documents/accounts/$(data.accountId)).data;
+      return ownsAccount(data.accountId)
+        && (
+          (data.keys().hasAny(['allData']) && data.allData is map && account.firestoreDoc == docId)
+          || (data.keys().hasAny(['notes']) && data.notes is map && account.notesDoc == docId)
+          || (data.keys().hasAny(['sessions']) && data.sessions is map && account.firestoreDoc + '-presence' == docId)
+        );
+    }
+
+    function validOwnedSchedule(docId, data) {
+      return signedIn()
+        && data.ownerUid == request.auth.uid
+        && data.accountId is string
+        && validScheduleShape(data)
+        && linkedScheduleDocument(docId, data);
+    }
+
+    // Account metadata is isolated by Firebase Auth UID. Usernames remain the
+    // document IDs so uniqueness can be enforced by Firestore itself.
+    match /accounts/{username} {
+      allow create: if signedIn()
+        && validAccount(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow read, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid
+        && validAccount(request.resource.data);
     }
 
     match /schedules/{docId} {
-      allow read: if true;
-      allow create, update: if docId != 'accounts' && validAccountDoc();
-      allow delete: if docId != 'accounts';
+      // Existing installations used one shared account registry. It is now a
+      // signed-in, read-only migration source and cannot be changed by clients.
+      allow read: if docId == 'accounts' && signedIn();
+      allow write: if docId == 'accounts' && false;
+
+      allow create: if docId != 'accounts'
+        && validOwnedSchedule(docId, request.resource.data);
+      allow read, delete: if docId != 'accounts'
+        && signedIn()
+        && resource.data.ownerUid == request.auth.uid;
+      allow update: if docId != 'accounts'
+        && validOwnedSchedule(docId, request.resource.data)
+        && (
+          resource.data.ownerUid == request.auth.uid
+          || !resource.data.keys().hasAny(['ownerUid'])
+        );
     }
 
-    // The shared accounts registry: schedules/accounts = { accounts: {...}, ... }.
-    // Every write must keep `accounts` a map (blocks corruption / empty-wipe),
-    // and it can never be deleted.
-    match /schedules/accounts {
-      allow read: if true;
-      allow create, update: if request.resource.data.accounts is map;
-      allow delete: if false;
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

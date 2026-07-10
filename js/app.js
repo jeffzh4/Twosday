@@ -43,10 +43,22 @@ function renderViewSwitch() {
     const btn = document.createElement('button');
     btn.className = 'view-btn' + (viewMode === v ? ' active' : '');
     btn.textContent = v;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', String(viewMode === v));
+    btn.tabIndex = viewMode === v ? 0 : -1;
     btn.onclick = () => {
       viewMode = v;
       render();
     };
+    btn.addEventListener('keydown', e => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault();
+      const views = ['day','week','month','year'];
+      const next = views[(views.indexOf(v) + (e.key === 'ArrowRight' ? 1 : -1) + views.length) % views.length];
+      viewMode = next;
+      render();
+      document.querySelector(`.view-btn[aria-selected="true"]`).focus();
+    });
     c.appendChild(btn);
   });
 }
@@ -60,6 +72,10 @@ function renderUserSwitcher() {
   USERS.forEach((u, idx) => {
     const b = document.createElement('button');
     b.className = 'user-tab user-' + idx + (u === activeUser ? ' active' : '') + (viewingProfiles.has(u) ? ' viewing' : '');
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(u === activeUser));
+    b.setAttribute('aria-label', `${u} calendar${viewingProfiles.has(u) ? ', viewing now' : ''}`);
+    b.tabIndex = u === activeUser ? 0 : -1;
     const emoji = emojis[idx] ? `<span class="user-emoji">${escHtml(emojis[idx])}</span>` : '';
     const presence = viewingProfiles.has(u) ? '<span class="user-presence-dot" title="viewing now"></span>' : '';
     b.innerHTML = `<span class="user-dot"></span>${emoji}${escHtml(u)}${presence}`;
@@ -69,6 +85,15 @@ function renderUserSwitcher() {
       render();
       if (notesOpen) renderNotes();
     };
+    b.addEventListener('keydown', e => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault();
+      const nextIndex = (idx + (e.key === 'ArrowRight' ? 1 : -1) + USERS.length) % USERS.length;
+      activeUser = USERS[nextIndex];
+      applyTheme();
+      render();
+      document.querySelector('.user-tab[aria-selected="true"]').focus();
+    });
     c.appendChild(b);
   });
 }
@@ -146,7 +171,7 @@ function bootApp() {
     const meta = e.metaKey || e.ctrlKey;
     if (meta && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoAction(); return; }
     if (meta && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoAction(); return; }
-    if (e.key === 'Escape') { const m = document.querySelector('.modal-bg'); if (m) m.remove(); }
+    if (e.key === 'Escape') { const m = document.querySelector('.modal-bg'); if (m && !e.defaultPrevented) m.remove(); }
     const inInput = e.target.closest('input, textarea, select');
     if (!document.querySelector('.modal-bg') && !inInput) {
       if (e.key === 'ArrowLeft')  navigate(-1);
