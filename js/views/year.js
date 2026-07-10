@@ -15,11 +15,15 @@ function renderYearView() {
     const header = document.createElement('div');
     header.className = 'mini-month-header';
     header.textContent = MONTH_NAMES[m];
+    header.tabIndex = 0;
+    header.setAttribute('role', 'button');
+    header.setAttribute('aria-label', `Open ${MONTH_NAMES[m]} ${year}`);
     header.addEventListener('click', () => {
       currentDate = new Date(year, m, 1);
       viewMode = 'month';
       render();
     });
+    onKeyboardActivate(header, () => header.click());
     mini.appendChild(header);
 
     // Day letter headers
@@ -49,12 +53,16 @@ function renderYearView() {
           (hasEvents && isCurrentMonth ? ' has-events' : '');
         cell.textContent = date.getDate();
         cell.title = dateKey;
+        cell.tabIndex = 0;
+        cell.setAttribute('role', 'button');
+        cell.setAttribute('aria-label', `${date.toLocaleDateString()}, ${hasEvents ? 'has events' : 'no events'}`);
 
         cell.addEventListener('click', () => {
           currentDate = new Date(date);
           viewMode = 'day';
           render();
         });
+        onKeyboardActivate(cell, () => cell.click());
 
         row.appendChild(cell);
       });

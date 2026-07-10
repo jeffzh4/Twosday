@@ -44,6 +44,7 @@ function openRepeatModal(srcDateKey, srcEv) {
 
   bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
   document.body.appendChild(bg);
+  makeModalAccessible(bg, { initialFocusSelector: '#r-count' });
 
   // ── Compute what copies will be created ─────────────────────────────────────
   function getCopies() {

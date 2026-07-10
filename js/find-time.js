@@ -137,6 +137,7 @@ function openFindTimeModal() {
   function close() { bg.remove(); }
   bg.addEventListener('click', e => { if (e.target === bg) close(); });
   document.body.appendChild(bg);
+  makeModalAccessible(bg, { initialFocusSelector: '#ft-date', onClose: close });
   document.getElementById('ft-close').onclick = close;
 
   function readOptions() {

@@ -104,11 +104,15 @@ function renderDayColumn(date) {
   if (viewMode === 'week') {
     head.style.cursor = 'pointer';
     head.title = 'Switch to day view';
+    head.tabIndex = 0;
+    head.setAttribute('role', 'button');
+    head.setAttribute('aria-label', `Open ${DAY_NAMES_LONG[date.getDay()]}, ${date.toLocaleDateString()}`);
     head.addEventListener('click', () => {
       currentDate = new Date(date);
       viewMode = 'day';
       render();
     });
+    onKeyboardActivate(head, () => head.click());
   }
   col.appendChild(head);
 
@@ -117,6 +121,17 @@ function renderDayColumn(date) {
   body.className = 'col-body';
   body.dataset.datekey = dateKey;
   body.style.height = ((END_H - START_H) * PX_PER_HOUR) + 'px';
+  body.tabIndex = 0;
+  body.setAttribute('role', 'button');
+  body.setAttribute('aria-label', `Add an event on ${date.toLocaleDateString()}`);
+  onKeyboardActivate(body, e => {
+    if (e.target !== body) return;
+    const now = new Date();
+    const suggested = dateKey === getDateKey(now)
+      ? clampTime(Math.ceil((now.getHours() + now.getMinutes() / 60) / STEP_H) * STEP_H)
+      : 9;
+    openModal({ dateKey, startH: suggested });
+  });
 
   // Hour, half-hour, and quarter-hour grid lines
   for (let h = START_H; h < END_H; h++) {
@@ -199,6 +214,9 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
 
   const div = document.createElement('div');
   div.className = 'ev' + (ev.done ? ' done' : '') + (conflict ? ' conflict' : '');
+  div.tabIndex = 0;
+  div.setAttribute('role', 'button');
+  div.setAttribute('aria-label', `${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}${ev.shared ? ', shared' : ''}${ev.done ? ', completed' : ''}`);
   div.title = `${fmtFull(ev.start)} – ${fmtFull(ev.end)} (${fmtDuration(ev.start, ev.end)})`;
   if (ev.updatedAt) div.title += `\nupdated ${fmtRelativeTime(ev.updatedAt)} by ${ev.updatedBy || activeUser}`;
 
@@ -224,10 +242,10 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
       ? `<div class="ev-meta" style="color:${p.text}">updated ${escHtml(fmtRelativeTime(ev.updatedAt))}</div>`
       : '') +
     `<div class="ev-actions">` +
-      `<button class="ev-act" data-a="dup"  style="color:${p.text}" title="Repeat event…">&#10697;</button>` +
-      `<button class="ev-act" data-a="edit" style="color:${p.text}" title="Edit">&#9998;</button>` +
-      `<button class="ev-act" data-a="done" style="color:${p.text}">${ev.done ? '&#8617;' : '&#10003;'}</button>` +
-      `<button class="ev-act" data-a="del"  style="color:${p.text}">&#215;</button>` +
+      `<button class="ev-act" data-a="dup"  style="color:${p.text}" title="Repeat event" aria-label="Repeat ${escHtml(ev.text)}">&#10697;</button>` +
+      `<button class="ev-act" data-a="edit" style="color:${p.text}" title="Edit" aria-label="Edit ${escHtml(ev.text)}">&#9998;</button>` +
+      `<button class="ev-act" data-a="done" style="color:${p.text}" aria-label="${ev.done ? 'Mark incomplete' : 'Mark complete'}: ${escHtml(ev.text)}">${ev.done ? '&#8617;' : '&#10003;'}</button>` +
+      `<button class="ev-act" data-a="del"  style="color:${p.text}" aria-label="Delete ${escHtml(ev.text)}">&#215;</button>` +
     `</div>`;
 
   div.addEventListener('mousedown', mE => {
@@ -244,6 +262,9 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
     if (cE.target.closest('.ev-act') || cE.target.closest('.resize-handle')) return;
     if (dragState && dragState.moved) return;
     openModal({ dateKey, editEvId: ev.id });
+  });
+  onKeyboardActivate(div, e => {
+    if (e.target === div) openModal({ dateKey, editEvId: ev.id });
   });
 
   div.querySelectorAll('.ev-act').forEach(btn => {

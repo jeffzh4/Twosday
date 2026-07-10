@@ -179,6 +179,7 @@ function openICSImportPreview(fileName, parsedEvents, defaultUser) {
   function close() { bg.remove(); }
   bg.addEventListener('click', e => { if (e.target === bg) close(); });
   document.body.appendChild(bg);
+  makeModalAccessible(bg, { initialFocusSelector: '#i-user', onClose: close });
   document.getElementById('i-close').onclick = close;
   document.getElementById('i-cancel').onclick = close;
   document.getElementById('i-import').onclick = () => {
@@ -276,6 +277,7 @@ function openCalendarToolsModal() {
 
   bg.addEventListener('click', e => { if (e.target === bg) close(); });
   document.body.appendChild(bg);
+  makeModalAccessible(bg, { initialFocusSelector: '#ct-import-user', onClose: close });
   document.getElementById('ct-close').onclick = close;
 
   document.getElementById('ct-import-btn').onclick = () => {
