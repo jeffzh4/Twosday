@@ -54,6 +54,7 @@ Accessible via the ⚙ gear icon in the top-right user pill:
 - **Insights** — open the calendar insights dashboard from the stats section
 - **Username** — change with password confirmation
 - **Password** — change with current + new + confirm fields
+- **Connect Google** — link a Google account for one-click sign-in on future logins
 - **Profile names & emojis** — rename either profile and pick an emoji from a 15-option picker
 - **Delete account** — permanently removes all Firestore data and clears local storage (type username to confirm)
 
@@ -68,7 +69,7 @@ Changes save to Firestore and propagate to all open sessions within ~1–2 secon
 |---|---|
 | Frontend | Vanilla JS, HTML5, CSS3 — no framework, no build step |
 | Sync | Firebase Firestore (`onSnapshot` real-time listener) |
-| Auth | Custom username/password; passwords hashed with SHA-256 (Web Crypto API) |
+| Auth | Custom username/password (SHA-256 hashed) with an optional Firebase Auth layer — sign in with Google once you've connected it in settings |
 | Persistence | `localStorage` as cache and offline fallback |
 | Hosting | Vercel — auto-deploys on push to `main` |
 | Fonts | DM Sans + DM Mono (Google Fonts) |

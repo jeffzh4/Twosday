@@ -36,6 +36,39 @@ function firebaseAuthSignIn(authEmail, password) {
   return firebase.auth().signInWithEmailAndPassword(authEmail, password);
 }
 
+// Google sign-in only works for accounts already claimed and linked to a
+// Google credential (via "connect Google" in account settings) — it never
+// creates a new account, since Twosday's two-profile accounts are shared and
+// a fresh Google identity has no way to know which existing account it
+// belongs to. Present on both the login and signup tabs; formId routes the
+// status message to whichever tab's error slot the click came from.
+async function handleGoogleSignIn(formId = 'login') {
+  setError(formId, 'connecting to Google…');
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await firebase.auth().signInWithPopup(provider);
+    const uid = result.user.uid;
+
+    const accounts = await refreshAccountsFromFirestore();
+    const entry = Object.entries(accounts).find(([, acc]) => acc.authUid === uid);
+    if (!entry) {
+      await firebase.auth().signOut();
+      setError(formId, 'no Twosday account is linked to this Google account yet — log in with your username and password once, then connect Google from account settings.');
+      return;
+    }
+
+    const [username, account] = entry;
+    activateAccount(username, account);
+    saveSession(username);
+    setError(formId, '');
+    hideAuth();
+    bootApp();
+  } catch (err) {
+    if (err.code === 'auth/popup-closed-by-user') { setError(formId, ''); return; }
+    setError(formId, 'Google sign-in failed: ' + err.message);
+  }
+}
+
 // ── Account loading ───────────────────────────────────────────────────────────
 
 function getCachedAccounts() {
@@ -127,6 +160,9 @@ function setupAuthListeners() {
     };
   });
 
+  document.getElementById('btn-google-signin').onclick = () => handleGoogleSignIn('login');
+  document.getElementById('btn-google-signup').onclick = () => handleGoogleSignIn('signup');
+
   // ── Login ────────────────────────────────────────────────────────────────────
   document.getElementById('login-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -214,6 +250,9 @@ function setupAuthListeners() {
     }
     if (password !== passwordConfirm) {
       setError('signup', 'passwords do not match'); return;
+    }
+    if (password.length < 6) {
+      setError('signup', 'password must be at least 6 characters'); return;
     }
     if (profile1 === profile2) {
       setError('signup', 'profile names must differ'); return;
