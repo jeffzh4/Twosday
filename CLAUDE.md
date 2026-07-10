@@ -66,7 +66,7 @@ scripts/
 |---|---|
 | `USERS` | `[profile1, profile2]` — the two profile names for the logged-in account |
 | `activeUser` | Currently selected profile name |
-| `currentAccount` | `{ username, password, profiles, profileEmojis, firestoreDoc, notesDoc, authClaimed?, authUid?, authEmail? }` |
+| `currentAccount` | `{ username, password, profiles, profileEmojis, firestoreDoc, notesDoc, authClaimed?, authUid?, authEmail?, googleLinked? }` |
 | `FIRESTORE_DOC` | Firestore ref for the account's events doc |
 | `NOTES_DOC` | Firestore ref for the account's notes doc |
 | `PRESENCE_DOC` | Firestore ref for the account's presence doc (`{firestoreDoc}-presence`) |
@@ -141,6 +141,7 @@ accounts["myusername"] = {
 | `activateAccount(username, account)` | auth.js | Sets all per-account globals after login |
 | `claimFirebaseAuth(username, password)` | auth.js | Creates the Firebase Auth user for this account; throws on failure (non-fatal for callers) |
 | `firebaseAuthSignIn(authEmail, password)` | auth.js | Signs in via Firebase Auth for already-claimed accounts |
+| `handleGoogleSignIn(formId)` | auth.js | Login/signup "continue with Google" button; only logs in if a claimed account's `authUid` matches |
 | `openSettingsModal()` | settings.js | Renders the account settings modal (stats, export, emoji, delete) |
 | `computeStats()` | settings.js | Aggregates event counts / busiest day / top color across both profiles |
 | `exportICS(user)` | settings.js | Downloads a profile's events as an RFC 5545 `.ics` file |
@@ -175,6 +176,8 @@ accounts["myusername"] = {
 - **Subsequent logins:** if `account.authClaimed`, sign-in goes through `firebaseAuthSignIn(account.authEmail, password)` exclusively — the legacy hash is not re-checked, though it stays in sync (see below) as the fallback of record.
 - **Password change / delete account** (`settings.js`): the legacy hash is always the field settings.js itself verifies and updates. For claimed accounts, `firebase.auth().currentUser.updatePassword()` / `.delete()` are called as best-effort side effects to keep the Auth user in sync — failures there don't block the primary Firestore write.
 - **One manual step required, not automatable from code:** the Email/Password sign-in provider must be enabled once in the Firebase Console (Authentication → Sign-in method) for project `jhschedule4`. Until then, every claim/sign-in call rejects with `auth/operation-not-allowed` and the app gracefully continues on the legacy path — no user-visible breakage either way.
+- **Password minimum is 6 characters** (signup and settings password-change), matching Firebase Auth's hard, non-configurable floor. An account whose legacy password is shorter than 6 characters will fail to claim (`auth/weak-password`, caught non-fatally) on every login until the password is changed to 6+ characters via Settings — the *next* login after that change completes the claim.
+- **Google sign-in is account-linking only, not a signup path — by design, exactly one Google account per (two-profile) login.** Because Twosday's accounts are shared units, not 1:1 with a person, a fresh Google identity has no way to know which existing account it belongs to, and Firebase Auth's `linkWithPopup` only has room for one linked Google identity per Firebase Auth user anyway. So: `handleGoogleSignIn(formId)` — present as a "continue with Google" button on **both** the login and signup tabs (`formId` routes status text to the right tab's error slot) — looks up `accounts[*].authUid === <signed-in Google uid>` and logs in only if a match exists; a brand-new Google identity gets "no account linked yet" on either tab, never a new account. Linking itself happens from Settings → "connect Google" (`currentAccount.authClaimed` required), via `firebase.auth().currentUser.linkWithPopup(GoogleAuthProvider)`, which attaches Google to the same Firebase Auth user created at claim time — same `authUid`, so the login/signup lookup works either way. Both partners keep normal username/password login regardless of whether Google is connected.
 - **Security posture:** `firestore.rules` confines access to the `schedules` collection, validates document shape, and blocks deletion of the shared `accounts` registry — defense-in-depth against corruption/abuse. Firestore rules still don't enforce per-account ownership (`request.auth.uid`), since document paths are keyed by username, not Firebase Auth UID, and rewriting that path scheme is a separate, deliberately out-of-scope follow-up once accounts are broadly claimed.
 
 ## Testing
