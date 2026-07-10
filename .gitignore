@@ -3,3 +3,8 @@ Thumbs.db
 PUBLIC_LAUNCH_NOTES.md
 scripts/seed-demo.html
 graphify-out/
+node_modules/
+firebase-debug.log
+firestore-debug.log
+.firebase/
+*.log

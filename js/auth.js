@@ -1,110 +1,130 @@
-// ── Auth module ───────────────────────────────────────────────────────────────
-// All accounts live in Firestore (schedules/accounts). Passwords are hashed
-// client-side (SHA-256) before storage. Firebase Authentication is layered on
-// top as the credential verifier: on an account's next successful login it is
-// silently "claimed" — a Firebase Auth user is created with a synthetic email
-// (see syntheticEmail()) and future logins verify through Firebase Auth first,
-// falling back to the legacy hash check for any account not yet claimed. This
-// touches nothing about how calendar/notes/presence documents are stored or
-// addressed — see CLAUDE.md's Auth System section for the full design.
-// localStorage is used as a cache/fallback for fast loads and offline support.
+// Account authentication and owner-scoped Firestore access.
+//
+// New account metadata lives at accounts/{username}. Each record carries the
+// Firebase Auth UID that owns it, and every calendar/notes/presence document is
+// stamped with that same UID. The old schedules/accounts registry is read only
+// after authentication and is used solely to migrate previously claimed users.
 
 const ACCOUNTS_CACHE_KEY = 'twosday_accounts_v1';
-const SESSION_KEY        = 'twosday_session_v1';
-const ACCOUNTS_DOC       = () => db.collection('schedules').doc('accounts');
+const SESSION_KEY = 'twosday_session_v1';
+const ACCOUNT_COLLECTION = () => db.collection('accounts');
+const ACCOUNT_DOC = username => ACCOUNT_COLLECTION().doc(username);
+const LEGACY_ACCOUNTS_DOC = () => db.collection('schedules').doc('accounts');
 
-let currentAccount = null;   // { username, profiles, firestoreDoc, notesDoc }
+let currentAccount = null;
 
-// ── Firebase Auth claim layer ─────────────────────────────────────────────────
-// Firebase Auth's email/password provider requires an email; usernames aren't
-// emails, so each account gets a synthetic, never-emailed address. This is
-// fixed at claim time and stored as account.authEmail so a later username
-// rename can't orphan the Firebase Auth login (see renameProfile / settings.js).
 function syntheticEmail(username) {
   return `${username.toLowerCase()}@twosday.local`;
 }
 
-// Creates the Firebase Auth user for a newly-verified (or newly-created)
-// account. Throws on failure — callers decide whether that's fatal.
 async function claimFirebaseAuth(username, password) {
   const email = syntheticEmail(username);
   const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
-  return { authUid: cred.user.uid, authEmail: email };
+  return { ownerUid: cred.user.uid, authUid: cred.user.uid, authEmail: email };
 }
 
 function firebaseAuthSignIn(authEmail, password) {
   return firebase.auth().signInWithEmailAndPassword(authEmail, password);
 }
 
-// Google sign-in only works for accounts already claimed and linked to a
-// Google credential (via "connect Google" in account settings) — it never
-// creates a new account, since Twosday's two-profile accounts are shared and
-// a fresh Google identity has no way to know which existing account it
-// belongs to. Present on both the login and signup tabs; formId routes the
-// status message to whichever tab's error slot the click came from.
-async function handleGoogleSignIn(formId = 'login') {
-  setError(formId, 'connecting to Google…');
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    const result = await firebase.auth().signInWithPopup(provider);
-    const uid = result.user.uid;
-
-    const accounts = await refreshAccountsFromFirestore();
-    const entry = Object.entries(accounts).find(([, acc]) => acc.authUid === uid);
-    if (!entry) {
-      await firebase.auth().signOut();
-      setError(formId, 'no Twosday account is linked to this Google account yet — log in with your username and password once, then connect Google from account settings.');
-      return;
-    }
-
-    const [username, account] = entry;
-    activateAccount(username, account);
-    saveSession(username);
-    setError(formId, '');
-    hideAuth();
-    bootApp();
-  } catch (err) {
-    if (err.code === 'auth/popup-closed-by-user') { setError(formId, ''); return; }
-    setError(formId, 'Google sign-in failed: ' + err.message);
-  }
+function waitForFirebaseAuth() {
+  return new Promise(resolve => {
+    const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+      unsubscribe();
+      resolve(user);
+    }, () => resolve(null));
+  });
 }
-
-// ── Account loading ───────────────────────────────────────────────────────────
 
 function getCachedAccounts() {
-  try { return JSON.parse(localStorage.getItem(ACCOUNTS_CACHE_KEY) || '{}'); } catch (e) { return {}; }
+  try { return JSON.parse(localStorage.getItem(ACCOUNTS_CACHE_KEY) || '{}'); }
+  catch (e) { return {}; }
 }
 
-// Fetch accounts from Firestore and update the local cache.
-async function refreshAccountsFromFirestore() {
+function cacheAccount(username, account) {
+  const cached = getCachedAccounts();
+  cached[username] = account;
+  localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(cached));
+}
+
+function removeCachedAccount(username) {
+  const cached = getCachedAccounts();
+  delete cached[username];
+  localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(cached));
+}
+
+async function loadAccountRecord(username, allowCache = true) {
   try {
-    const snap = await ACCOUNTS_DOC().get();
-    if (snap.exists && snap.data() && snap.data().accounts) {
-      const accounts = snap.data().accounts;
-      localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(accounts));
-      return accounts;
+    const snap = await ACCOUNT_DOC(username).get();
+    if (snap.exists) {
+      const account = snap.data();
+      cacheAccount(username, account);
+      return account;
     }
   } catch (e) {
-    console.warn('Failed to refresh accounts from Firestore:', e);
+    console.warn('Failed to load account metadata:', e);
   }
-  // Fall back to cache if Firestore is unavailable.
-  return getCachedAccounts();
+  return allowCache ? (getCachedAccounts()[username] || null) : null;
 }
 
-// ── Account activation ────────────────────────────────────────────────────────
+async function saveAccountRecord(username, account) {
+  const ownerUid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+  if (!ownerUid || account.ownerUid !== ownerUid) throw new Error('account ownership could not be verified');
+  await ACCOUNT_DOC(username).set({ ...account, updatedAt: Date.now() });
+  cacheAccount(username, account);
+}
 
-// Configure all the per-account globals that other modules read.
+async function migrateLegacyAccount(username, uid, verifiedLegacyAccount = null) {
+  let account = verifiedLegacyAccount;
+  if (!account) {
+    const legacySnap = await LEGACY_ACCOUNTS_DOC().get();
+    const legacyAccounts = legacySnap.exists && legacySnap.data().accounts;
+    account = legacyAccounts && legacyAccounts[username];
+    if (!account || account.authUid !== uid) return null;
+  }
+
+  const migrated = {
+    ...account,
+    ownerUid: uid,
+    authUid: uid,
+    authClaimed: true,
+    authEmail: account.authEmail || syntheticEmail(username),
+    migratedAt: Date.now(),
+  };
+  await saveAccountRecord(username, migrated);
+  return migrated;
+}
+
+async function findAccountForAuthUser(user) {
+  const snap = await ACCOUNT_COLLECTION().where('ownerUid', '==', user.uid).limit(1).get();
+  if (!snap.empty) {
+    const doc = snap.docs[0];
+    const account = doc.data();
+    cacheAccount(doc.id, account);
+    return { username: doc.id, account };
+  }
+
+  // Signed-in compatibility path for records created before owner-scoped docs.
+  const legacySnap = await LEGACY_ACCOUNTS_DOC().get();
+  const legacy = legacySnap.exists && legacySnap.data().accounts;
+  const entry = legacy && Object.entries(legacy).find(([, account]) => account.authUid === user.uid);
+  if (!entry) return null;
+  const [username] = entry;
+  const account = await migrateLegacyAccount(username, user.uid);
+  return account ? { username, account } : null;
+}
+
 function activateAccount(username, account) {
   currentAccount = { username, ...account };
 
-  USERS               = account.profiles.slice();
-  STORAGE_KEY         = `twosday_v2_${username}`;
-  NOTES_KEY           = `twosday_notes_v2_${username}`;
-  PRESENCE_KEY        = `twosday_presence_v1_${username}`;
-  CUSTOM_COLORS_KEY   = `twosday_colors_v1_${username}`;
-  FIRESTORE_DOC       = db.collection('schedules').doc(account.firestoreDoc);
-  NOTES_DOC           = db.collection('schedules').doc(account.notesDoc);
-  PRESENCE_DOC        = db.collection('schedules').doc(account.firestoreDoc + '-presence');
+  USERS = account.profiles.slice();
+  STORAGE_KEY = `twosday_v2_${username}`;
+  NOTES_KEY = `twosday_notes_v2_${username}`;
+  PRESENCE_KEY = `twosday_presence_v1_${username}`;
+  CUSTOM_COLORS_KEY = `twosday_colors_v1_${username}`;
+  FIRESTORE_DOC = db.collection('schedules').doc(account.firestoreDoc);
+  NOTES_DOC = db.collection('schedules').doc(account.notesDoc);
+  PRESENCE_DOC = db.collection('schedules').doc(account.firestoreDoc + '-presence');
 
   activeUser = USERS[0];
   userTheme = {};
@@ -113,7 +133,48 @@ function activateAccount(username, account) {
   USERS.forEach(u => { userNotes[u] = []; });
 }
 
-// ── Session helpers ───────────────────────────────────────────────────────────
+async function claimDataDocument(ref, emptyField) {
+  const ownership = { accountId: currentAccount.username, ownerUid: currentAccount.ownerUid };
+  try {
+    await ref.update(ownership);
+  } catch (e) {
+    await ref.set({ ...ownership, [emptyField]: {} }, { merge: true });
+  }
+}
+
+async function prepareAccount(username, account) {
+  const user = firebase.auth().currentUser;
+  if (!user || account.ownerUid !== user.uid) throw new Error('signed-in user does not own this account');
+  activateAccount(username, account);
+  await Promise.all([
+    claimDataDocument(FIRESTORE_DOC, 'allData'),
+    claimDataDocument(NOTES_DOC, 'notes'),
+    claimDataDocument(PRESENCE_DOC, 'sessions'),
+  ]);
+}
+
+async function handleGoogleSignIn(formId = 'login') {
+  setError(formId, 'connecting to Google...');
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await firebase.auth().signInWithPopup(provider);
+    const found = await findAccountForAuthUser(result.user);
+    if (!found) {
+      await firebase.auth().signOut();
+      setError(formId, 'no Twosday account is linked to this Google account yet - log in with your username and password, then connect Google in settings.');
+      return;
+    }
+
+    await prepareAccount(found.username, found.account);
+    saveSession(found.username);
+    setError(formId, '');
+    hideAuth();
+    bootApp();
+  } catch (err) {
+    if (err.code === 'auth/popup-closed-by-user') { setError(formId, ''); return; }
+    setError(formId, 'Google sign-in failed: ' + err.message);
+  }
+}
 
 function saveSession(username) {
   localStorage.setItem(SESSION_KEY, JSON.stringify({ username, savedAt: Date.now() }));
@@ -130,11 +191,10 @@ function logout() {
   location.reload();
 }
 
-// ── Auth UI ───────────────────────────────────────────────────────────────────
-
 function showAuth() {
   document.getElementById('auth-overlay').style.display = 'flex';
   document.querySelector('.app').style.display = 'none';
+  requestAnimationFrame(() => document.getElementById('login-username').focus());
 }
 
 function hideAuth() {
@@ -146,98 +206,84 @@ function setError(formId, msg) {
   document.getElementById(formId + '-error').textContent = msg || '';
 }
 
-function setupAuthListeners() {
-  // Tab switching
+function selectAuthTab(which) {
   document.querySelectorAll('.auth-tab').forEach(tab => {
-    tab.onclick = () => {
-      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const which = tab.dataset.tab;
-      document.getElementById('login-form').classList.toggle('hidden', which !== 'login');
-      document.getElementById('signup-form').classList.toggle('hidden', which !== 'signup');
-      setError('login', '');
-      setError('signup', '');
-    };
+    const selected = tab.dataset.tab === which;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  ['login', 'signup'].forEach(name => {
+    const form = document.getElementById(name + '-form');
+    const hidden = name !== which;
+    form.classList.toggle('hidden', hidden);
+    form.hidden = hidden;
+  });
+  setError('login', '');
+  setError('signup', '');
+}
+
+function setupAuthListeners() {
+  document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.onclick = () => selectAuthTab(tab.dataset.tab);
+    tab.addEventListener('keydown', e => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault();
+      const next = tab.dataset.tab === 'login' ? 'signup' : 'login';
+      selectAuthTab(next);
+      document.querySelector(`.auth-tab[data-tab="${next}"]`).focus();
+    });
   });
 
   document.getElementById('btn-google-signin').onclick = () => handleGoogleSignIn('login');
   document.getElementById('btn-google-signup').onclick = () => handleGoogleSignIn('signup');
 
-  // ── Login ────────────────────────────────────────────────────────────────────
-  document.getElementById('login-form').onsubmit = async (e) => {
+  document.getElementById('login-form').onsubmit = async e => {
     e.preventDefault();
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
     if (!username || !password) { setError('login', 'username and password required'); return; }
 
-    setError('login', 'checking…');
-    const accounts = await refreshAccountsFromFirestore();
-    const account  = accounts[username];
-    if (!account) { setError('login', 'invalid username or password'); return; }
-
-    const patch = {};   // fields to persist back to the account record, if any
-
-    if (account.authClaimed) {
-      // Firebase Auth is the source of truth for this account.
-      try {
-        await firebaseAuthSignIn(account.authEmail, password);
-      } catch (err) {
+    setError('login', 'checking...');
+    let user;
+    let account;
+    try {
+      const cred = await firebaseAuthSignIn(syntheticEmail(username), password);
+      user = cred.user;
+      account = await loadAccountRecord(username, false);
+      if (!account) account = await migrateLegacyAccount(username, user.uid);
+    } catch (authError) {
+      // A user who still has a legacy account cached on this device can claim it
+      // without exposing the old registry to anonymous clients.
+      const cached = getCachedAccounts()[username];
+      if (!cached || cached.ownerUid || !(await verifyPassword(password, cached.password))) {
         setError('login', 'invalid username or password');
         return;
       }
-    } else {
-      // Legacy path: verify against the stored hash (or plaintext, pre-migration).
-      if (!(await verifyPassword(password, account.password))) {
-        setError('login', 'invalid username or password');
-        return;
-      }
-      if (!isHashed(account.password)) patch.password = await hashPassword(password);
-
-      // Silently claim the account into Firebase Auth now that the password is
-      // verified. Non-fatal if it fails (e.g. provider not yet enabled in the
-      // Firebase Console) — the account simply stays on the legacy path and
-      // claiming is retried on the next successful login.
       try {
         const claim = await claimFirebaseAuth(username, password);
-        patch.authClaimed = true;
-        patch.authUid = claim.authUid;
-        patch.authEmail = claim.authEmail;
-      } catch (err) {
-        if (err.code === 'auth/email-already-in-use') {
-          // A prior claim attempt likely created the Firebase Auth user but the
-          // Firestore write recording it didn't complete (e.g. connection drop).
-          // Self-heal: sign in with the password we just verified and adopt it.
-          try {
-            const email = syntheticEmail(username);
-            const cred = await firebaseAuthSignIn(email, password);
-            patch.authClaimed = true;
-            patch.authUid = cred.user.uid;
-            patch.authEmail = email;
-          } catch (signInErr) {
-            console.warn('Firebase Auth self-heal sign-in failed, staying on legacy login:', signInErr);
-          }
-        } else {
-          console.warn('Firebase Auth claim failed, staying on legacy login:', err);
-        }
+        user = firebase.auth().currentUser;
+        account = await migrateLegacyAccount(username, claim.ownerUid, cached);
+      } catch (claimError) {
+        setError('login', 'secure account migration failed - try again or contact the project owner');
+        return;
       }
     }
 
-    if (Object.keys(patch).length) {
-      const updated = { ...accounts, [username]: { ...account, ...patch } };
-      ACCOUNTS_DOC().set({ accounts: updated, savedAt: Date.now() }).catch(() => {});
-      localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(updated));
-      Object.assign(account, patch);
+    if (!user || !account || account.ownerUid !== user.uid) {
+      await firebase.auth().signOut();
+      setError('login', 'invalid username or password');
+      return;
     }
 
-    activateAccount(username, account);
+    await prepareAccount(username, account);
     saveSession(username);
     setError('login', '');
     hideAuth();
     bootApp();
   };
 
-  // ── Signup ───────────────────────────────────────────────────────────────────
-  document.getElementById('signup-form').onsubmit = async (e) => {
+  document.getElementById('signup-form').onsubmit = async e => {
     e.preventDefault();
     const username = document.getElementById('signup-username').value.trim();
     const password = document.getElementById('signup-password').value;
@@ -245,104 +291,64 @@ function setupAuthListeners() {
     const profile1 = document.getElementById('signup-profile1').value.trim().toLowerCase();
     const profile2 = document.getElementById('signup-profile2').value.trim().toLowerCase();
 
-    if (!username || !password || !profile1 || !profile2) {
-      setError('signup', 'all fields are required'); return;
-    }
-    if (password !== passwordConfirm) {
-      setError('signup', 'passwords do not match'); return;
-    }
-    if (password.length < 6) {
-      setError('signup', 'password must be at least 6 characters'); return;
-    }
-    if (profile1 === profile2) {
-      setError('signup', 'profile names must differ'); return;
-    }
-    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      setError('signup', 'username can only contain letters, numbers, _ and -'); return;
-    }
-    if (!/^[a-zA-Z0-9]+$/.test(profile1) || !/^[a-zA-Z0-9]+$/.test(profile2)) {
-      setError('signup', 'profile names: letters and numbers only'); return;
-    }
-    if (profile1.length > 15 || profile2.length > 15) {
-      setError('signup', 'profile names must be 15 characters or less'); return;
-    }
+    if (!username || !password || !profile1 || !profile2) { setError('signup', 'all fields are required'); return; }
+    if (password !== passwordConfirm) { setError('signup', 'passwords do not match'); return; }
+    if (password.length < 6) { setError('signup', 'password must be at least 6 characters'); return; }
+    if (profile1 === profile2) { setError('signup', 'profile names must differ'); return; }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) { setError('signup', 'username can only contain letters, numbers, _ and -'); return; }
+    if (!/^[a-zA-Z0-9]+$/.test(profile1) || !/^[a-zA-Z0-9]+$/.test(profile2)) { setError('signup', 'profile names: letters and numbers only'); return; }
+    if (profile1.length > 15 || profile2.length > 15) { setError('signup', 'profile names must be 15 characters or less'); return; }
 
-    setError('signup', 'creating account…');
-
-    // Always read the latest accounts from Firestore before writing,
-    // so we don't accidentally clobber existing accounts.
-    const accounts = await refreshAccountsFromFirestore();
-    if (accounts[username]) {
-      setError('signup', 'that username is taken');
-      return;
-    }
-
-    const newAccount = {
-      password: await hashPassword(password),
-      profiles: [profile1, profile2],
-      firestoreDoc: username,
-      notesDoc: username + '-notes',
-      createdAt: Date.now(),
-    };
-
-    // Claim into Firebase Auth immediately so new accounts never touch the
-    // legacy hash-check path. Non-fatal if it fails (e.g. provider not yet
-    // enabled) — the account still works, claimed on its next login instead.
+    setError('signup', 'creating secure account...');
+    let authUser = null;
     try {
       const claim = await claimFirebaseAuth(username, password);
-      newAccount.authClaimed = true;
-      newAccount.authUid = claim.authUid;
-      newAccount.authEmail = claim.authEmail;
+      authUser = firebase.auth().currentUser;
+      const account = {
+        password: await hashPassword(password),
+        profiles: [profile1, profile2],
+        firestoreDoc: username,
+        notesDoc: username + '-notes',
+        createdAt: Date.now(),
+        authClaimed: true,
+        authUid: claim.authUid,
+        authEmail: claim.authEmail,
+        ownerUid: claim.ownerUid,
+      };
+      await saveAccountRecord(username, account);
+      await prepareAccount(username, account);
+      saveSession(username);
+      setError('signup', '');
+      hideAuth();
+      bootApp();
     } catch (err) {
-      console.warn('Firebase Auth claim failed at signup, staying on legacy login:', err);
+      if (authUser) authUser.delete().catch(() => {});
+      setError('signup', err.code === 'auth/email-already-in-use' ? 'that username is taken' : 'failed to create account: ' + err.message);
     }
-
-    const merged = { ...accounts, [username]: newAccount };
-    try {
-      await ACCOUNTS_DOC().set({ accounts: merged, savedAt: Date.now() });
-    } catch (err) {
-      setError('signup', 'failed to save: ' + err.message);
-      return;
-    }
-    localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(merged));
-
-    activateAccount(username, newAccount);
-    saveSession(username);
-    setError('signup', '');
-    hideAuth();
-    bootApp();
   };
 }
 
-// ── Initial boot path ─────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   setupAuthListeners();
+  selectAuthTab('login');
 
   const session = getSession();
-  if (session && session.username) {
-    // Fast path: try the local cache first so the calendar appears immediately.
-    const cached = getCachedAccounts();
-    if (cached[session.username]) {
-      activateAccount(session.username, cached[session.username]);
-      hideAuth();
-      bootApp();
-      // Background refresh — picks up any changes made on other devices.
-      refreshAccountsFromFirestore();
-      return;
+  const authUser = await waitForFirebaseAuth();
+  if (session && session.username && authUser) {
+    try {
+      let account = await loadAccountRecord(session.username, true);
+      if (!account || !account.ownerUid) account = await migrateLegacyAccount(session.username, authUser.uid);
+      if (account && account.ownerUid === authUser.uid) {
+        await prepareAccount(session.username, account);
+        hideAuth();
+        bootApp();
+        return;
+      }
+    } catch (e) {
+      console.warn('Saved session could not be restored:', e);
     }
-    // Cache miss — fetch from Firestore before proceeding.
-    const fresh = await refreshAccountsFromFirestore();
-    if (fresh[session.username]) {
-      activateAccount(session.username, fresh[session.username]);
-      hideAuth();
-      bootApp();
-      return;
-    }
-    // Session points at a deleted/unknown account — clear it.
     localStorage.removeItem(SESSION_KEY);
   }
 
   showAuth();
-  // Pre-warm the cache so login feels instant.
-  refreshAccountsFromFirestore();
 });

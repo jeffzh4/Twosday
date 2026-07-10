@@ -185,6 +185,8 @@ function saveToFirestore() {
     FIRESTORE_DOC.set({
       allData,
       userTheme,
+      accountId: currentAccount.username,
+      ownerUid: currentAccount.ownerUid,
       savedAt: Date.now(),
       clientId: CLIENT_ID,
     }).catch(e => {

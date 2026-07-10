@@ -162,6 +162,7 @@ function openConflictsModal() {
   function close() { bg.remove(); }
   bg.addEventListener('click', e => { if (e.target === bg) close(); });
   document.body.appendChild(bg);
+  makeModalAccessible(bg, { initialFocusSelector: '#c-range', onClose: close });
   document.getElementById('c-close').onclick = close;
   ['c-range', 'c-scope'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => renderConflictRows(bg));

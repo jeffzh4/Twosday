@@ -7,6 +7,8 @@ function saveNotes() {
   try {
     NOTES_DOC.set({
       notes: JSON.parse(JSON.stringify(userNotes)),
+      accountId: currentAccount.username,
+      ownerUid: currentAccount.ownerUid,
       savedAt: Date.now(),
       clientId: CLIENT_ID,
     }).catch(() => showToast("couldn't sync notes — check your connection"));
@@ -78,11 +80,13 @@ function renderNotes() {
     const editBtn = document.createElement('button');
     editBtn.className = 'note-edit-btn';
     editBtn.title = 'Edit note';
+    editBtn.setAttribute('aria-label', 'Edit note');
     editBtn.innerHTML = '&#9998;';
 
     const delBtn = document.createElement('button');
     delBtn.className = 'note-del';
     delBtn.title = 'Delete note';
+    delBtn.setAttribute('aria-label', 'Delete note');
     delBtn.innerHTML = '&times;';
 
     actions.appendChild(editBtn);
@@ -162,6 +166,13 @@ function addNote() {
 
 function toggleNotes(force) {
   notesOpen = force !== undefined ? force : !notesOpen;
-  document.getElementById('notes-panel').classList.toggle('open', notesOpen);
-  if (notesOpen) renderNotes();
+  const panel = document.getElementById('notes-panel');
+  panel.classList.toggle('open', notesOpen);
+  panel.setAttribute('aria-hidden', String(!notesOpen));
+  panel.inert = !notesOpen;
+  document.getElementById('btn-notes').setAttribute('aria-expanded', String(notesOpen));
+  if (notesOpen) {
+    renderNotes();
+    document.getElementById('notes-input').focus();
+  }
 }

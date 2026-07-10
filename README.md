@@ -61,6 +61,12 @@ Accessible via the ⚙ gear icon in the top-right user pill:
 ### Real-time sync
 Changes save to Firestore and propagate to all open sessions within ~1–2 seconds via `onSnapshot`. A thin sync bar appears during the initial load. Offline edits are preserved in `localStorage` and reconciled on reconnect.
 
+### Accessibility
+- Keyboard-operable day, week, month, and year calendars, including events and search results
+- Focus-trapped dialogs that close with `Escape` and restore focus to their trigger
+- Semantic tabs, forms, navigation landmarks, status announcements, and descriptive icon labels
+- High-contrast focus indicators, improved secondary-text contrast, a skip link, and reduced-motion support
+
 ---
 
 ## Tech stack
@@ -69,7 +75,8 @@ Changes save to Firestore and propagate to all open sessions within ~1–2 secon
 |---|---|
 | Frontend | Vanilla JS, HTML5, CSS3 — no framework, no build step |
 | Sync | Firebase Firestore (`onSnapshot` real-time listener) |
-| Auth | Custom username/password (SHA-256 hashed) with an optional Firebase Auth layer — sign in with Google once you've connected it in settings |
+| Auth | Firebase Authentication with username-derived email credentials and optional linked Google sign-in |
+| Authorization | Owner-scoped Firestore rules verified through the Firebase Emulator Suite |
 | Persistence | `localStorage` as cache and offline fallback |
 | Hosting | Vercel — auto-deploys on push to `main` |
 | Fonts | DM Sans + DM Mono (Google Fonts) |
@@ -85,7 +92,10 @@ Twosday/
 ├── css/
 │   └── style.css           # All styles: themes, grid, modals, mobile
 ├── tests/
-│   └── core-tests.js       # Node-based regression tests for core logic
+│   ├── core-tests.js       # Node-based regression tests for core logic
+│   └── firestore-rules-tests.js # Emulator-backed authorization tests
+├── firestore.rules         # Owner isolation and document-shape validation
+├── firebase.json           # Rules and Firestore Emulator configuration
 ├── ARCHITECTURE.md         # Data model, sync, and workflow notes
 ├── package.json            # Test script
 └── js/
@@ -112,11 +122,12 @@ Twosday/
 
 ## Running locally
 
-No build step needed — just open `index.html` in a browser:
+No build step is needed for the app. Install the test tooling, then open `index.html`:
 
 ```bash
 git clone https://github.com/jeffzh4/Twosday.git
 cd Twosday
+npm install
 open index.html
 ```
 
@@ -128,7 +139,7 @@ The app connects to Firebase on load. An internet connection is required to log 
 npm test
 ```
 
-The core test suite covers date helpers, free-window detection, analytics aggregation, ICS parsing, and conflict collection.
+`npm test` runs both the core logic suite and the Firestore Emulator authorization suite. The latter requires Java and verifies anonymous denial, account isolation, owner-only writes, immutable ownership, schema validation, and safe legacy migration.
 
 ---
 
@@ -142,6 +153,7 @@ The core test suite covers date helpers, free-window detection, analytics aggreg
 | `Cmd+Z` | Undo |
 | `Cmd+Y` or `Cmd+Shift+Z` | Redo |
 | `Escape` | Close any open modal |
+| `Enter` / `Space` | Activate a focused date, event, result, tab, or calendar control |
 
 ---
 
@@ -168,8 +180,9 @@ userNotes["alex"] = [
   { text: "remember to...", time: 1716230400000 }
 ]
 
-// Accounts — stored in Firestore at schedules/accounts
-accounts["myusername"] = {
+// Account metadata — stored at accounts/{username}
+account = {
+  ownerUid: "firebase-auth-uid",
   password: "<sha256-hex>",
   profiles: ["alex", "jamie"],
   profileEmojis: ["☕", "🌙"],
@@ -177,6 +190,13 @@ accounts["myusername"] = {
   notesDoc: "myusername-notes",
   createdAt: 1716230400000,
 }
+
+// Every synchronized data document repeats the ownership boundary
+scheduleDocument = {
+  ownerUid: "firebase-auth-uid",
+  accountId: "myusername",
+  allData: { /* ... */ }, // or notes / sessions for the companion docs
+}
 ```
 
-Each account writes to its own Firestore document, so accounts are fully isolated from one another.
+Firestore rules require `request.auth.uid` to match `ownerUid` for account metadata and calendar, notes, and presence documents. The previous shared account registry is authenticated and read-only, and exists only to migrate previously claimed accounts into the owner-scoped model.

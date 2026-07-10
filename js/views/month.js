@@ -39,6 +39,9 @@ function renderMonthView() {
       cell.className = 'month-cell' +
         (isCurrentMonth ? '' : ' other-month') +
         (isToday ? ' today' : '');
+      cell.tabIndex = 0;
+      cell.setAttribute('role', 'button');
+      cell.setAttribute('aria-label', `${date.toLocaleDateString()}, ${events.length} event${events.length === 1 ? '' : 's'}`);
 
       const dateNum = document.createElement('div');
       dateNum.className = 'month-date-num';
@@ -50,6 +53,9 @@ function renderMonthView() {
         const p = palette(ev);
         const pill = document.createElement('div');
         pill.className = 'month-ev-pill' + (ev.done ? ' done' : '');
+        pill.tabIndex = 0;
+        pill.setAttribute('role', 'button');
+        pill.setAttribute('aria-label', `Edit ${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}`);
         pill.style.cssText = `background:${p.bg};color:${p.text};`;
         pill.textContent = ev.text;
         pill.title = `${fmtFull(ev.start)} – ${fmtFull(ev.end)}: ${ev.text}`;
@@ -57,6 +63,7 @@ function renderMonthView() {
           e.stopPropagation();
           openModal({ dateKey, editEvId: ev.id });
         });
+        onKeyboardActivate(pill, () => pill.click());
         cell.appendChild(pill);
       });
 
@@ -80,6 +87,7 @@ function renderMonthView() {
         currentDate = new Date(date);
         openModal({ dateKey });
       });
+      onKeyboardActivate(cell, () => cell.click());
 
       row.appendChild(cell);
     });

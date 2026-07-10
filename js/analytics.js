@@ -426,6 +426,7 @@ function openAnalyticsModal() {
   function close() { bg.remove(); }
   bg.addEventListener('click', e => { if (e.target === bg) close(); });
   document.body.appendChild(bg);
+  makeModalAccessible(bg, { initialFocusSelector: '#a-range', onClose: close });
 
   document.getElementById('a-close').onclick = close;
   ['a-range', 'a-scope'].forEach(id => {
