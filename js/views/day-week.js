@@ -273,10 +273,23 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
       const action = btn.dataset.a;
       if (action === 'edit') { openModal({ dateKey, editEvId: ev.id }); return; }
       if (action === 'dup')  { openRepeatModal(dateKey, ev); return; }
-      pushHistory();
-      if (action === 'del')  deleteEvent(dateKey, activeUser, ev.id);
-      if (action === 'done') toggleDone(dateKey, activeUser, ev.id);
-      render();
+      if (action === 'del') {
+        // Recurring instance → ask which occurrences to remove.
+        if (ev.recurrenceId && seriesCount(ev.recurrenceId, activeUser) > 1) {
+          openRecurrenceScopeModal({ verb: 'delete', onChoose: scope => {
+            pushHistory();
+            if (scope === 'this') deleteEvent(dateKey, activeUser, ev.id);
+            else deleteRecurringSeries(ev.recurrenceId, activeUser, scope === 'future' ? dateKey : null);
+            render();
+          }});
+          return;
+        }
+        pushHistory();
+        deleteEvent(dateKey, activeUser, ev.id);
+        render();
+        return;
+      }
+      if (action === 'done') { pushHistory(); toggleDone(dateKey, activeUser, ev.id); render(); }
     });
   });
 
