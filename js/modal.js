@@ -14,6 +14,24 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     ? `<div class="event-meta">last updated ${fmtRelativeTime(editEv.updatedAt)} by ${escHtml(editEv.updatedBy || activeUser)}</div>`
     : '';
 
+  // Recurrence control: full picker on new events; a note on recurring edits.
+  const recurHTML = isEdit
+    ? (editEv.recurrenceId
+        ? `<div class="field"><label>repeats</label><div class="recur-note">part of a recurring series${editEv.recurrence ? ` · ${escHtml(recurrenceLabel(editEv.recurrence))}` : ''} — saving asks which occurrences to change</div></div>`
+        : '')
+    : `<div class="field">
+        <label for="m-recur-freq">repeats</label>
+        <select id="m-recur-freq">${RECURRENCE_OPTIONS.map(o => `<option value="${o.value}">${escHtml(o.label)}</option>`).join('')}</select>
+        <div class="recur-ends" id="m-recur-ends" style="display:none">
+          <label for="m-recur-count" class="recur-ends-label">ends after</label>
+          <div class="recur-ends-row">
+            <input type="number" id="m-recur-count" value="12" min="2" max="${RECURRENCE_CAP}" />
+            <span>occurrences</span>
+          </div>
+          <div class="recur-preview" id="m-recur-preview"></div>
+        </div>
+      </div>`;
+
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
   bg.innerHTML = `
@@ -31,19 +49,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         <label>date</label>
         <input type="date" id="m-date" value="${dateKey}" />
       </div>
-      <div class="field">
-        <label>repeat this week</label>
-        <div class="shared-toggle">
-          <label class="toggle-switch">
-            <input type="checkbox" id="m-repeat" />
-            <span class="toggle-slider"></span>
-          </label>
-          <label for="m-repeat" style="cursor:pointer">repeat on selected days</label>
-        </div>
-        <div class="repeat-days" id="m-repeat-days" style="display:none;margin-top:8px">
-          ${DAYS.map(d => `<label class="repeat-day"><input type="checkbox" value="${d}"> ${d}</label>`).join('')}
-        </div>
-      </div>
+      ${recurHTML}
       <div class="field">
         <label>color</label>
         <div id="m-color-section"></div>
@@ -209,14 +215,85 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   });
   updateConflict();
 
-  // Repeat toggle
-  const repeatToggle = document.getElementById('m-repeat');
-  const repeatDays = document.getElementById('m-repeat-days');
-  repeatToggle.onchange = () => {
-    repeatDays.style.display = repeatToggle.checked ? 'flex' : 'none';
-  };
+  // Recurrence control (new events only)
+  const recurFreq = document.getElementById('m-recur-freq');
+  function readRule() {
+    if (!recurFreq || recurFreq.value === 'none') return null;
+    const count = Math.max(2, Math.min(RECURRENCE_CAP, parseInt(document.getElementById('m-recur-count').value) || 12));
+    return { freq: recurFreq.value, count };
+  }
+  function updateRecurPreview() {
+    const ends = document.getElementById('m-recur-ends');
+    const rule = readRule();
+    ends.style.display = rule ? 'block' : 'none';
+    if (!rule) return;
+    const dk = document.getElementById('m-date').value;
+    const dates = expandRecurrence(rule, dk);
+    const labels = dates.slice(0, 5).map(d => {
+      const dd = parseDateKey(d);
+      return `${MONTH_SHORT[dd.getMonth()]} ${dd.getDate()}`;
+    });
+    const extra = dates.length > 5 ? ` … +${dates.length - 5} more` : '';
+    document.getElementById('m-recur-preview').textContent = `→ ${labels.join(', ')}${extra}`;
+  }
+  if (recurFreq) {
+    recurFreq.addEventListener('change', updateRecurPreview);
+    document.getElementById('m-recur-count').addEventListener('input', updateRecurPreview);
+    document.getElementById('m-date').addEventListener('change', updateRecurPreview);
+  }
 
   document.getElementById('m-cancel').onclick = () => bg.remove();
+
+  // Single-event edit: date move, shared-toggle handling, field updates. Used for
+  // non-recurring events and for the 'this event only' scope (which detaches the
+  // instance from its series first, turning it into an exception).
+  function applySingleEdit(name, s, endTime, dk, isShared) {
+    const oldDk = dateKey;
+    const wasShared = editEv.shared;
+    const oldSharedId = editEv.sharedId;
+
+    if (dk !== oldDk) {
+      const oldArr = getEventsForDate(oldDk, activeUser);
+      const oi = oldArr.indexOf(editEv);
+      if (oi >= 0) oldArr.splice(oi, 1);
+      ensureDateUser(dk, activeUser);
+      allData[dk][activeUser].push(editEv);
+    }
+
+    editEv.text = name;
+    editEv.start = s;
+    editEv.end = endTime;
+    editEv.color = selectedColor;
+    markEventUpdated(editEv, activeUser);
+
+    if (wasShared && !isShared) {
+      syncSharedEvent(activeUser, oldSharedId, oldDk, 'delete');
+      if (dk !== oldDk) syncSharedEvent(activeUser, oldSharedId, dk, 'delete');
+      editEv.shared = false; editEv.sharedId = null;
+    } else if (!wasShared && isShared) {
+      const sid = uid();
+      editEv.shared = true; editEv.sharedId = sid;
+      syncSharedEvent(activeUser, sid, dk, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: sid });
+    } else if (wasShared && isShared) {
+      if (dk !== oldDk) {
+        syncSharedEvent(activeUser, oldSharedId, oldDk, 'delete');
+        syncSharedEvent(activeUser, oldSharedId, dk, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: oldSharedId });
+      } else {
+        syncSharedEvent(activeUser, oldSharedId, dk, 'edit', {
+          text: name, start: s, end: endTime, color: selectedColor,
+          updatedAt: editEv.updatedAt, updatedBy: editEv.updatedBy,
+        });
+      }
+    }
+    editEv.shared = isShared;
+
+    sortDateUser(oldDk, activeUser);
+    sortDateUser(dk, activeUser);
+
+    currentDate = parseDateKey(dk);
+    bg.remove();
+    render();
+  }
 
   document.getElementById('m-save').onclick = () => {
     const name = document.getElementById('m-name').value.trim();
@@ -227,107 +304,45 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     const endTime = enRaw > s ? enRaw : s + STEP_H;
     const dk = document.getElementById('m-date').value;
     const isShared = document.getElementById('m-shared').checked;
-    pushHistory();
 
     if (isEdit) {
-      const oldDk = dateKey;
-      const wasShared = editEv.shared;
-      const oldSharedId = editEv.sharedId;
-
-      if (dk !== oldDk) {
-        const oldArr = getEventsForDate(oldDk, activeUser);
-        const oi = oldArr.indexOf(editEv);
-        if (oi >= 0) oldArr.splice(oi, 1);
-        ensureDateUser(dk, activeUser);
-        allData[dk][activeUser].push(editEv);
+      // Recurring instance → ask which occurrences the edit applies to.
+      if (editEv.recurrenceId && seriesCount(editEv.recurrenceId, activeUser) > 1) {
+        const recurrenceId = editEv.recurrenceId;
+        bg.remove();
+        openRecurrenceScopeModal({ verb: 'edit', onChoose: scope => {
+          pushHistory();
+          if (scope === 'this') {
+            editEv.recurrenceId = null;
+            editEv.recurrence = null;
+            applySingleEdit(name, s, endTime, dk, isShared);
+          } else {
+            // Time/text/color propagate; per-instance date and sharedness are left as-is.
+            editRecurringSeries(recurrenceId, activeUser, scope === 'future' ? dateKey : null,
+              { text: name, start: s, end: endTime, color: selectedColor });
+            currentDate = parseDateKey(dateKey);
+            render();
+          }
+        }});
+        return;
       }
-
-      editEv.text = name;
-      editEv.start = s;
-      editEv.end = endTime;
-      editEv.color = selectedColor;
-      markEventUpdated(editEv, activeUser);
-
-      if (wasShared && !isShared) {
-        syncSharedEvent(activeUser, oldSharedId, oldDk, 'delete');
-        if (dk !== oldDk) syncSharedEvent(activeUser, oldSharedId, dk, 'delete');
-        editEv.shared = false; editEv.sharedId = null;
-      } else if (!wasShared && isShared) {
-        const sid = uid();
-        editEv.shared = true; editEv.sharedId = sid;
-        syncSharedEvent(activeUser, sid, dk, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: sid });
-      } else if (wasShared && isShared) {
-        if (dk !== oldDk) {
-          syncSharedEvent(activeUser, oldSharedId, oldDk, 'delete');
-          syncSharedEvent(activeUser, oldSharedId, dk, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: oldSharedId });
-        } else {
-          syncSharedEvent(activeUser, oldSharedId, dk, 'edit', {
-            text: name, start: s, end: endTime, color: selectedColor,
-            updatedAt: editEv.updatedAt, updatedBy: editEv.updatedBy,
-          });
-        }
-      }
-      editEv.shared = isShared;
-
-      sortDateUser(oldDk, activeUser);
-      sortDateUser(dk, activeUser);
-
-      // Repeat: copy the (now-edited) event to additional selected days
-      if (repeatToggle.checked) {
-        const checked = Array.from(document.querySelectorAll('#m-repeat-days input:checked')).map(el => el.value);
-        if (checked.length) {
-          const base = parseDateKey(dk);
-          const weekDates = getWeekDates(base);
-          checked.forEach(dayName => {
-            const copyDk = getDateKey(weekDates[DAYS.indexOf(dayName)]);
-            if (copyDk === dk) return; // skip the event's own day
-            const sharedId = isShared ? uid() : null;
-            const copy = normalizeEvent({
-              id: uid(), text: editEv.text, start: editEv.start, end: editEv.end,
-              done: false, shared: isShared, sharedId,
-              color: editEv.color, recurrenceId: editEv.recurrenceId || null,
-            });
-            markEventUpdated(copy, activeUser);
-            ensureDateUser(copyDk, activeUser);
-            allData[copyDk][activeUser].push(copy);
-            sortDateUser(copyDk, activeUser);
-            if (isShared) {
-              syncSharedEvent(activeUser, sharedId, copyDk, 'add', {
-                ...clone(copy), id: uid(), shared: true, sharedId,
-              });
-            }
-          });
-        }
-      }
-
-      currentDate = parseDateKey(dk);
-      bg.remove();
-      render();
+      pushHistory();
+      applySingleEdit(name, s, endTime, dk, isShared);
       return;
     }
 
-    // New event — gather dates
-    let datesToCreate = [dk];
-    let recurrenceId = null;
-
-    if (document.getElementById('m-repeat') && document.getElementById('m-repeat').checked) {
-      const checked = Array.from(document.querySelectorAll('#m-repeat-days input:checked')).map(el => el.value);
-      if (checked.length) {
-        const base = parseDateKey(dk);
-        const weekDates = getWeekDates(base);
-        const extraDates = checked.map(dayName => getDateKey(weekDates[DAYS.indexOf(dayName)]));
-        // Always include the original date; deduplicate in case the user also checked it
-        datesToCreate = [...new Set([dk, ...extraDates])];
-        recurrenceId = uid();
-      }
-    }
+    // New event — materialize the recurrence series (or a single event).
+    pushHistory();
+    const rule = readRule();
+    const recurrenceId = rule ? uid() : null;
+    const datesToCreate = rule ? expandRecurrence(rule, dk) : [dk];
 
     datesToCreate.forEach(dKey => {
       const sharedId = isShared ? uid() : null;
       const newEv = normalizeEvent({
         id: uid(), text: name, start: s, end: endTime,
         done: false, shared: isShared, sharedId,
-        color: selectedColor, recurrenceId,
+        color: selectedColor, recurrenceId, recurrence: rule,
       });
       markEventUpdated(newEv, activeUser);
       ensureDateUser(dKey, activeUser);

@@ -42,6 +42,7 @@ function normalizeEvent(raw) {
     sharedId: raw.sharedId || null,
     color: raw.color || null,
     recurrenceId: raw.recurrenceId || null,
+    recurrence: raw.recurrence && typeof raw.recurrence === 'object' ? raw.recurrence : null,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : null,
     updatedBy: typeof raw.updatedBy === 'string' ? raw.updatedBy : null,
   };

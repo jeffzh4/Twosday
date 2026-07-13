@@ -103,6 +103,8 @@ function renderUserPill() {
   if (nameEl && currentAccount) nameEl.textContent = currentAccount.username;
 }
 
+let _lastRenderedView = null;
+
 function render() {
   document.getElementById('nav-label').textContent = getNavLabel();
   renderViewSwitch();
@@ -112,6 +114,14 @@ function render() {
   if      (viewMode === 'day' || viewMode === 'week') renderGrid();
   else if (viewMode === 'month') renderMonthView();
   else if (viewMode === 'year')  renderYearView();
+
+  // Cross-fade the view container only when the view mode actually changes, so
+  // ordinary edits/navigation don't re-animate the whole grid.
+  if (_lastRenderedView !== viewMode) {
+    const content = document.getElementById('main-content');
+    if (content) { content.classList.remove('view-enter'); void content.offsetWidth; content.classList.add('view-enter'); }
+    _lastRenderedView = viewMode;
+  }
 
   if (typeof renderPresence === 'function') renderPresence();
   if (typeof queuePresenceUpdate === 'function') queuePresenceUpdate();
@@ -169,6 +179,7 @@ function bootApp() {
 
   document.addEventListener('keydown', e => {
     const meta = e.metaKey || e.ctrlKey;
+    if (meta && e.key.toLowerCase() === 'k') { e.preventDefault(); openCommandPalette(); return; }
     if (meta && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoAction(); return; }
     if (meta && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoAction(); return; }
     if (e.key === 'Escape') { const m = document.querySelector('.modal-bg'); if (m && !e.defaultPrevented) m.remove(); }
