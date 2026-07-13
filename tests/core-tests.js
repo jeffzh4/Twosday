@@ -54,6 +54,7 @@ load('js/utils.js');
 load('js/state.js');
 exec(`activeUser = 'alex'; viewMode = 'week'; currentDate = new Date(2026, 5, 14);`);
 load('js/events.js');
+load('js/recurrence.js');
 load('js/find-time.js');
 load('js/analytics.js');
 load('js/import.js');
@@ -322,6 +323,76 @@ run('applyTestingDemoSeed populates once and is idempotent on rerun', () => {
   assert.strictEqual(sharedPairFound, true);  // shared seed events mirror onto both profiles
 
   exec(`Object.keys(allData).forEach(k => delete allData[k]); currentAccount = null;`);
+});
+
+run('expandRecurrence generates the right instance dates per frequency', () => {
+  // Jun 14 2026 is a Sunday.
+  assert.deepStrictEqual(plain(exec(`expandRecurrence({ freq:'daily', count:3 }, '2026-06-14')`)),
+    ['2026-06-14', '2026-06-15', '2026-06-16']);
+  assert.deepStrictEqual(plain(exec(`expandRecurrence({ freq:'weekly', count:3 }, '2026-06-14')`)),
+    ['2026-06-14', '2026-06-21', '2026-06-28']);
+  assert.deepStrictEqual(plain(exec(`expandRecurrence({ freq:'monthly', count:3 }, '2026-06-14')`)),
+    ['2026-06-14', '2026-07-14', '2026-08-14']);
+  // weekdays: skip the Sunday start, take the next 3 weekdays (Mon–Wed).
+  assert.deepStrictEqual(plain(exec(`expandRecurrence({ freq:'weekdays', count:3 }, '2026-06-14')`)),
+    ['2026-06-15', '2026-06-16', '2026-06-17']);
+  // 'none' and cap.
+  assert.deepStrictEqual(plain(exec(`expandRecurrence({ freq:'none' }, '2026-06-14')`)), ['2026-06-14']);
+  assert.strictEqual(exec(`expandRecurrence({ freq:'daily', count:5000 }, '2026-06-14').length`), exec(`RECURRENCE_CAP`));
+});
+
+run('collectSeries and seriesCount find all instances of a series', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ['2026-06-14','2026-06-15','2026-06-16'].forEach(dk => {
+      ensureDateUser(dk, 'alex');
+      allData[dk].alex.push({ id:'r_'+dk, text:'standup', start:9, end:9.5, done:false, shared:false, sharedId:null, color:'blue', recurrenceId:'series1', recurrence:{freq:'daily',count:3} });
+    });
+    ensureDateUser('2026-06-15','alex');
+    allData['2026-06-15'].alex.push({ id:'solo', text:'lunch', start:12, end:13, done:false, shared:false, sharedId:null, color:null, recurrenceId:null });
+  `);
+  assert.strictEqual(exec(`seriesCount('series1', 'alex')`), 3);
+  assert.strictEqual(exec(`collectSeries('series1', 'alex')[0].dateKey`), '2026-06-14');
+  assert.strictEqual(exec(`seriesCount('nope', 'alex')`), 0);
+});
+
+run('deleteRecurringSeries removes all or this-and-following', () => {
+  function seed() {
+    exec(`
+      Object.keys(allData).forEach(k => delete allData[k]);
+      ['2026-06-14','2026-06-15','2026-06-16','2026-06-17'].forEach(dk => {
+        ensureDateUser(dk, 'alex');
+        allData[dk].alex.push({ id:'r_'+dk, text:'standup', start:9, end:9.5, done:false, shared:false, sharedId:null, color:'blue', recurrenceId:'series1', recurrence:{freq:'daily',count:4} });
+      });
+    `);
+  }
+  seed();
+  exec(`deleteRecurringSeries('series1', 'alex', '2026-06-16')`);  // this-and-following
+  assert.strictEqual(exec(`seriesCount('series1', 'alex')`), 2);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex').length`), 0);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-15','alex').length`), 1);
+
+  seed();
+  exec(`deleteRecurringSeries('series1', 'alex', null)`);  // all
+  assert.strictEqual(exec(`seriesCount('series1', 'alex')`), 0);
+});
+
+run('editRecurringSeries patches time and text across the scope', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ['2026-06-14','2026-06-15','2026-06-16'].forEach(dk => {
+      ensureDateUser(dk, 'alex');
+      allData[dk].alex.push({ id:'r_'+dk, text:'standup', start:9, end:9.5, done:false, shared:false, sharedId:null, color:'blue', recurrenceId:'series1', recurrence:{freq:'daily',count:3} });
+    });
+    editRecurringSeries('series1', 'alex', '2026-06-15', { text:'sync', start:10, end:10.5, color:'red' });
+  `);
+  // First instance untouched (before the 'future' cutoff).
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','alex')[0].text`), 'standup');
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','alex')[0].start`), 9);
+  // Later instances patched.
+  assert.strictEqual(exec(`getEventsForDate('2026-06-15','alex')[0].text`), 'sync');
+  assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex')[0].start`), 10);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex')[0].color`), 'red');
 });
 
 console.log('all core tests passed');
