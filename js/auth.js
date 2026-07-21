@@ -253,19 +253,33 @@ function setupAuthListeners() {
       account = await loadAccountRecord(username, false);
       if (!account) account = await migrateLegacyAccount(username, user.uid);
     } catch (authError) {
-      // A user who still has a legacy account cached on this device can claim it
-      // without exposing the old registry to anonymous clients.
-      const cached = getCachedAccounts()[username];
-      if (!cached || cached.ownerUid || !(await verifyPassword(password, cached.password))) {
+      // Never-claimed legacy account: sign-in failed because no Firebase Auth
+      // user exists for it yet. Prefer a cached copy of the legacy registry
+      // (avoids a round trip), but always fall back to a live read — the
+      // registry is publicly readable specifically so this bootstrap works on
+      // any device, not just the one that originally cached it.
+      let legacyAccount = getCachedAccounts()[username];
+      if (!legacyAccount || legacyAccount.ownerUid) {
+        try {
+          const legacySnap = await LEGACY_ACCOUNTS_DOC().get();
+          const legacyAccounts = legacySnap.exists && legacySnap.data().accounts;
+          legacyAccount = legacyAccounts && legacyAccounts[username];
+        } catch (e) {
+          legacyAccount = null;
+        }
+      }
+      if (!legacyAccount || legacyAccount.ownerUid || !(await verifyPassword(password, legacyAccount.password))) {
         setError('login', 'invalid username or password');
         return;
       }
       try {
         const claim = await claimFirebaseAuth(username, password);
         user = firebase.auth().currentUser;
-        account = await migrateLegacyAccount(username, claim.ownerUid, cached);
+        account = await migrateLegacyAccount(username, claim.ownerUid, legacyAccount);
       } catch (claimError) {
-        setError('login', 'secure account migration failed - try again or contact the project owner');
+        setError('login', claimError.code === 'auth/weak-password'
+          ? 'this account\'s saved password is too short to secure (Firebase requires 6+ characters) - contact the project owner to reset it'
+          : 'secure account migration failed - try again or contact the project owner');
         return;
       }
     }
