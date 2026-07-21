@@ -124,6 +124,9 @@ function importParsedEvents(events, user, shared) {
       });
     }
   });
+  if (events.length && typeof logAudit === 'function') {
+    logAudit('imported', `${events.length} event${events.length === 1 ? '' : 's'}`);
+  }
 }
 
 function openICSImportPreview(fileName, parsedEvents, defaultUser) {
