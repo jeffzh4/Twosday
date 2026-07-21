@@ -3160,6 +3160,60 @@ body::after {
 .audit-resized .audit-dot  { background: #93c5fd; }
 .audit-completed .audit-dot { background: var(--accent); }
 .audit-imported .audit-dot { background: #fde047; }
+
+/* ── light glass refinement + translucent calendar surfaces ── */
+[data-theme="light"] {
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-strong: rgba(255, 255, 255, 0.9);
+  --glass-highlight: rgba(255, 255, 255, 0.92);
+  --glass-shadow: 0 14px 38px rgba(51, 65, 85, 0.14);
+}
+
+[data-theme="light"] body::before {
+  background: #60a5fa;
+  opacity: 0.16;
+}
+
+[data-theme="light"] body::after {
+  background: #c084fc;
+  opacity: 0.14;
+}
+
+[data-theme="light"] .ev,
+[data-theme="light"] .month-ev-pill {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 5px 14px rgba(51, 65, 85, 0.1);
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme="light"] .ev.done { opacity: 0.52; }
+[data-theme="light"] .month-ev-pill.done { opacity: 0.62; }
+
+.ev {
+  position: absolute;
+  isolation: isolate;
+}
+
+.ev::before,
+.month-ev-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.04) 58%, rgba(0, 0, 0, 0.06));
+  border-radius: inherit;
+}
+
+.ev > * { position: relative; z-index: 1; }
+.ev .ev-actions { z-index: 2; }
+.ev .resize-handle { z-index: 3; }
+
+.month-ev-pill {
+  position: relative;
+  isolation: isolate;
+}
+
+.month-ev-pill > * { position: relative; z-index: 1; }
 .audit-text { flex: 1; color: var(--text); }
 .audit-text strong { font-weight: 500; }
 .audit-detail { color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
