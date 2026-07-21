@@ -103,6 +103,8 @@ function editRecurringSeries(recurrenceId, user, fromDateKey, patch) {
     if (patch.start != null) ev.start = patch.start;
     if (patch.end != null)   ev.end = patch.end;
     if (patch.color !== undefined) ev.color = patch.color;
+    if (patch.location !== undefined) ev.location = patch.location;
+    if (patch.description !== undefined) ev.description = patch.description;
     markEventUpdated(ev, user);
     sortDateUser(dateKey, user);
     label = ev.text;
@@ -110,6 +112,7 @@ function editRecurringSeries(recurrenceId, user, fromDateKey, patch) {
     if (ev.shared) {
       syncSharedEvent(user, ev.sharedId, dateKey, 'edit', {
         text: ev.text, start: ev.start, end: ev.end, color: ev.color,
+        location: ev.location, description: ev.description,
         updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
       });
     }
