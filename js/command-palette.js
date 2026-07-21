@@ -17,6 +17,7 @@ function buildCommandList() {
     { label: 'Search events',    hint: '/',       keywords: 'find',        run: () => toggleSearch(true) },
     { label: 'Find mutual time', hint: '',        keywords: 'free window schedule', run: () => openFindTimeModal() },
     { label: 'Conflict center',  hint: '',        keywords: 'overlap',     run: () => openConflictsModal() },
+    { label: 'Change history',   hint: '',        keywords: 'audit log activity', run: () => openAuditModal() },
     { label: 'Import / export',  hint: '',        keywords: 'ics csv calendar', run: () => openCalendarToolsModal() },
     { label: 'Toggle notes',     hint: '',        keywords: 'panel',       run: () => toggleNotes() },
     { label: 'Toggle theme',     hint: '',        keywords: 'dark light',  run: () => { userTheme[activeUser] = userTheme[activeUser] === 'dark' ? 'light' : 'dark'; applyTheme(); render(); } },

@@ -8,21 +8,26 @@ Events are stored by date and profile:
 
 ```js
 allData["2026-06-14"]["alex"] = [
-  { id, text, start, end, done, shared, sharedId, color, recurrenceId, updatedAt, updatedBy }
+  { id, text, start, end, done, shared, sharedId, color, recurrenceId, recurrence, updatedAt, updatedBy }
 ]
 ```
 
-Times are decimal hours, so `9.5` means 9:30 AM. Shared events are mirrored into both profiles and linked by `sharedId`.
+Times are decimal hours, so `9.5` means 9:30 AM. Shared events are mirrored into both profiles and linked by `sharedId`. Recurring events are materialized instances that share a `recurrenceId` and each carry the `recurrence` rule, so edit/delete can act on a single occurrence, this-and-following, or the whole series (see `recurrence.js`).
 
-## Sync
+Two more append-only structures travel with the calendar:
+
+- `tombstones` — `{ eventId: deletedAt }`, so a concurrent merge cannot resurrect a deleted event.
+- `auditLog` — a capped, newest-first list of every mutation (`reconcile.js`/`audit.js`).
+
+## Sync and Conflict Reconciliation
 
 Each account maps to three Firestore documents:
 
-- calendar data: events, themes, save timestamp, writer client id
+- calendar data: events, themes, tombstones, audit log, save timestamp, writer client id
 - notes data: per-profile notes
 - presence data: active browser sessions, current view, and heartbeat timestamp
 
-The calendar listener ignores its own client echo, while applying remote saves from other sessions. Local storage is used as a fast cache and offline fallback.
+The calendar listener ignores its own client echo. Remote snapshots are **merged**, not applied wholesale, so two profiles editing at once no longer clobber each other. `mergeCalendars` (in `reconcile.js`) is a last-write-wins element-set CRDT keyed by event id: for an id on both sides the higher `updatedAt` wins, ties break deterministically on serialized form (so both clients converge regardless of arrival order), and tombstones suppress ids the other side deleted. The merge is a pure, idempotent, order-independent function — after merging, a client whose result differs from the remote document writes the merged state back so both sides settle on the same state (the idempotence guarantees this cannot loop). A `try/catch` falls back to the previous wholesale-apply if a merge ever throws. Audit logs merge by union of entry ids. Local storage is a fast cache and offline fallback.
 
 ## Authentication and Authorization
 
@@ -42,22 +47,17 @@ Previously claimed accounts are migrated after a successful Firebase Auth login.
 - Analytics reads normalized events into derived metrics without mutating calendar state.
 - ICS import parses VEVENT records, previews them, then imports selected events through the same normalized event path.
 - Conflict center scans all relevant event pairs, de-dupes mirrored/shared overlaps, and links users back to edit or find-time flows.
+- Every mutation appends an immutable entry to the audit log (`logAudit`) — an event-sourced history reviewable from the command palette's "change history".
 
 ## Testing
 
-`tests/core-tests.js` runs pure logic checks in Node using the browser modules inside a VM context. It focuses on logic that is easy to regress:
+Three suites run under `npm test`:
 
-- date keys and month grids
-- shared-event mirroring (add/edit/toggle-done/delete) and undo/redo
-- Firestore sync-signature dedup and password-hash guard
-- account stats aggregation, ICS datetime formatting, profile rename
-- demo-seed idempotency (safe to call `applyTestingDemoSeed()` repeatedly)
-- busy interval merging and free-window search
-- analytics aggregation
-- ICS parsing
-- conflict collection
+- **`tests/core-tests.js`** — example-based pure-logic checks in a Node VM context: date/month helpers, shared-event mirroring and undo/redo, sync-signature dedup, password-hash guard, stats/ICS/rename, demo-seed idempotency, free-window search, analytics, ICS parsing, conflict collection, recurrence expansion and series edit/delete, and the reconciliation merge (LWW, tombstones, idempotence, audit-log union).
+- **`tests/property-tests.js`** — invariants checked across thousands of generated inputs with `fast-check`: `normalizeEvent` always yields a positive-duration event in `[0,24]`; `mergeCalendars` is order-independent, idempotent, and never keeps duplicate ids; `expandRecurrence` is bounded, monotonic, and emits valid date keys. This is the correctness-under-arbitrary-input discipline used for financial reconciliation logic.
+- **`tests/firestore-rules-tests.js`** — owner isolation, schema checks, immutability, and the legacy migration path against the local Firestore Emulator.
 
-Run both core and Firestore rules tests:
+Run everything:
 
 ```bash
 npm test

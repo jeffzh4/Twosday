@@ -131,6 +131,8 @@ function activateAccount(username, account) {
   USERS.forEach((u, i) => { userTheme[u] = i === 0 ? 'dark' : 'light'; });
   userNotes = {};
   USERS.forEach(u => { userNotes[u] = []; });
+  tombstones = {};
+  auditLog = [];
 }
 
 async function claimDataDocument(ref, emptyField) {
