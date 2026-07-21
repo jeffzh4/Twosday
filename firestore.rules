@@ -59,8 +59,14 @@ service cloud.firestore {
 
     match /schedules/{docId} {
       // Existing installations used one shared account registry. It is now a
-      // signed-in, read-only migration source and cannot be changed by clients.
-      allow read: if docId == 'accounts' && signedIn();
+      // read-only migration source and can never be changed by clients. Read
+      // access must stay public (not signedIn()-gated): migrating an unclaimed
+      // legacy account is the one operation a client performs before it has any
+      // Firebase Auth session, so gating the read on signedIn() would make that
+      // account permanently unreachable. Only password hashes live here, never
+      // plaintext, and this document cannot be written by clients under any
+      // condition below.
+      allow read: if docId == 'accounts';
       allow write: if docId == 'accounts' && false;
 
       allow create: if docId != 'accounts'
