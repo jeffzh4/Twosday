@@ -803,7 +803,7 @@ html, body {
   letter-spacing: 0.06em;
 }
 
-.field input, .field select {
+.field input, .field select, .field textarea {
   width: 100%;
   font-family: var(--font);
   font-size: 14px;
@@ -815,11 +815,16 @@ html, body {
   outline: none;
   transition: border-color 0.15s;
 }
+.field textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: var(--font);
+}
 .field input[type="date"],
 .field input[type="time"] { font-family: var(--mono); font-size: 13px; }
 .field input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.5; }
 .field input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
-.field input:focus, .field select:focus { border-color: var(--accent); }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
 .field select option { background: var(--surface2); color: var(--text); }
 
 .field-row { display: flex; gap: 8px; }
