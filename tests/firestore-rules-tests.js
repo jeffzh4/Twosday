@@ -109,10 +109,13 @@ async function run() {
     }));
     console.log('ok - only the linked owner can claim a legacy data document');
 
-    await assertFails(getDoc(doc(anonymous, 'schedules/accounts')));
+    // Read must stay public: migrating an unclaimed legacy account is the one
+    // operation a client performs before it has a Firebase Auth session at all.
+    await assertSucceeds(getDoc(doc(anonymous, 'schedules/accounts')));
     await assertSucceeds(getDoc(doc(alice, 'schedules/accounts')));
+    await assertFails(updateDoc(doc(anonymous, 'schedules/accounts'), { savedAt: Date.now() }));
     await assertFails(updateDoc(doc(alice, 'schedules/accounts'), { savedAt: Date.now() }));
-    console.log('ok - the legacy account registry is authenticated and read only');
+    console.log('ok - the legacy account registry is publicly readable and never writable');
   } finally {
     await env.cleanup();
   }
