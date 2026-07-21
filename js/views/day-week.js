@@ -218,6 +218,8 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
   div.setAttribute('role', 'button');
   div.setAttribute('aria-label', `${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}${ev.shared ? ', shared' : ''}${ev.done ? ', completed' : ''}`);
   div.title = `${fmtFull(ev.start)} – ${fmtFull(ev.end)} (${fmtDuration(ev.start, ev.end)})`;
+  if (ev.location) div.title += `\nlocation: ${ev.location}`;
+  if (ev.description) div.title += `\n${ev.description}`;
   if (ev.updatedAt) div.title += `\nupdated ${fmtRelativeTime(ev.updatedAt)} by ${ev.updatedBy || activeUser}`;
 
   let posStyle = `top:${top}px;height:${height}px;background:${p.bg};`;

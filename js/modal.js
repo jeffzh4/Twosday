@@ -49,6 +49,14 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         <label>date</label>
         <input type="date" id="m-date" value="${dateKey}" />
       </div>
+      <div class="field">
+        <label>location</label>
+        <input type="text" id="m-location" value="${isEdit && editEv.location ? escHtml(editEv.location) : ''}" placeholder="e.g. 123 Main St, Zoom link" />
+      </div>
+      <div class="field">
+        <label>description</label>
+        <textarea id="m-description" placeholder="add details here…">${isEdit && editEv.description ? escHtml(editEv.description) : ''}</textarea>
+      </div>
       ${recurHTML}
       <div class="field">
         <label>color</label>
@@ -247,7 +255,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   // Single-event edit: date move, shared-toggle handling, field updates. Used for
   // non-recurring events and for the 'this event only' scope (which detaches the
   // instance from its series first, turning it into an exception).
-  function applySingleEdit(name, s, endTime, dk, isShared) {
+  function applySingleEdit(name, s, endTime, dk, isShared, location, description) {
     const oldDk = dateKey;
     const wasShared = editEv.shared;
     const oldSharedId = editEv.sharedId;
@@ -264,6 +272,8 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     editEv.start = s;
     editEv.end = endTime;
     editEv.color = selectedColor;
+    editEv.location = location;
+    editEv.description = description;
     markEventUpdated(editEv, activeUser);
 
     if (wasShared && !isShared) {
@@ -280,7 +290,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         syncSharedEvent(activeUser, oldSharedId, dk, 'add', { ...clone(editEv), id: uid(), shared: true, sharedId: oldSharedId });
       } else {
         syncSharedEvent(activeUser, oldSharedId, dk, 'edit', {
-          text: name, start: s, end: endTime, color: selectedColor,
+          text: name, start: s, end: endTime, color: selectedColor, location, description,
           updatedAt: editEv.updatedAt, updatedBy: editEv.updatedBy,
         });
       }
@@ -305,6 +315,8 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     const endTime = enRaw > s ? enRaw : s + STEP_H;
     const dk = document.getElementById('m-date').value;
     const isShared = document.getElementById('m-shared').checked;
+    const location = document.getElementById('m-location').value.trim() || null;
+    const description = document.getElementById('m-description').value.trim() || null;
 
     if (isEdit) {
       // Recurring instance → ask which occurrences the edit applies to.
@@ -316,11 +328,11 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
           if (scope === 'this') {
             editEv.recurrenceId = null;
             editEv.recurrence = null;
-            applySingleEdit(name, s, endTime, dk, isShared);
+            applySingleEdit(name, s, endTime, dk, isShared, location, description);
           } else {
             // Time/text/color propagate; per-instance date and sharedness are left as-is.
             editRecurringSeries(recurrenceId, activeUser, scope === 'future' ? dateKey : null,
-              { text: name, start: s, end: endTime, color: selectedColor });
+              { text: name, start: s, end: endTime, color: selectedColor, location, description });
             currentDate = parseDateKey(dateKey);
             render();
           }
@@ -328,7 +340,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         return;
       }
       pushHistory();
-      applySingleEdit(name, s, endTime, dk, isShared);
+      applySingleEdit(name, s, endTime, dk, isShared, location, description);
       return;
     }
 
@@ -343,7 +355,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
       const newEv = normalizeEvent({
         id: uid(), text: name, start: s, end: endTime,
         done: false, shared: isShared, sharedId,
-        color: selectedColor, recurrenceId, recurrence: rule,
+        color: selectedColor, location, description, recurrenceId, recurrence: rule,
       });
       markEventUpdated(newEv, activeUser);
       ensureDateUser(dKey, activeUser);

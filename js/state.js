@@ -50,6 +50,8 @@ function normalizeEvent(raw) {
     shared: !!raw.shared,
     sharedId: raw.sharedId || null,
     color: raw.color || null,
+    location: typeof raw.location === 'string' ? raw.location : null,
+    description: typeof raw.description === 'string' ? raw.description : null,
     recurrenceId: raw.recurrenceId || null,
     recurrence: raw.recurrence && typeof raw.recurrence === 'object' ? raw.recurrence : null,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : null,
