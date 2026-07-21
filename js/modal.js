@@ -290,6 +290,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     sortDateUser(oldDk, activeUser);
     sortDateUser(dk, activeUser);
 
+    logAudit('edited', name, `${fmtFull(s)} – ${fmtFull(endTime)}`);
     currentDate = parseDateKey(dk);
     bg.remove();
     render();
@@ -356,6 +357,9 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
       }
     });
 
+    logAudit('created', name, rule
+      ? `recurring · ${recurrenceLabel(rule)}`
+      : `${fmtFull(s)} – ${fmtFull(endTime)}`);
     currentDate = parseDateKey(dk);
     bg.remove();
     render();

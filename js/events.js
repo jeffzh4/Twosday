@@ -6,6 +6,8 @@ function deleteEvent(dateKey, user, evId) {
   if (idx < 0) return;
   const ev = arr[idx];
   if (ev.shared) syncSharedEvent(user, ev.sharedId, dateKey, 'delete');
+  tombstone(ev.id);
+  logAudit('deleted', ev.text);
   arr.splice(idx, 1);
 }
 
@@ -15,6 +17,7 @@ function toggleDone(dateKey, user, evId) {
   if (!ev) return;
   ev.done = !ev.done;
   markEventUpdated(ev, user);
+  logAudit(ev.done ? 'completed' : 'reopened', ev.text);
   if (ev.shared) {
     syncSharedEvent(user, ev.sharedId, dateKey, 'toggle-done', {
       done: ev.done, updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
@@ -33,6 +36,7 @@ function syncSharedEvent(user, sharedId, dateKey, action, updates) {
     arr.push(clone(updates));
     sortDateUser(dateKey, other);
   } else if (action === 'delete' && idx !== -1) {
+    tombstone(arr[idx].id);   // tombstone the mirror too, so a merge can't revive it
     arr.splice(idx, 1);
   } else if (action === 'toggle-done' && idx !== -1) {
     arr[idx].done = updates.done;
@@ -170,6 +174,10 @@ function onDragEnd() {
     return;
   }
   if (!dragState) return;
+  if (dragState.moved) {
+    const ev = getEventsForDate(dragState.dateKey, activeUser).find(x => x.id === dragState.evId);
+    if (ev) logAudit(dragState.mode === 'move' ? 'moved' : 'resized', ev.text, `${fmtFull(ev.start)} – ${fmtFull(ev.end)}`);
+  }
   dragState = null;
   render();
 }

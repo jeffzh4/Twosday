@@ -71,21 +71,32 @@ function seriesCount(recurrenceId, user) {
 
 // Delete a series. fromDateKey null = all; otherwise this-and-following.
 function deleteRecurringSeries(recurrenceId, user, fromDateKey) {
-  collectSeries(recurrenceId, user).forEach(({ dateKey, ev }) => {
+  const series = collectSeries(recurrenceId, user);
+  let removed = 0;
+  let label = '';
+  series.forEach(({ dateKey, ev }) => {
     if (fromDateKey && dateKey < fromDateKey) return;
     const arr = allData[dateKey] && allData[dateKey][user];
     if (!arr) return;
     const idx = arr.indexOf(ev);
     if (idx < 0) return;
+    label = ev.text;
     if (ev.shared) syncSharedEvent(user, ev.sharedId, dateKey, 'delete');
+    if (typeof tombstone === 'function') tombstone(ev.id);
     arr.splice(idx, 1);
+    removed++;
   });
+  if (removed && typeof logAudit === 'function') {
+    logAudit('deleted', label, `recurring series · ${removed} occurrence${removed !== 1 ? 's' : ''}`);
+  }
 }
 
 // Patch time/text/color across a series. Date and sharedness are per-instance and
 // are intentionally left untouched here — those changes go through the single-event
 // path ('this' scope), which detaches the instance as an exception.
 function editRecurringSeries(recurrenceId, user, fromDateKey, patch) {
+  let edited = 0;
+  let label = '';
   collectSeries(recurrenceId, user).forEach(({ dateKey, ev }) => {
     if (fromDateKey && dateKey < fromDateKey) return;
     if (patch.text != null)  ev.text = patch.text;
@@ -94,6 +105,8 @@ function editRecurringSeries(recurrenceId, user, fromDateKey, patch) {
     if (patch.color !== undefined) ev.color = patch.color;
     markEventUpdated(ev, user);
     sortDateUser(dateKey, user);
+    label = ev.text;
+    edited++;
     if (ev.shared) {
       syncSharedEvent(user, ev.sharedId, dateKey, 'edit', {
         text: ev.text, start: ev.start, end: ev.end, color: ev.color,
@@ -101,6 +114,9 @@ function editRecurringSeries(recurrenceId, user, fromDateKey, patch) {
       });
     }
   });
+  if (edited && typeof logAudit === 'function') {
+    logAudit('edited', label, `recurring series · ${edited} occurrence${edited !== 1 ? 's' : ''}`);
+  }
 }
 
 // Small chooser shown before a scoped edit/delete of a recurring event.

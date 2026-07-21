@@ -8,7 +8,14 @@ let activeUser = null;       // set by auth.js → activateAccount()
 let viewMode = 'week';       // 'day' | 'week' | 'month' | 'year'
 let currentDate = new Date();
 let userTheme = {};          // { [profileName]: 'dark' | 'light' }
+let tombstones = {};         // { [eventId]: deletedAt } — for CRDT delete merge
+let auditLog = [];           // append-only change history (newest first)
 const appHistory = { undo: [], redo: [] };
+
+// Record a deletion so a concurrent remote merge can't resurrect the event.
+function tombstone(id) {
+  if (id) tombstones[id] = Date.now();
+}
 
 // Set by drag logic
 let dragState = null;
@@ -30,7 +37,9 @@ function sortDateUser(dateKey, user) {
 }
 
 function normalizeEvent(raw) {
-  const start = clampTime(typeof raw.start === 'number' ? raw.start : 9);
+  // Cap start at END_H - STEP_H so there is always room for a positive-duration
+  // end; otherwise a start of exactly END_H would yield a zero-duration event.
+  const start = Math.min(clampTime(typeof raw.start === 'number' ? raw.start : 9), END_H - STEP_H);
   const endRaw = clampTime(typeof raw.end === 'number' ? raw.end : start + STEP_H);
   const end = endRaw > start ? endRaw : Math.min(END_H, start + STEP_H);
   return {
@@ -163,6 +172,8 @@ function saveToLocalStorage() {
       viewMode,
       currentDate: currentDate.toISOString(),
       userTheme,
+      tombstones,
+      auditLog,
       savedAt: Date.now(),
     }));
   } catch (e) {}
@@ -173,9 +184,11 @@ function saveToLocalStorage() {
 }
 
 // Signature of the syncable data, used to skip no-op Firestore writes — e.g. when
-// the user is only navigating dates/views, which mutates no event data.
+// the user is only navigating dates/views, which mutates no event data. Includes
+// tombstones so a delete (which removes an event AND records a tombstone) always
+// counts as a change worth syncing.
 function _syncSig() {
-  return JSON.stringify(allData) + '|' + JSON.stringify(userTheme);
+  return JSON.stringify(allData) + '|' + JSON.stringify(userTheme) + '|' + JSON.stringify(tombstones);
 }
 
 function saveToFirestore() {
@@ -186,6 +199,8 @@ function saveToFirestore() {
     FIRESTORE_DOC.set({
       allData,
       userTheme,
+      tombstones,
+      auditLog,
       accountId: currentAccount.username,
       ownerUid: currentAccount.ownerUid,
       savedAt: Date.now(),
@@ -236,6 +251,30 @@ function applyParsedData(parsed, applyViewState) {
       if (parsed.userTheme[u]) userTheme[u] = parsed.userTheme[u];
     });
   }
+
+  if (parsed.tombstones && typeof parsed.tombstones === 'object') tombstones = { ...parsed.tombstones };
+  if (Array.isArray(parsed.auditLog)) auditLog = parsed.auditLog.slice(0, AUDIT_CAP);
+}
+
+// Normalize a raw remote allData object into the in-memory event shape, without
+// touching the live `allData` — used by the reconciliation merge.
+function normalizeAllData(rawAll, users) {
+  const out = {};
+  Object.keys(rawAll || {}).forEach(dk => {
+    out[dk] = {};
+    users.forEach(u => {
+      const src = rawAll[dk] && Array.isArray(rawAll[dk][u]) ? rawAll[dk][u] : [];
+      out[dk][u] = src.map(normalizeEvent);
+    });
+  });
+  return out;
+}
+
+// Replace the contents of the live `allData` object in place (keeps the const
+// binding) with a freshly-merged tree.
+function replaceAllData(next) {
+  Object.keys(allData).forEach(k => delete allData[k]);
+  Object.keys(next).forEach(dk => { allData[dk] = next[dk]; });
 }
 
 function migrateWeekFormat(allWeeks) {
@@ -284,11 +323,47 @@ function startFirestoreListener() {
     if (!snap.exists) return;
     const data = snap.data();
     if (data.clientId && data.clientId === CLIENT_ID) return; // own echo — skip
+
     _isLoadingFromFirestore = true;
-    applyParsedData(data, false);
-    _lastSyncedSig = _syncSig();   // remote state is now the baseline — don't echo it back
-    applyTheme();
-    render();
-    _isLoadingFromFirestore = false;
+    const localSig = _syncSig();
+    try {
+      // Per-event LWW + tombstone merge, so a concurrent edit from the other
+      // profile is reconciled rather than clobbering our local changes.
+      const remoteAll = normalizeAllData(data.allData, USERS);
+      const merged = mergeCalendars(allData, remoteAll, tombstones, data.tombstones || {}, USERS);
+      replaceAllData(merged.allData);
+      tombstones = merged.tombstones;
+      auditLog = mergeAuditLogs(auditLog, data.auditLog, AUDIT_CAP);
+      if (data.userTheme) USERS.forEach(u => { if (data.userTheme[u]) userTheme[u] = data.userTheme[u]; });
+
+      const mergedSig = _syncSig();
+      applyTheme();
+      render();
+      _isLoadingFromFirestore = false;
+
+      if (mergedSig !== localSig) {
+        showToast('merged changes from the other calendar', 'info');
+      }
+      // Converge: if our merged result carries anything the remote document
+      // lacked (e.g. our newer local edits), push it back so both sides settle
+      // on the same state. The merge is idempotent, so this cannot loop.
+      const remoteSig = JSON.stringify(remoteAll)
+        + '|' + JSON.stringify(data.userTheme || userTheme)
+        + '|' + JSON.stringify(data.tombstones || {});
+      if (mergedSig !== remoteSig) {
+        _lastSyncedSig = null;
+        saveToFirestore();
+      } else {
+        _lastSyncedSig = mergedSig;
+      }
+    } catch (e) {
+      // Never let a merge bug wedge sync — fall back to the previous behavior.
+      console.warn('Merge failed, applying remote snapshot directly:', e);
+      applyParsedData(data, false);
+      _lastSyncedSig = _syncSig();
+      applyTheme();
+      render();
+      _isLoadingFromFirestore = false;
+    }
   }, err => console.warn('Firestore listener error:', err));
 }

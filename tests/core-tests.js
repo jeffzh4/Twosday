@@ -52,6 +52,8 @@ function getTheme() { return 'dark'; }
 
 load('js/utils.js');
 load('js/state.js');
+load('js/reconcile.js');
+load('js/audit.js');
 exec(`activeUser = 'alex'; viewMode = 'week'; currentDate = new Date(2026, 5, 14);`);
 load('js/events.js');
 load('js/recurrence.js');
@@ -393,6 +395,64 @@ run('editRecurringSeries patches time and text across the scope', () => {
   assert.strictEqual(exec(`getEventsForDate('2026-06-15','alex')[0].text`), 'sync');
   assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex')[0].start`), 10);
   assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex')[0].color`), 'red');
+});
+
+run('mergeCalendars resolves a concurrent edit by last-write-wins', () => {
+  const merged = exec(`(function(){
+    const local = { '2026-06-14': { alex: [{ id:'e1', text:'gym', start:7, end:8, updatedAt:100 }], jamie: [] } };
+    const remote = { '2026-06-14': { alex: [{ id:'e1', text:'GYM (moved)', start:9, end:10, updatedAt:200 }], jamie: [] } };
+    return mergeCalendars(local, remote, {}, {}, ['alex','jamie']);
+  })()`);
+  assert.strictEqual(merged.allData['2026-06-14'].alex.length, 1);
+  assert.strictEqual(merged.allData['2026-06-14'].alex[0].text, 'GYM (moved)');  // ts 200 > 100
+  assert.strictEqual(merged.allData['2026-06-14'].alex[0].start, 9);
+});
+
+run('mergeCalendars keeps each side\'s non-conflicting concurrent edit', () => {
+  const merged = exec(`(function(){
+    const local  = { '2026-06-14': { alex: [{ id:'a', text:'alex edit', start:7, end:8, updatedAt:200 }], jamie: [{ id:'b', text:'old', start:1, end:2, updatedAt:100 }] } };
+    const remote = { '2026-06-14': { alex: [{ id:'a', text:'old', start:7, end:8, updatedAt:100 }], jamie: [{ id:'b', text:'jamie edit', start:3, end:4, updatedAt:200 }] } };
+    return mergeCalendars(local, remote, {}, {}, ['alex','jamie']);
+  })()`);
+  // Neither concurrent edit is clobbered — both survive.
+  assert.strictEqual(merged.allData['2026-06-14'].alex[0].text, 'alex edit');
+  assert.strictEqual(merged.allData['2026-06-14'].jamie[0].text, 'jamie edit');
+});
+
+run('mergeCalendars honors a tombstone and does not resurrect a deleted event', () => {
+  // Tombstones use real (recent) timestamps — the merge prunes tombstones older
+  // than its 30-day TTL, so the test data must be recent to exercise suppression.
+  const count = exec(`(function(){
+    const now = Date.now();
+    const remote = { '2026-06-14': { alex: [{ id:'e1', text:'gym', start:7, end:8, updatedAt: now - 1000 }], jamie: [] } };
+    const m = mergeCalendars({}, remote, { e1: now }, {}, ['alex','jamie']);  // tombstone now >= edit
+    return Object.keys(m.allData).reduce((s, dk) => s + (m.allData[dk].alex||[]).length, 0);
+  })()`);
+  assert.strictEqual(count, 0);  // stays deleted
+});
+
+run('mergeCalendars is idempotent and order-independent', () => {
+  const [ab, ba, abab] = exec(`(function(){
+    const A = { '2026-06-14': { alex: [{ id:'a', text:'A', start:7, end:8, updatedAt:200 }], jamie: [] } };
+    const B = { '2026-06-14': { alex: [{ id:'a', text:'B', start:7, end:8, updatedAt:100 }], jamie: [{ id:'c', text:'C', start:1, end:2, updatedAt:50 }] } };
+    const ab = mergeCalendars(A, B, {}, {}, ['alex','jamie']);
+    const ba = mergeCalendars(B, A, {}, {}, ['alex','jamie']);
+    const abab = mergeCalendars(ab.allData, ab.allData, ab.tombstones, ab.tombstones, ['alex','jamie']);
+    return [JSON.stringify(ab.allData), JSON.stringify(ba.allData), JSON.stringify(abab.allData)];
+  })()`);
+  assert.strictEqual(ab, ba);      // order-independent: merge(A,B) === merge(B,A)
+  assert.strictEqual(ab, abab);    // idempotent: merge(m,m) === m
+});
+
+run('mergeAuditLogs unions by id, sorts newest first, and caps', () => {
+  const result = exec(`
+    const a = [{ id:'1', ts:100 }, { id:'2', ts:300 }];
+    const b = [{ id:'2', ts:300 }, { id:'3', ts:200 }];
+    mergeAuditLogs(a, b, 10).map(e => e.id);
+  `);
+  assert.deepStrictEqual(plain(result), ['2', '3', '1']);  // deduped by id, newest ts first
+  const capped = exec(`mergeAuditLogs([{id:'1',ts:1},{id:'2',ts:2},{id:'3',ts:3}], [], 2).length`);
+  assert.strictEqual(capped, 2);
 });
 
 console.log('all core tests passed');

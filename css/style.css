@@ -2796,9 +2796,13 @@ html, body {
   to   { opacity: 1; transform: none; }
 }
 
-/* View cross-fade — the .view-enter class is toggled in app.js only when the
-   view mode changes, so ordinary edits don't re-animate the whole grid. */
-.main-content.view-enter > * { animation: view-enter 0.2s ease both; }
+/* View cross-fade — animates the container itself (added in app.js only on a
+   view-mode change). It must NOT target the children (`> *`): renderGrid()
+   rebuilds those on every edit/toggle/navigate, and since the class persists
+   on the container, child-targeted animation would replay on every render and
+   make the whole grid blink. Animating the container runs the animation once
+   per view switch and is unaffected by later child replacement. */
+.main-content.view-enter { animation: view-enter 0.2s ease; }
 @keyframes view-enter {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
@@ -2913,3 +2917,54 @@ html, body {
   padding: 10px 12px;
 }
 .scope-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+
+/* ══════════════════════════════════════
+   AUDIT LOG / CHANGE HISTORY
+══════════════════════════════════════ */
+.audit-modal { width: 460px; max-width: calc(100vw - 32px); }
+.audit-header { display: flex; align-items: center; justify-content: space-between; }
+.audit-copy { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.audit-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 52vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface2) transparent;
+}
+.audit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 8px 4px;
+  border-top: 0.5px solid var(--border);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.audit-row:first-child { border-top: none; }
+.audit-dot {
+  flex-shrink: 0;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transform: translateY(-1px);
+}
+.audit-created .audit-dot  { background: #6ee7b7; }
+.audit-deleted .audit-dot  { background: #f87171; }
+.audit-edited .audit-dot,
+.audit-moved .audit-dot,
+.audit-resized .audit-dot  { background: #93c5fd; }
+.audit-completed .audit-dot { background: var(--accent); }
+.audit-imported .audit-dot { background: #fde047; }
+.audit-text { flex: 1; color: var(--text); }
+.audit-text strong { font-weight: 500; }
+.audit-detail { color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
+.audit-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.audit-empty { padding: 20px; text-align: center; color: var(--text-dim); font-size: 13px; }

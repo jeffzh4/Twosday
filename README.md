@@ -12,7 +12,7 @@ Twosday helps two people coordinate individual plans, shared events, conflicts, 
 
 | Collaboration | Scheduling intelligence | Engineering depth |
 | --- | --- | --- |
-| Two independent profiles with mirrored shared events, live presence, and per-event update metadata. | Conflict Center and mutual free-window search make coordination visible and actionable. | Firebase Auth ownership, Firestore authorization tests, offline cache, accessibility support, and real-time listeners. |
+| Two independent profiles with mirrored shared events, live presence, an append-only change history, and per-event update metadata. | Conflict Center and mutual free-window search make coordination visible and actionable. | Deterministic CRDT conflict reconciliation, property-based tests, Firebase Auth ownership, Firestore authorization tests, and real-time listeners. |
 
 ## Product Walkthrough
 
@@ -33,7 +33,10 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 - Day, week, month, and year views across a full 24-hour schedule
 - Two named profiles with independent themes, notes, and optional emoji identifiers
 - Shared events mirrored automatically between profiles
+- True recurring events with this / this-and-following / all-occurrences edit and delete
 - Drag, resize, duplicate, repeat, complete, undo, and redo event workflows
+- Command palette (`⌘K`) over every action, with type-to-jump dates
+- Append-only change history recording who changed what and when, shared across both profiles
 - Live presence showing who is viewing and their current calendar context
 - Event update metadata showing the latest editor and timestamp
 
@@ -49,6 +52,8 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 
 - Firebase Authentication with owner-scoped account metadata
 - Firestore rules that protect account, calendar, notes, and presence documents
+- Deterministic conflict reconciliation: concurrent edits merge via a last-write-wins CRDT with delete tombstones, instead of one profile clobbering the other
+- Property-based invariant tests alongside example-based and Firestore-rules tests
 - Legacy-account migration after verified sign-in
 - Real-time Firestore synchronization with self-echo suppression
 - `localStorage` cache and offline fallback
@@ -72,9 +77,10 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 npm test
 ```
 
-The suite combines Node-based core logic tests with Firebase Emulator authorization tests.
+The suite combines Node-based core logic tests, property-based invariant tests, and Firebase Emulator authorization tests.
 
-- Core coverage: date helpers, shared-event mirroring, undo/redo, sync deduplication, analytics, import parsing, conflicts, profile rename, and seeded demo data
+- Core coverage: date helpers, shared-event mirroring, undo/redo, sync deduplication, analytics, import parsing, conflicts, profile rename, seeded demo data, recurrence expansion and series edits, and CRDT merge reconciliation
+- Property coverage (`fast-check`): event-duration invariants, and merge order-independence, idempotence, and no-duplicate-id guarantees across thousands of generated inputs
 - Rules coverage: anonymous denial, account privacy, cross-account isolation, owner immutability, schema validation, and safe legacy migration
 
 ## Run Locally
