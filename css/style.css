@@ -2827,6 +2827,204 @@ html, body {
 /* ══════════════════════════════════════
    COMMAND PALETTE (⌘K)
 ══════════════════════════════════════ */
+
+/* ══════════════════════════════════════
+   LIQUID GLASS SHELL
+   Kept as a focused override block so the treatment can be reverted without
+   disturbing calendar layout or event colors.
+══════════════════════════════════════ */
+:root {
+  --glass-bg: rgba(24, 24, 27, 0.78);
+  --glass-bg-strong: rgba(24, 24, 27, 0.9);
+  --glass-highlight: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="light"] {
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-bg-strong: rgba(255, 255, 255, 0.94);
+  --glass-highlight: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 14px 38px rgba(39, 39, 42, 0.12);
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  width: 42vw;
+  height: 42vw;
+  min-width: 320px;
+  min-height: 320px;
+  border-radius: 46% 54% 62% 38% / 42% 38% 62% 58%;
+  pointer-events: none;
+  filter: blur(64px);
+  opacity: 0.2;
+  transform: translate3d(0, 0, 0);
+}
+
+body::before {
+  top: -22vw;
+  right: -12vw;
+  background: #7c3aed;
+  animation: liquid-drift-a 18s ease-in-out infinite alternate;
+}
+
+body::after {
+  bottom: -25vw;
+  left: -14vw;
+  background: #0891b2;
+  animation: liquid-drift-b 23s ease-in-out infinite alternate;
+}
+
+[data-theme="light"] body::before,
+[data-theme="light"] body::after { opacity: 0.11; }
+
+.header,
+.user-switcher,
+.presence-strip {
+  background: var(--glass-bg);
+  border: 0.5px solid var(--glass-highlight);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+.header {
+  position: relative;
+  z-index: 2;
+  padding: 8px 10px;
+  margin: -8px -10px 14px;
+  border-radius: var(--radius);
+}
+
+.user-switcher {
+  position: relative;
+  z-index: 1;
+}
+
+.user-tab.active.user-0,
+.user-tab.active.user-1 {
+  box-shadow: inset 0 0 0 0.5px currentColor, 0 0 18px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.btn-find,
+.btn-conflicts,
+.btn-calendar-tools,
+.btn-icon,
+.notes-toggle,
+.nav-btn,
+.nav-today-btn,
+.view-switch,
+.user-pill {
+  border: 0.5px solid var(--glass-highlight);
+  background: var(--glass-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 5px 18px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+}
+
+.btn-find:hover,
+.btn-conflicts:hover,
+.btn-calendar-tools:hover,
+.btn-icon:hover,
+.notes-toggle:hover,
+.nav-btn:hover,
+.nav-today-btn:hover {
+  border-color: currentColor;
+  background: color-mix(in srgb, var(--accent) 16%, var(--glass-bg));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 20px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+#btn-conflicts:hover {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(127, 29, 29, 0.3);
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.18);
+}
+
+#btn-find-time:hover {
+  color: #86efac;
+  border-color: rgba(74, 222, 128, 0.7);
+  background: rgba(20, 83, 45, 0.3);
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.18);
+}
+
+#btn-calendar-tools:hover,
+#btn-notes:hover {
+  color: #93c5fd;
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(30, 64, 175, 0.25);
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.18);
+}
+
+.modal-bg {
+  background: color-mix(in srgb, var(--modal-overlay) 78%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.modal,
+.find-time-modal,
+.conflict-center-modal,
+.import-preview-modal,
+.calendar-tools-modal,
+.analytics-modal,
+.settings-modal,
+.notes-panel,
+.search-container,
+.cmdk {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-highlight);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(22px) saturate(125%);
+  -webkit-backdrop-filter: blur(22px) saturate(125%);
+}
+
+@keyframes liquid-drift-a {
+  from { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96); }
+  to { transform: translate3d(3vw, 5vw, 0) rotate(12deg) scale(1.08); }
+}
+
+@keyframes liquid-drift-b {
+  from { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04); }
+  to { transform: translate3d(-4vw, -5vw, 0) rotate(-14deg) scale(0.95); }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .header,
+  .user-switcher,
+  .presence-strip,
+  .btn-find,
+  .btn-conflicts,
+  .btn-calendar-tools,
+  .btn-icon,
+  .notes-toggle,
+  .nav-btn,
+  .nav-today-btn,
+  .view-switch,
+  .user-pill,
+  .modal,
+  .find-time-modal,
+  .conflict-center-modal,
+  .import-preview-modal,
+  .calendar-tools-modal,
+  .analytics-modal,
+  .settings-modal,
+  .notes-panel,
+  .search-container,
+  .cmdk { background: var(--surface); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after { animation: none; }
+}
 .cmdk-bg { align-items: flex-start; }
 .cmdk {
   width: 540px;
