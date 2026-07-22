@@ -4,7 +4,7 @@
 
 Twosday helps two people coordinate individual plans, shared events, conflicts, and open time without turning a personal calendar into a cluttered group workspace.
 
-[Live project](https://twosday-five.vercel.app) · [Architecture notes](ARCHITECTURE.md) · [Run the test suite](#testing)
+[Live project](https://twosday.dev) · [Architecture notes](ARCHITECTURE.md) · [Run the test suite](#testing)
 
 <!-- Add assets/twosday-demo.gif here after recording the README walkthrough. -->
 
