@@ -105,6 +105,40 @@ function renderUserPill() {
 
 let _lastRenderedView = null;
 
+function initLiquidPointer() {
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reducedMotion) return;
+
+  let frameId = null;
+  let targetX = window.innerWidth / 2;
+  let targetY = window.innerHeight / 2;
+  let currentX = targetX;
+  let currentY = targetY;
+
+  function settleLiquidPointer() {
+    currentX += (targetX - currentX) * 0.09;
+    currentY += (targetY - currentY) * 0.09;
+    document.documentElement.style.setProperty('--liquid-pointer-x', `${currentX}px`);
+    document.documentElement.style.setProperty('--liquid-pointer-y', `${currentY}px`);
+
+    if (Math.abs(targetX - currentX) > 0.5 || Math.abs(targetY - currentY) > 0.5) {
+      frameId = requestAnimationFrame(settleLiquidPointer);
+    } else {
+      currentX = targetX;
+      currentY = targetY;
+      frameId = null;
+    }
+  }
+
+  document.addEventListener('pointermove', event => {
+    if (event.pointerType && event.pointerType !== 'mouse') return;
+    targetX = event.clientX;
+    targetY = event.clientY;
+    if (frameId !== null) return;
+    frameId = requestAnimationFrame(settleLiquidPointer);
+  }, { passive: true });
+}
+
 function render() {
   document.getElementById('nav-label').textContent = getNavLabel();
   renderViewSwitch();
@@ -131,6 +165,7 @@ function render() {
 // ── Boot: called by auth.js once an account is active ────────────────────────
 function bootApp() {
   renderUserPill();
+  initLiquidPointer();
 
   // Button listeners
   document.getElementById('btn-prev').onclick  = () => navigate(-1);
