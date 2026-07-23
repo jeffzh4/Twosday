@@ -9,7 +9,7 @@
 // Firestore, Firebase Auth, and Google Fonts are never touched here. They are
 // cross-origin and handled by the Firebase SDK's own offline layer.
 
-const CACHE_VERSION = 'twosday-v2';
+const CACHE_VERSION = 'twosday-v3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 const SHELL_ASSETS = [
