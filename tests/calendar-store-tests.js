@@ -74,6 +74,25 @@ async function run(name, fn) {
     assert.strictEqual(h.calls.writes, 1);
   });
 
+  await run('ignores completion from a write started before reset', async () => {
+    let finishWrite;
+    const statuses = [];
+    const store = context.createCalendarStore({
+      cache: { load: () => false, save: () => {} },
+      remote: {
+        isLoading: () => false, isOffline: () => false, signature: () => 'one',
+        setStatus: status => statuses.push(status),
+        write: () => new Promise(resolve => { finishWrite = resolve; }),
+        onWriteError: () => {}, listen: () => () => {},
+      },
+    });
+    const pending = store.saveRemote();
+    store.reset();
+    finishWrite();
+    assert.strictEqual(await pending, false);
+    assert.deepStrictEqual(statuses, ['pending']);
+  });
+
   await run('exposes controlled reconvergence timing to the remote adapter', async () => {
     const h = makeHarness();
     assert.strictEqual(h.store.listen(), 'unsubscribe');

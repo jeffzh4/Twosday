@@ -3,6 +3,10 @@ const fs = require('fs');
 const events = fs.readFileSync('js/events.js', 'utf8');
 const dayWeek = fs.readFileSync('js/views/day-week.js', 'utf8');
 const css = fs.readFileSync('css/style.css', 'utf8');
+const settings = fs.readFileSync('js/settings.js', 'utf8');
+const state = fs.readFileSync('js/state.js', 'utf8');
+const serviceWorker = fs.readFileSync('sw.js', 'utf8');
+const index = fs.readFileSync('index.html', 'utf8');
 
 const onDragEnd = events.slice(events.indexOf('function onDragEnd()'), events.indexOf('\n}', events.indexOf('function onDragEnd()')) + 2);
 if (!/if \(didMove\) render\(\)/.test(onDragEnd)) {
@@ -22,5 +26,26 @@ const eventGlass = css.slice(css.indexOf('.glass-events .ev,'), css.indexOf('.gl
 if (/backdrop-filter/.test(eventGlass)) {
   throw new Error('event flicker regression: event cards must not blur animated backdrops');
 }
+
+if (/s-density|data-density="compact"/.test(settings + css)) {
+  throw new Error('density regression: unsupported compact controls or geometry must stay removed');
+}
+if (!/setAttribute\('data-density', 'comfortable'\)/.test(state)) {
+  throw new Error('density regression: legacy compact values must render at stable comfortable geometry');
+}
+
+if (!/bg\.appendChild\(popover\)/.test(settings) || !/hidden aria-hidden="true"/.test(settings)) {
+  throw new Error('emoji picker regression: popover must escape scroll clipping and stay hidden when closed');
+}
+if (!/role="listbox"/.test(settings) || !/setAttribute\('role', 'option'\)/.test(settings)) {
+  throw new Error('emoji picker regression: listbox and option semantics must stay intact');
+}
+
+const localScripts = Array.from(index.matchAll(/<script src="(js\/[^"]+)/g), match => '/' + match[1].split('?')[0]);
+localScripts.forEach(script => {
+  if (!serviceWorker.includes(`'${script}'`)) {
+    throw new Error(`offline shell regression: ${script} is missing from service worker assets`);
+  }
+});
 
 console.log('ui regression guards passed');

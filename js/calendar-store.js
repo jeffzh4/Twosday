@@ -18,6 +18,7 @@ function createCalendarStore(options) {
   let lastSyncedSignature = null;
   let lastReconvergeAt = 0;
   let stopListening = null;
+  let lifecycle = 0;
 
   function load() {
     return cache.load();
@@ -31,6 +32,7 @@ function createCalendarStore(options) {
   }
 
   function saveRemote() {
+    const writeLifecycle = lifecycle;
     const signature = remote.signature();
     if (signature === lastSyncedSignature) return Promise.resolve(false);
 
@@ -40,15 +42,18 @@ function createCalendarStore(options) {
     try {
       write = remote.write();
     } catch (error) {
+      if (writeLifecycle !== lifecycle) return Promise.resolve(false);
       lastSyncedSignature = null;
       remote.onWriteError(error);
       return Promise.resolve(false);
     }
 
     return Promise.resolve(write).then(() => {
+      if (writeLifecycle !== lifecycle) return false;
       remote.setStatus('synced');
       return true;
     }).catch(error => {
+      if (writeLifecycle !== lifecycle) return false;
       lastSyncedSignature = null;
       remote.onWriteError(error);
       return false;
@@ -68,6 +73,7 @@ function createCalendarStore(options) {
   }
 
   function reset() {
+    lifecycle++;
     clearTimeoutFn(saveTimer);
     if (stopListening) stopListening();
     saveTimer = null;

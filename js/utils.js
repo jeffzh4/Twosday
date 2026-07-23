@@ -96,7 +96,7 @@ function makeModalAccessible(bg, { titleSelector = 'h3', initialFocusSelector = 
       return;
     }
     if (e.key !== 'Tab') return;
-    const focusable = Array.from(dialog.querySelectorAll(
+    const focusable = Array.from(bg.querySelectorAll(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
     )).filter(el => !el.hidden && el.offsetParent !== null);
     if (!focusable.length) { e.preventDefault(); dialog.focus(); return; }

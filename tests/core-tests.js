@@ -274,24 +274,34 @@ run('_icsDateTime formats decimal hours into ICS local datetime', () => {
   assert.strictEqual(exec(`_icsDateTime('2026-12-31', 0)`), '20261231T000000');
 });
 
-run('renameProfile migrates allData, notes, and theme keys', () => {
+run('renameProfiles preserves both profiles during a name swap', () => {
   exec(`
     Object.keys(allData).forEach(k => delete allData[k]);
     USERS = ['alex', 'jamie'];
     activeUser = 'alex';
-    userNotes = { alex: [{ text:'note', time: 1 }], jamie: [] };
+    userNotes = { alex: [{ text:'alex note' }], jamie: [{ text:'jamie note' }] };
     userTheme = { alex: 'dark', jamie: 'light' };
-    ensureDateUser('2026-06-14', 'alex');
-    allData['2026-06-14'].alex.push({ id:'e1', text:'gym', start:7, end:8, done:false, shared:false, sharedId:null, color:null });
-    renameProfile('alex', 'sam');
+    calendarDensity = { alex: 'comfortable', jamie: 'compact' };
+    allData['2026-06-14'] = {
+      alex: [{ id:'alex-event', text:'alex', start:8, end:9 }],
+      jamie: [{ id:'jamie-event', text:'jamie', start:10, end:11 }],
+    };
+    renameProfiles(['alex', 'jamie'], ['jamie', 'alex']);
   `);
-  assert.deepStrictEqual(plain(exec(`USERS`)), ['sam', 'jamie']);
-  assert.strictEqual(exec(`activeUser`), 'sam');
-  assert.strictEqual(exec(`allData['2026-06-14'].sam.length`), 1);
-  assert.strictEqual(exec(`allData['2026-06-14'].alex`), undefined);
-  assert.strictEqual(exec(`userNotes.sam.length`), 1);
-  assert.strictEqual(exec(`userTheme.sam`), 'dark');
-  exec(`renameProfile('sam', 'alex');`);  // restore for any tests that follow
+  assert.strictEqual(exec(`allData['2026-06-14'].jamie[0].id`), 'alex-event');
+  assert.strictEqual(exec(`allData['2026-06-14'].alex[0].id`), 'jamie-event');
+  assert.strictEqual(exec(`userNotes.jamie[0].text`), 'alex note');
+  assert.strictEqual(exec(`userTheme.alex`), 'light');
+  assert.strictEqual(exec(`calendarDensity.jamie`), 'comfortable');
+  assert.strictEqual(exec(`activeUser`), 'jamie');
+  exec(`renameProfiles(['jamie', 'alex'], ['alex', 'jamie']);`);
+});
+
+run('emoji popover position stays inside viewport and flips above when needed', () => {
+  const below = exec(`getFloatingPopoverPosition({ left:20, top:20, bottom:54 }, { width:180, height:80 }, 400, 300)`);
+  assert.deepStrictEqual(plain(below), { left:20, top:60 });
+  const above = exec(`getFloatingPopoverPosition({ left:350, top:250, bottom:284 }, { width:180, height:100 }, 400, 300)`);
+  assert.deepStrictEqual(plain(above), { left:212, top:144 });
 });
 
 run('getDemoSeedDefinitions expands weekly patterns and preserves event shape', () => {
