@@ -293,7 +293,13 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
         render();
         return;
       }
-      if (action === 'done') { pushHistory(); toggleDone(dateKey, activeUser, ev.id); render(); }
+      if (action === 'done') {
+        pushHistory();
+        toggleDone(dateKey, activeUser, ev.id);
+        const updated = getEventsForDate(dateKey, activeUser).find(item => item.id === ev.id);
+        if (!updated || !refreshDraggedEl(updated, dateKey)) renderGrid();
+        saveToLocalStorage();
+      }
     });
   });
 
