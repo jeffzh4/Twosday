@@ -174,10 +174,14 @@ function onDragEnd() {
     return;
   }
   if (!dragState) return;
-  if (dragState.moved) {
+  const didMove = dragState.moved;
+  if (didMove) {
     const ev = getEventsForDate(dragState.dateKey, activeUser).find(x => x.id === dragState.evId);
     if (ev) logAudit(dragState.mode === 'move' ? 'moved' : 'resized', ev.text, `${fmtFull(ev.start)} – ${fmtFull(ev.end)}`);
   }
   dragState = null;
-  render();
+  // A normal click briefly creates drag state on mousedown. Avoid rebuilding
+  // the entire calendar when pointer never moved; this caused event clicks to
+  // flash every glass surface before opening the edit modal.
+  if (didMove) render();
 }

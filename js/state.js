@@ -8,6 +8,7 @@ let activeUser = null;       // set by auth.js → activateAccount()
 let viewMode = 'week';       // 'day' | 'week' | 'month' | 'year'
 let currentDate = new Date();
 let userTheme = {};          // { [profileName]: 'dark' | 'light' }
+let calendarDensity = {};    // { [profileName]: 'comfortable' | 'compact' }
 let tombstones = {};         // { [eventId]: deletedAt } — for CRDT delete merge
 let auditLog = [];           // append-only change history (newest first)
 const appHistory = { undo: [], redo: [] };
@@ -154,6 +155,19 @@ function applyTheme() {
   if (btn) btn.innerHTML = t === 'dark' ? '&#9790;' : '&#9788;';
 }
 
+function applyDensity() {
+  const density = calendarDensity[activeUser] || 'comfortable';
+  document.documentElement.setAttribute('data-density', density);
+}
+
+function setSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.dataset.state = status;
+  el.textContent = status === 'offline' ? 'offline' : status === 'pending' ? 'syncing' : status === 'error' ? 'sync issue' : 'synced';
+  el.title = `Calendar sync: ${el.textContent}`;
+}
+
 // ── Persistence ───────────────────────────────────────────────────────────────
 let _saveDebounce = null;
 let _isLoadingFromFirestore = false;
@@ -175,6 +189,7 @@ function saveToLocalStorage() {
       viewMode,
       currentDate: currentDate.toISOString(),
       userTheme,
+      calendarDensity,
       tombstones,
       auditLog,
       savedAt: Date.now(),
@@ -191,30 +206,36 @@ function saveToLocalStorage() {
 // tombstones so a delete (which removes an event AND records a tombstone) always
 // counts as a change worth syncing.
 function _syncSig() {
-  return JSON.stringify(allData) + '|' + JSON.stringify(userTheme) + '|' + JSON.stringify(tombstones);
+  return JSON.stringify(allData) + '|' + JSON.stringify(userTheme) + '|' + JSON.stringify(calendarDensity) + '|' + JSON.stringify(tombstones);
 }
 
 function saveToFirestore() {
   const sig = _syncSig();
   if (sig === _lastSyncedSig) return;   // nothing changed since the last sync
   _lastSyncedSig = sig;
+  setSyncStatus(navigator.onLine === false ? 'offline' : 'pending');
   try {
     FIRESTORE_DOC.set({
       allData,
       userTheme,
+      calendarDensity,
       tombstones,
       auditLog,
       accountId: currentAccount.username,
       ownerUid: currentAccount.ownerUid,
       savedAt: Date.now(),
       clientId: CLIENT_ID,
+    }).then(() => {
+      setSyncStatus('synced');
     }).catch(e => {
       _lastSyncedSig = null;            // allow the next render to retry the write
       console.warn('Firestore save failed:', e);
+      setSyncStatus('error');
       showToast("couldn't sync — check your connection");
     });
   } catch (e) {
     _lastSyncedSig = null;
+    setSyncStatus('error');
     showToast("couldn't sync — check your connection");
   }
 }
@@ -252,6 +273,11 @@ function applyParsedData(parsed, applyViewState) {
   if (parsed.userTheme) {
     USERS.forEach(u => {
       if (parsed.userTheme[u]) userTheme[u] = parsed.userTheme[u];
+    });
+  }
+  if (parsed.calendarDensity) {
+    USERS.forEach(u => {
+      if (['comfortable', 'compact'].includes(parsed.calendarDensity[u])) calendarDensity[u] = parsed.calendarDensity[u];
     });
   }
 
@@ -338,9 +364,11 @@ function startFirestoreListener() {
       tombstones = merged.tombstones;
       auditLog = mergeAuditLogs(auditLog, data.auditLog, AUDIT_CAP);
       if (data.userTheme) USERS.forEach(u => { if (data.userTheme[u]) userTheme[u] = data.userTheme[u]; });
+      if (data.calendarDensity) USERS.forEach(u => { if (['comfortable', 'compact'].includes(data.calendarDensity[u])) calendarDensity[u] = data.calendarDensity[u]; });
 
       const mergedSig = _syncSig();
       applyTheme();
+      applyDensity();
       render();
       _isLoadingFromFirestore = false;
 
@@ -357,6 +385,7 @@ function startFirestoreListener() {
       // as UI flashing even though every individual write is "correct."
       const remoteSig = JSON.stringify(remoteAll)
         + '|' + JSON.stringify(data.userTheme || userTheme)
+        + '|' + JSON.stringify(data.calendarDensity || calendarDensity)
         + '|' + JSON.stringify(data.tombstones || {});
       if (mergedSig !== remoteSig) {
         const now = Date.now();
@@ -369,6 +398,7 @@ function startFirestoreListener() {
         // the next remote snapshot after the throttle window) will carry it.
       } else {
         _lastSyncedSig = mergedSig;
+        setSyncStatus('synced');
       }
     } catch (e) {
       // Never let a merge bug wedge sync — fall back to the previous behavior.
@@ -376,6 +406,7 @@ function startFirestoreListener() {
       applyParsedData(data, false);
       _lastSyncedSig = _syncSig();
       applyTheme();
+      applyDensity();
       render();
       _isLoadingFromFirestore = false;
     }

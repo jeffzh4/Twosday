@@ -9,7 +9,7 @@
 // Firestore, Firebase Auth, and Google Fonts are never touched here. They are
 // cross-origin and handled by the Firebase SDK's own offline layer.
 
-const CACHE_VERSION = 'twosday-v1';
+const CACHE_VERSION = 'twosday-v2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 const SHELL_ASSETS = [
@@ -99,13 +99,16 @@ self.addEventListener('fetch', event => {
 
   if (!isStaticAsset(url)) return;
 
+  // Ignore cache-busting query strings when reading/writing the shell cache.
+  // Otherwise `/js/app.js?v=...` misses the pre-cached `/js/app.js` offline.
+  const cacheKey = new Request(url.origin + url.pathname, { method: 'GET' });
   event.respondWith(
-    caches.match(request).then(cached => {
+    caches.match(cacheKey).then(cached => {
       const network = fetch(request)
         .then(response => {
           if (response && response.ok) {
             const copy = response.clone();
-            caches.open(SHELL_CACHE).then(cache => cache.put(request, copy));
+            caches.open(SHELL_CACHE).then(cache => cache.put(cacheKey, copy));
           }
           return response;
         })

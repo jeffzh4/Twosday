@@ -173,6 +173,14 @@ function openSettingsModal() {
 
       <!-- ── Username ── -->
       <div class="settings-section">
+        <div class="settings-section-title">calendar density</div>
+        <select id="s-density" class="settings-density-select" aria-label="Calendar density">
+          <option value="comfortable" ${calendarDensity[activeUser] !== 'compact' ? 'selected' : ''}>comfortable</option>
+          <option value="compact" ${calendarDensity[activeUser] === 'compact' ? 'selected' : ''}>compact</option>
+        </select>
+      </div>
+
+      <div class="settings-section">
         <div class="settings-section-title">username</div>
         <div class="field">
           <input id="s-new-username" placeholder="new username"
@@ -319,6 +327,11 @@ function openSettingsModal() {
   document.getElementById('s-open-insights').onclick = () => {
     _closeModal();
     openAnalyticsModal();
+  };
+  document.getElementById('s-density').onchange = e => {
+    calendarDensity[activeUser] = e.target.value;
+    applyDensity();
+    render();
   };
 
   // ── Connect Google ────────────────────────────────────────────────────────
