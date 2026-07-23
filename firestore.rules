@@ -20,10 +20,22 @@ service cloud.firestore {
         && data.notesDoc is string;
     }
 
+    // Shallow shape and size validation. Firestore rules cannot walk nested
+    // maps, so per-event fields stay client-validated — but these caps stop a
+    // buggy or hostile client from growing a document without bound (the 1 MiB
+    // document limit would otherwise be the only backstop, and hitting it
+    // bricks the account's sync).
+    function validCalendarShape(data) {
+      return data.allData is map
+        && data.allData.size() <= 1500
+        && (!data.keys().hasAny(['auditLog']) || (data.auditLog is list && data.auditLog.size() <= 300))
+        && (!data.keys().hasAny(['tombstones']) || data.tombstones is map);
+    }
+
     function validScheduleShape(data) {
-      return (data.keys().hasAny(['allData']) && data.allData is map)
-        || (data.keys().hasAny(['notes']) && data.notes is map)
-        || (data.keys().hasAny(['sessions']) && data.sessions is map);
+      return (data.keys().hasAny(['allData']) && validCalendarShape(data))
+        || (data.keys().hasAny(['notes']) && data.notes is map && data.notes.size() <= 8)
+        || (data.keys().hasAny(['sessions']) && data.sessions is map && data.sessions.size() <= 30);
     }
 
     function linkedScheduleDocument(docId, data) {

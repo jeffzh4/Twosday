@@ -23,6 +23,11 @@ async function verifyPassword(input, stored) {
 function showToast(msg, type = 'error') {
   const el = document.createElement('div');
   el.className = `toast toast-${type}`;
+  // Errors interrupt (assertive); successes wait their turn (polite). Without a
+  // role the toast is silent to screen readers — a sync failure would go
+  // entirely unannounced.
+  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  el.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
   el.textContent = msg;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));

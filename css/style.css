@@ -470,7 +470,7 @@ html, body {
 .ev:hover { transform: scale(1.005); border-color: var(--ev-hover-border); }
 .ev:focus-visible { z-index: 8; border-color: var(--accent); }
 .ev.conflict { box-shadow: inset 0 0 0 1px rgba(248,113,113,0.8); }
-.ev.done { opacity: 0.35; }
+.ev.done { opacity: 0.55; }
 .ev.done .ev-title { text-decoration: line-through; }
 
 .ev-title {
@@ -518,8 +518,28 @@ html, body {
   padding: 1px 4px;
   line-height: 1.4;
   color: inherit;
+  position: relative;
+}
+/* Expanded hit area beyond the visual button, so small glyphs still give a
+   comfortable target without inflating the layout. */
+.ev-act::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
 }
 .ev-act:hover { background: var(--ev-act-hover); }
+
+/* Touch devices have no hover: reveal-on-hover would make every event action
+   unreachable. Show the actions permanently and size them for fingers. */
+@media (hover: none) {
+  .ev .ev-actions { opacity: 1; gap: 4px; }
+  .ev-act {
+    font-size: 14px;
+    padding: 5px 8px;
+    border-radius: 5px;
+  }
+  .ev-act::after { inset: -4px; }
+}
 
 .resize-handle {
   position: absolute;
@@ -665,7 +685,7 @@ html, body {
   transition: filter 0.1s;
 }
 .month-ev-pill:hover { filter: brightness(1.15); }
-.month-ev-pill.done { opacity: 0.45; text-decoration: line-through; }
+.month-ev-pill.done { opacity: 0.6; text-decoration: line-through; }
 
 .month-more {
   font-size: 10px;
@@ -3287,8 +3307,8 @@ body::after {
   border-color: rgba(255, 255, 255, 0.65);
 }
 
-[data-theme="light"] .ev.done { opacity: 0.52; }
-[data-theme="light"] .month-ev-pill.done { opacity: 0.62; }
+[data-theme="light"] .ev.done { opacity: 0.7; }
+[data-theme="light"] .month-ev-pill.done { opacity: 0.75; }
 
 .ev,
 .month-ev-pill {
@@ -3443,7 +3463,10 @@ body::after {
 ══════════════════════════════════════ */
 .glass-events .ev,
 .glass-events .month-ev-pill {
-  position: relative;
+  /* No `position` here: .ev must keep its base `position: absolute` (a
+     `relative` override would drop events into document flow and stack them
+     below one another — the misalignment bug). Pills are static by default and
+     get `relative` separately below so their ::before sheen can anchor. */
   isolation: isolate;
   border: 0.5px solid var(--glass-highlight);
   backdrop-filter: blur(14px) saturate(160%);
@@ -3453,6 +3476,9 @@ body::after {
     inset 0 -1px 0 rgba(0, 0, 0, 0.1),
     0 4px 14px rgba(0, 0, 0, 0.16);
 }
+
+/* Pills flow in a list, so relative is safe here — and required for ::before. */
+.glass-events .month-ev-pill { position: relative; }
 
 /* Specular sheen: a soft highlight riding the top edge, the way light beads on
    a curved glass surface. Sits under the text (z-index -1 inside the isolated

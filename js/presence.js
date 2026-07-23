@@ -1,6 +1,10 @@
 // ── Realtime presence ────────────────────────────────────────────────────────
 const PRESENCE_TTL_MS = 45000;
 const PRESENCE_HEARTBEAT_MS = 15000;
+// A session this stale is a dead client (crashed tab, killed browser) whose
+// beforeunload cleanup never ran. Pruned opportunistically on our own writes.
+const PRESENCE_PRUNE_AFTER_MS = 10 * 60 * 1000;
+const PRESENCE_PRUNE_BATCH = 20;
 
 let presenceSessions = {};
 let localPresenceSessions = {};
@@ -26,7 +30,24 @@ function publishPresence(force = false) {
   const session = getPresenceSnapshot();
   saveLocalPresence(session);
   if (!PRESENCE_DOC) return;
+
+  // Opportunistic garbage collection: fold deletes for long-dead sessions into
+  // the heartbeat we are writing anyway, so the sessions map cannot grow
+  // without bound (no backend job needed). Capped per write to keep the
+  // update payload small; leftovers go out with the next heartbeat.
+  const prune = {};
+  const now = Date.now();
+  Object.keys(presenceSessions).forEach(id => {
+    if (id === CLIENT_ID) return;
+    if (Object.keys(prune).length >= PRESENCE_PRUNE_BATCH) return;
+    const s = presenceSessions[id];
+    if (!s || now - (s.updatedAt || 0) > PRESENCE_PRUNE_AFTER_MS) {
+      prune['sessions.' + id] = firebase.firestore.FieldValue.delete();
+    }
+  });
+
   PRESENCE_DOC.update({
+    ...prune,
     ['sessions.' + CLIENT_ID]: session,
     accountId: currentAccount.username,
     ownerUid: currentAccount.ownerUid,

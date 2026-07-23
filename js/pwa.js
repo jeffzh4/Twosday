@@ -1,9 +1,7 @@
-// Progressive web app wiring: service worker registration plus the install
-// prompt. The button in the header stays hidden until the browser fires
-// beforeinstallprompt, so it never shows in a context that cannot install
-// (already installed, unsupported browser, or iOS Safari).
-
-let deferredInstallPrompt = null;
+// Progressive web app wiring: service worker registration for the offline
+// shell. (The header install button was removed — browsers still surface
+// their own install affordance in the address bar / share sheet, since the
+// manifest and service worker remain in place.)
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
@@ -22,39 +20,6 @@ function registerServiceWorker() {
   else window.addEventListener('load', register, { once: true });
 }
 
-function setInstallButtonVisible(visible) {
-  const btn = document.getElementById('btn-install');
-  if (btn) btn.hidden = !visible;
-}
-
-function initInstallPrompt() {
-  const btn = document.getElementById('btn-install');
-  if (!btn) return;
-
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    setInstallButtonVisible(true);
-  });
-
-  window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    setInstallButtonVisible(false);
-    if (typeof showToast === 'function') showToast('twosday installed', 'success');
-  });
-
-  btn.onclick = async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    const { outcome } = await deferredInstallPrompt.userChoice;
-    // The prompt is single-use; a dismissed prompt cannot be replayed until the
-    // browser decides to fire beforeinstallprompt again.
-    deferredInstallPrompt = null;
-    if (outcome === 'accepted') setInstallButtonVisible(false);
-  };
-}
-
 function initPwa() {
   registerServiceWorker();
-  initInstallPrompt();
 }

@@ -154,6 +154,31 @@ async function run() {
     await assertFails(getDocs(collection(anonymous, 'shares')));
     await assertFails(getDocs(collection(alice, 'shares')));
     console.log('ok - the shares collection cannot be enumerated by anyone');
+
+    // Size caps: unbounded growth is rejected before the 1 MiB document limit
+    // can brick the account's sync.
+    // (accounts/alice was re-pointed at 'legacy-calendar' by the migration test
+    // above, so the linked doc ids are legacy-calendar / legacy-calendar-presence.)
+    const hugeAudit = Array.from({ length: 301 }, (_, i) => ({ id: String(i), ts: i }));
+    await assertFails(setDoc(doc(alice, 'schedules/legacy-calendar'), calendar('alice', 'alice', { auditLog: hugeAudit })));
+    await assertSucceeds(setDoc(doc(alice, 'schedules/legacy-calendar'), calendar('alice', 'alice', { auditLog: hugeAudit.slice(0, 300) })));
+    await assertFails(setDoc(doc(alice, 'schedules/legacy-calendar'), calendar('alice', 'alice', { auditLog: 'not-a-list' })));
+    const manySessions = {};
+    for (let i = 0; i < 31; i++) manySessions['client' + i] = { updatedAt: i };
+    await assertFails(setDoc(doc(alice, 'schedules/legacy-calendar-presence'), {
+      ownerUid: 'alice',
+      accountId: 'alice',
+      sessions: manySessions,
+      savedAt: Date.now(),
+    }));
+    delete manySessions.client30;
+    await assertSucceeds(setDoc(doc(alice, 'schedules/legacy-calendar-presence'), {
+      ownerUid: 'alice',
+      accountId: 'alice',
+      sessions: manySessions,
+      savedAt: Date.now(),
+    }));
+    console.log('ok - schedule documents reject oversized audit logs and session maps');
   } finally {
     await env.cleanup();
   }
