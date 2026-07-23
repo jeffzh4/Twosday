@@ -44,6 +44,37 @@ service cloud.firestore {
         && linkedScheduleDocument(docId, data);
     }
 
+    function validShare(data) {
+      return data.ownerUid is string
+        && data.event is map
+        && data.event.title is string
+        && data.event.dateKey is string
+        && data.event.start is number
+        && data.event.end is number
+        && data.createdAt is number
+        && data.expiresAt is number;
+    }
+
+    // Read-only public share links. A share document is a flattened copy of one
+    // event, never a pointer into the owner's calendar, so an anonymous reader
+    // learns nothing beyond what the sender chose to publish.
+    //
+    // `get` is public because the token in the URL is the only credential a
+    // recipient has. `list` stays denied: without it the collection cannot be
+    // enumerated, so the 22-character token remains the only way in.
+    match /shares/{token} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && validShare(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid
+        && validShare(request.resource.data);
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
     // Account metadata is isolated by Firebase Auth UID. Usernames remain the
     // document IDs so uniqueness can be enforced by Firestore itself.
     match /accounts/{username} {

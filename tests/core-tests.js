@@ -22,6 +22,16 @@ const context = {
 };
 context.globalThis = context;
 context.document = { querySelector: () => null, getElementById: () => null };
+context.location = { origin: 'https://twosday.dev' };
+context.crypto = { getRandomValues: arr => { for (let i = 0; i < arr.length; i++) arr[i] = (i * 37 + 11) % 256; return arr; } };
+context.localStorage = (() => {
+  const store = {};
+  return {
+    getItem: k => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v); },
+    removeItem: k => { delete store[k]; },
+  };
+})();
 
 function load(file) {
   const src = fs.readFileSync(path.join(root, file), 'utf8');
@@ -63,6 +73,7 @@ load('js/import.js');
 load('js/conflicts.js');
 load('js/settings.js');
 load('js/demo-data.js');
+load('js/share.js');
 
 function run(name, fn) {
   try {
@@ -453,6 +464,30 @@ run('mergeAuditLogs unions by id, sorts newest first, and caps', () => {
   assert.deepStrictEqual(plain(result), ['2', '3', '1']);  // deduped by id, newest ts first
   const capped = exec(`mergeAuditLogs([{id:'1',ts:1},{id:'2',ts:2},{id:'3',ts:3}], [], 2).length`);
   assert.strictEqual(capped, 2);
+});
+
+run('share payload copies only public event fields', () => {
+  const payload = exec(`(function () {
+    activeUser = 'alex';
+    return buildSharePayload({
+      id: 'ev_secret', text: 'sf moma', start: 15, end: 17,
+      location: '151 3rd St', description: 'meet in the lobby',
+      shared: true, sharedId: 'shared_secret', done: false,
+    }, '2026-07-19');
+  })()`);
+  const keys = Object.keys(plain(payload)).sort();
+  assert.deepStrictEqual(keys, ['dateKey', 'description', 'end', 'location', 'sharedBy', 'start', 'title']);
+  // The recipient must never receive anything that identifies the calendar.
+  assert.strictEqual(payload.id, undefined);
+  assert.strictEqual(payload.sharedId, undefined);
+  assert.strictEqual(payload.title, 'sf moma');
+});
+
+run('share tokens are long, url-safe, and unique per call', () => {
+  const token = exec(`shareToken()`);
+  assert.strictEqual(token.length, 22);
+  assert.ok(/^[0-9a-z]+$/.test(token), 'token must be url-safe');
+  assert.strictEqual(exec(`shareUrlFor('abc123')`), 'https://twosday.dev/share.html?t=abc123');
 });
 
 console.log('all core tests passed');

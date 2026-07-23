@@ -46,6 +46,24 @@ function calendar(ownerUid, accountId = ownerUid, overrides = {}) {
   };
 }
 
+function share(ownerUid, overrides = {}) {
+  return {
+    ownerUid,
+    event: {
+      title: 'sf moma',
+      dateKey: '2026-07-19',
+      start: 15,
+      end: 17,
+      location: '151 3rd St',
+      description: null,
+      sharedBy: 'jeff',
+    },
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 1000,
+    ...overrides,
+  };
+}
+
 async function run() {
   const env = await initializeTestEnvironment({
     projectId,
@@ -116,6 +134,26 @@ async function run() {
     await assertFails(updateDoc(doc(anonymous, 'schedules/accounts'), { savedAt: Date.now() }));
     await assertFails(updateDoc(doc(alice, 'schedules/accounts'), { savedAt: Date.now() }));
     console.log('ok - the legacy account registry is publicly readable and never writable');
+
+    await assertFails(setDoc(doc(anonymous, 'shares/anon-token'), share('alice')));
+    await assertFails(setDoc(doc(alice, 'shares/spoofed-token'), share('bob')));
+    await assertFails(setDoc(doc(alice, 'shares/malformed-token'), { ownerUid: 'alice', event: 'not-a-map' }));
+    await assertSucceeds(setDoc(doc(alice, 'shares/alice-token'), share('alice')));
+    console.log('ok - share links are owner-stamped and shape-validated on write');
+
+    // The token in the URL is the recipient's only credential, so a direct get
+    // must work unauthenticated.
+    await assertSucceeds(getDoc(doc(anonymous, 'shares/alice-token')));
+    await assertFails(updateDoc(doc(anonymous, 'shares/alice-token'), { createdAt: Date.now() }));
+    await assertFails(updateDoc(doc(bob, 'shares/alice-token'), share('bob')));
+    await assertFails(deleteDoc(doc(bob, 'shares/alice-token')));
+    await assertSucceeds(deleteDoc(doc(alice, 'shares/alice-token')));
+    console.log('ok - anyone can open a share token but only its owner can change it');
+
+    // Enumeration guard: without list, an unknown token cannot be discovered.
+    await assertFails(getDocs(collection(anonymous, 'shares')));
+    await assertFails(getDocs(collection(alice, 'shares')));
+    console.log('ok - the shares collection cannot be enumerated by anyone');
   } finally {
     await env.cleanup();
   }

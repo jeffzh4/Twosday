@@ -2838,8 +2838,6 @@ html, body {
   --glass-bg-strong: rgba(24, 24, 27, 0.9);
   --glass-highlight: rgba(255, 255, 255, 0.12);
   --glass-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
-  --liquid-pointer-x: 50vw;
-  --liquid-pointer-y: 50vh;
 }
 
 [data-theme="light"] {
@@ -2852,16 +2850,17 @@ html, body {
 body {
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(ellipse 88px 64px at var(--liquid-pointer-x) var(--liquid-pointer-y), rgba(192, 132, 252, 0.16), rgba(139, 92, 246, 0.08) 42%, transparent 74%),
-    radial-gradient(ellipse 190px 132px at calc(var(--liquid-pointer-x) + 18px) calc(var(--liquid-pointer-y) + 10px), rgba(168, 85, 247, 0.09), transparent 72%),
-    radial-gradient(ellipse 42vw 31vw at 8% 19%, rgba(52, 211, 153, 0.1), transparent 72%),
-    radial-gradient(ellipse 35vw 28vw at 84% 77%, rgba(248, 113, 113, 0.08), transparent 70%),
-    var(--bg);
+  background: var(--bg);
 }
 
+/* Four ambient corner blobs. Two ride on <body> so they show behind the auth
+   screen too; the other two ride on .app because <body> only has two
+   pseudo-elements. Each one drifts and morphs on its own timing so the field
+   never repeats in an obvious way. */
 body::before,
-body::after {
+body::after,
+.app::before,
+.app::after {
   content: '';
   position: fixed;
   z-index: -1;
@@ -2872,26 +2871,51 @@ body::after {
   border-radius: 46% 54% 62% 38% / 42% 38% 62% 58%;
   pointer-events: none;
   filter: blur(64px);
-  opacity: 0.2;
+  opacity: 0.36;
   transform: translate3d(0, 0, 0);
+  will-change: transform, border-radius;
 }
 
 body::before {
   top: -22vw;
   right: -12vw;
   background: #7c3aed;
-  animation: liquid-drift-a 18s ease-in-out infinite alternate;
+  animation: liquid-drift-a 11s ease-in-out infinite,
+             liquid-wobble-a 7s ease-in-out infinite;
 }
 
 body::after {
   bottom: -25vw;
   left: -14vw;
   background: #0891b2;
-  animation: liquid-drift-b 23s ease-in-out infinite alternate;
+  animation: liquid-drift-b 13s ease-in-out infinite,
+             liquid-wobble-b 8.5s ease-in-out infinite;
+}
+
+.app::before {
+  top: -20vw;
+  left: -16vw;
+  width: 46vw;
+  height: 46vw;
+  background: #34d399;
+  opacity: 0.3;
+  animation: liquid-drift-c 15s ease-in-out infinite,
+             liquid-wobble-c 9.5s ease-in-out infinite;
+}
+
+.app::after {
+  bottom: -22vw;
+  right: -14vw;
+  width: 46vw;
+  height: 46vw;
+  background: #f87171;
+  opacity: 0.3;
+  animation: liquid-drift-d 12.5s ease-in-out infinite,
+             liquid-wobble-d 10.5s ease-in-out infinite;
 }
 
 [data-theme="light"] body::before,
-[data-theme="light"] body::after { opacity: 0.11; }
+[data-theme="light"] body::after { opacity: 0.28; }
 
 .header,
 .user-switcher,
@@ -2994,14 +3018,70 @@ body::after {
   -webkit-backdrop-filter: blur(22px) saturate(125%);
 }
 
+/* Drift = swirl around the corner, looped (0% === 100%) so there is no snap-back
+   — no `alternate`, which would ping-pong the same two points and read as
+   congealing there. Wobble = the jelly part: it morphs border-radius on its own
+   timing, out of phase with drift, so the silhouette keeps deforming mid-swirl.
+   Mismatched cycle lengths (11/13/15/12.5s drift against 7/8.5/9.5/10.5s wobble)
+   mean the combined motion doesn't repeat on any timescale a viewer tracks. */
 @keyframes liquid-drift-a {
-  from { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96); }
-  to { transform: translate3d(3vw, 5vw, 0) rotate(12deg) scale(1.08); }
+  0%   { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96); }
+  22%  { transform: translate3d(1vw, 6vw, 0) rotate(6deg) scale(1.05); }
+  48%  { transform: translate3d(5vw, 1vw, 0) rotate(16deg) scale(0.99); }
+  71%  { transform: translate3d(3vw, -4vw, 0) rotate(4deg) scale(1.02); }
+  100% { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96); }
 }
 
 @keyframes liquid-drift-b {
-  from { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04); }
-  to { transform: translate3d(-4vw, -5vw, 0) rotate(-14deg) scale(0.95); }
+  0%   { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04); }
+  27%  { transform: translate3d(-1vw, -6vw, 0) rotate(-4deg) scale(0.98); }
+  55%  { transform: translate3d(-6vw, -1vw, 0) rotate(-16deg) scale(1.07); }
+  80%  { transform: translate3d(-2vw, 4vw, 0) rotate(-6deg) scale(1.01); }
+  100% { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04); }
+}
+
+@keyframes liquid-drift-c {
+  0%   { transform: translate3d(2vw, -3vw, 0) rotate(6deg) scale(0.97); }
+  30%  { transform: translate3d(6vw, 2vw, 0) rotate(-5deg) scale(1.06); }
+  58%  { transform: translate3d(1vw, 5vw, 0) rotate(14deg) scale(1.01); }
+  82%  { transform: translate3d(-3vw, 0vw, 0) rotate(2deg) scale(0.99); }
+  100% { transform: translate3d(2vw, -3vw, 0) rotate(6deg) scale(0.97); }
+}
+
+@keyframes liquid-drift-d {
+  0%   { transform: translate3d(-3vw, 3vw, 0) rotate(-7deg) scale(1.05); }
+  25%  { transform: translate3d(-6vw, -2vw, 0) rotate(5deg) scale(0.97); }
+  53%  { transform: translate3d(-1vw, -5vw, 0) rotate(-13deg) scale(1.04); }
+  78%  { transform: translate3d(3vw, 1vw, 0) rotate(3deg) scale(0.98); }
+  100% { transform: translate3d(-3vw, 3vw, 0) rotate(-7deg) scale(1.05); }
+}
+
+@keyframes liquid-wobble-a {
+  0%, 100% { border-radius: 46% 54% 62% 38% / 42% 38% 62% 58%; }
+  25%      { border-radius: 62% 38% 44% 56% / 56% 62% 38% 44%; }
+  50%      { border-radius: 38% 62% 56% 44% / 62% 44% 56% 38%; }
+  75%      { border-radius: 54% 46% 38% 62% / 44% 56% 44% 56%; }
+}
+
+@keyframes liquid-wobble-b {
+  0%, 100% { border-radius: 58% 42% 38% 62% / 54% 46% 54% 46%; }
+  25%      { border-radius: 42% 58% 62% 38% / 38% 62% 38% 62%; }
+  50%      { border-radius: 64% 36% 46% 54% / 46% 54% 62% 38%; }
+  75%      { border-radius: 40% 60% 54% 46% / 60% 40% 46% 54%; }
+}
+
+@keyframes liquid-wobble-c {
+  0%, 100% { border-radius: 52% 48% 44% 56% / 48% 56% 44% 52%; }
+  25%      { border-radius: 38% 62% 58% 42% / 62% 40% 60% 38%; }
+  50%      { border-radius: 60% 40% 36% 64% / 40% 62% 38% 60%; }
+  75%      { border-radius: 44% 56% 62% 38% / 56% 44% 56% 44%; }
+}
+
+@keyframes liquid-wobble-d {
+  0%, 100% { border-radius: 44% 56% 58% 42% / 60% 42% 58% 40%; }
+  25%      { border-radius: 60% 40% 42% 58% / 44% 60% 40% 56%; }
+  50%      { border-radius: 38% 62% 60% 40% / 58% 38% 62% 42%; }
+  75%      { border-radius: 56% 44% 38% 62% / 42% 56% 44% 58%; }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
@@ -3031,7 +3111,9 @@ body::after {
 
 @media (prefers-reduced-motion: reduce) {
   body::before,
-  body::after { animation: none; }
+  body::after,
+  .app::before,
+  .app::after { animation: none; }
 }
 .cmdk-bg { align-items: flex-start; }
 .cmdk {
@@ -3178,22 +3260,25 @@ body::after {
 }
 
 [data-theme="light"] body::before {
-  background: #60a5fa;
-  opacity: 0.16;
+  background: #3b82f6;
+  opacity: 0.3;
 }
 
 [data-theme="light"] body::after {
-  background: #c084fc;
-  opacity: 0.14;
+  background: #a855f7;
+  opacity: 0.28;
 }
 
-[data-theme="light"] body {
-  background:
-    radial-gradient(ellipse 88px 64px at var(--liquid-pointer-x) var(--liquid-pointer-y), rgba(167, 139, 250, 0.24), rgba(139, 92, 246, 0.12) 42%, transparent 74%),
-    radial-gradient(ellipse 190px 132px at calc(var(--liquid-pointer-x) + 18px) calc(var(--liquid-pointer-y) + 10px), rgba(196, 181, 253, 0.22), transparent 72%),
-    radial-gradient(ellipse 42vw 31vw at 8% 19%, rgba(52, 211, 153, 0.14), transparent 72%),
-    radial-gradient(ellipse 35vw 28vw at 84% 77%, rgba(251, 113, 133, 0.12), transparent 70%),
-    var(--bg);
+[data-theme="light"] body { background: var(--bg); }
+
+[data-theme="light"] .app::before {
+  background: #10b981;
+  opacity: 0.26;
+}
+
+[data-theme="light"] .app::after {
+  background: #f43f5e;
+  opacity: 0.24;
 }
 
 [data-theme="light"] .ev,
@@ -3220,3 +3305,197 @@ body::after {
   white-space: nowrap;
 }
 .audit-empty { padding: 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+/* ══════════════════════════════════════
+   SHARE LINKS + SHARE VIEWER PAGE
+══════════════════════════════════════ */
+.share-modal .share-copy {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.share-link-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.share-link-row .mbtn { flex-shrink: 0; }
+
+.share-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+/* Standalone viewer page (share.html) — no app shell, so it centers itself. */
+.share-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.share-view {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.share-card {
+  width: 100%;
+  padding: 28px;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  border: 0.5px solid var(--glass-highlight);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(22px) saturate(125%);
+  -webkit-backdrop-filter: blur(22px) saturate(125%);
+}
+
+.share-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.share-title {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+.share-when { font-size: 14px; color: var(--text); margin-bottom: 3px; }
+
+.share-time {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 18px;
+}
+
+.share-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+  margin-top: 12px;
+}
+
+.share-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.share-value { font-size: 14px; color: var(--text); line-height: 1.5; word-break: break-word; }
+
+.share-by {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.share-status {
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 18px 0;
+}
+
+.share-footer-link {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.share-footer-link:hover { color: var(--accent); }
+
+/* ══════════════════════════════════════
+   GLASS EVENT BLOCKS (iOS 26 "Liquid Glass" treatment)
+   Opt-in via the "glass-events" class on <body> (index.html). Remove that
+   class to revert every event block to the flat translucent fill above —
+   nothing in this block touches the default .ev/.month-ev-pill rules.
+══════════════════════════════════════ */
+.glass-events .ev,
+.glass-events .month-ev-pill {
+  position: relative;
+  isolation: isolate;
+  border: 0.5px solid var(--glass-highlight);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.16);
+}
+
+/* Specular sheen: a soft highlight riding the top edge, the way light beads on
+   a curved glass surface. Sits under the text (z-index -1 inside the isolated
+   stacking context) so it never dulls readability. */
+.glass-events .ev::before,
+.glass-events .month-ev-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.05) 32%, rgba(255, 255, 255, 0) 55%);
+}
+
+.glass-events .ev:hover,
+.glass-events .month-ev-pill:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 6px 20px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="light"] .glass-events .ev,
+[data-theme="light"] .glass-events .month-ev-pill {
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(51, 65, 85, 0.06),
+    0 4px 14px rgba(51, 65, 85, 0.1);
+}
+
+[data-theme="light"] .glass-events .ev::before,
+[data-theme="light"] .glass-events .month-ev-pill::before {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 32%, rgba(255, 255, 255, 0) 55%);
+}
+
+[data-theme="light"] .glass-events .ev:hover,
+[data-theme="light"] .glass-events .month-ev-pill:hover {
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(51, 65, 85, 0.08),
+    0 6px 20px rgba(51, 65, 85, 0.14);
+}
