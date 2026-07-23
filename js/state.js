@@ -169,37 +169,13 @@ function setSyncStatus(status) {
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
-let _saveDebounce = null;
 let _isLoadingFromFirestore = false;
-let _lastSyncedSig = null;   // signature of the data last sent to Firestore
-let _lastReconvergeAt = 0;   // throttle guard — see startFirestoreListener
+let calendarStore = null;
 
 // Unique ID for this browser session — written into every Firestore save so the
 // listener can tell "is this my own echo?" and skip it, while still applying
 // saves that came from the other user's session.
 const CLIENT_ID = uid();
-
-function saveToLocalStorage() {
-  try {
-    // No deep-clone needed: stringifying the live objects yields the same result
-    // as cloning first, and skips a redundant serialize+parse pass every render.
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      allData,
-      activeUser,
-      viewMode,
-      currentDate: currentDate.toISOString(),
-      userTheme,
-      calendarDensity,
-      tombstones,
-      auditLog,
-      savedAt: Date.now(),
-    }));
-  } catch (e) {}
-
-  if (_isLoadingFromFirestore) return;
-  clearTimeout(_saveDebounce);
-  _saveDebounce = setTimeout(saveToFirestore, 400);
-}
 
 // Signature of the syncable data, used to skip no-op Firestore writes — e.g. when
 // the user is only navigating dates/views, which mutates no event data. Includes
@@ -207,37 +183,6 @@ function saveToLocalStorage() {
 // counts as a change worth syncing.
 function _syncSig() {
   return JSON.stringify(allData) + '|' + JSON.stringify(userTheme) + '|' + JSON.stringify(calendarDensity) + '|' + JSON.stringify(tombstones);
-}
-
-function saveToFirestore() {
-  const sig = _syncSig();
-  if (sig === _lastSyncedSig) return;   // nothing changed since the last sync
-  _lastSyncedSig = sig;
-  setSyncStatus(navigator.onLine === false ? 'offline' : 'pending');
-  try {
-    FIRESTORE_DOC.set({
-      allData,
-      userTheme,
-      calendarDensity,
-      tombstones,
-      auditLog,
-      accountId: currentAccount.username,
-      ownerUid: currentAccount.ownerUid,
-      savedAt: Date.now(),
-      clientId: CLIENT_ID,
-    }).then(() => {
-      setSyncStatus('synced');
-    }).catch(e => {
-      _lastSyncedSig = null;            // allow the next render to retry the write
-      console.warn('Firestore save failed:', e);
-      setSyncStatus('error');
-      showToast("couldn't sync — check your connection");
-    });
-  } catch (e) {
-    _lastSyncedSig = null;
-    setSyncStatus('error');
-    showToast("couldn't sync — check your connection");
-  }
 }
 
 function applyParsedData(parsed, applyViewState) {
@@ -338,26 +283,40 @@ function migrateWeekFormat(allWeeks) {
   });
 }
 
-function loadFromLocalStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') applyParsedData(parsed, true);
-  } catch (e) {}
-}
+function getCalendarStore() {
+  if (calendarStore) return calendarStore;
+  if (typeof createCalendarStore !== 'function') throw new Error('calendar store module is unavailable');
 
-function startFirestoreListener() {
-  FIRESTORE_DOC.onSnapshot(snap => {
-    if (!snap.exists) return;
-    const data = snap.data();
-    if (data.clientId && data.clientId === CLIENT_ID) return; // own echo — skip
+  const cache = createLocalStorageCalendarAdapter({
+    storage: localStorage,
+    getKey: () => STORAGE_KEY,
+    buildPayload: () => ({
+      allData, activeUser, viewMode, currentDate: currentDate.toISOString(),
+      userTheme, calendarDensity, tombstones, auditLog, savedAt: Date.now(),
+    }),
+    applyPayload: parsed => applyParsedData(parsed, true),
+  });
 
-    _isLoadingFromFirestore = true;
-    const localSig = _syncSig();
-    try {
-      // Per-event LWW + tombstone merge, so a concurrent edit from the other
-      // profile is reconciled rather than clobbering our local changes.
+  const remote = createFirestoreCalendarAdapter({
+    getDocument: () => FIRESTORE_DOC,
+    clientId: CLIENT_ID,
+    isLoading: () => _isLoadingFromFirestore,
+    setLoading: value => { _isLoadingFromFirestore = value; },
+    isOffline: () => navigator.onLine === false,
+    signature: _syncSig,
+    buildPayload: () => ({
+      allData, userTheme, calendarDensity, tombstones, auditLog,
+      accountId: currentAccount.username, ownerUid: currentAccount.ownerUid,
+      savedAt: Date.now(), clientId: CLIENT_ID,
+    }),
+    setStatus: setSyncStatus,
+    onWriteError: error => {
+      console.warn('Firestore save failed:', error);
+      setSyncStatus('error');
+      showToast("couldn't sync — check your connection");
+    },
+    mergeSnapshot: data => {
+      const localSig = _syncSig();
       const remoteAll = normalizeAllData(data.allData, USERS);
       const merged = mergeCalendars(allData, remoteAll, tombstones, data.tombstones || {}, USERS);
       replaceAllData(merged.allData);
@@ -367,48 +326,47 @@ function startFirestoreListener() {
       if (data.calendarDensity) USERS.forEach(u => { if (['comfortable', 'compact'].includes(data.calendarDensity[u])) calendarDensity[u] = data.calendarDensity[u]; });
 
       const mergedSig = _syncSig();
-      applyTheme();
-      applyDensity();
-      render();
-      _isLoadingFromFirestore = false;
-
-      if (mergedSig !== localSig) {
-        showToast('merged changes from the other calendar', 'info');
-      }
-      // Converge: if our merged result carries anything the remote document
-      // lacked (e.g. our newer local edits), push it back so both sides settle
-      // on the same state. The merge is idempotent, so in steady state this
-      // settles in one round trip. Throttled as a backstop: two clients that
-      // each auto-reconverge on every snapshot from the other can otherwise
-      // ping-pong resaves as fast as round-trip latency allows (observed as
-      // fast as every ~1.3s), which forces a full render() each time — visible
-      // as UI flashing even though every individual write is "correct."
       const remoteSig = JSON.stringify(remoteAll)
         + '|' + JSON.stringify(data.userTheme || userTheme)
         + '|' + JSON.stringify(data.calendarDensity || calendarDensity)
         + '|' + JSON.stringify(data.tombstones || {});
-      if (mergedSig !== remoteSig) {
-        const now = Date.now();
-        if (now - _lastReconvergeAt > 3000) {
-          _lastReconvergeAt = now;
-          _lastSyncedSig = null;
-          saveToFirestore();
-        }
-        // else: skip this round's push-back. The next genuine local edit (or
-        // the next remote snapshot after the throttle window) will carry it.
-      } else {
-        _lastSyncedSig = mergedSig;
-        setSyncStatus('synced');
-      }
-    } catch (e) {
-      // Never let a merge bug wedge sync — fall back to the previous behavior.
-      console.warn('Merge failed, applying remote snapshot directly:', e);
-      applyParsedData(data, false);
-      _lastSyncedSig = _syncSig();
       applyTheme();
       applyDensity();
       render();
-      _isLoadingFromFirestore = false;
-    }
-  }, err => console.warn('Firestore listener error:', err));
+      if (mergedSig !== localSig) showToast('merged changes from the other calendar', 'info');
+      return { signature: mergedSig, needsReconverge: mergedSig !== remoteSig };
+    },
+    applyFallbackSnapshot: (data, error) => {
+      console.warn('Merge failed, applying remote snapshot directly:', error);
+      applyParsedData(data, false);
+      applyTheme();
+      applyDensity();
+      render();
+    },
+    onListenerError: error => console.warn('Firestore listener error:', error),
+  });
+
+  calendarStore = createCalendarStore({ cache, remote });
+  return calendarStore;
+}
+
+function resetCalendarStore() {
+  if (calendarStore) calendarStore.reset();
+  calendarStore = null;
+}
+
+function loadFromLocalStorage() {
+  return getCalendarStore().load();
+}
+
+function saveToLocalStorage() {
+  return getCalendarStore().save();
+}
+
+function saveToFirestore() {
+  return getCalendarStore().saveRemote();
+}
+
+function startFirestoreListener() {
+  return getCalendarStore().listen();
 }
