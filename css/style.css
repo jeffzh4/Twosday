@@ -242,6 +242,8 @@ html, body {
 /* ── user switcher ── */
 .user-switcher {
   display: flex;
+  width: 100%;
+  min-width: 0;
   gap: 2px;
   background: var(--surface);
   border-radius: var(--radius);
@@ -294,6 +296,8 @@ html, body {
 
 /* ── presence strip ── */
 .presence-strip {
+  width: 100%;
+  min-width: 0;
   min-height: 28px;
   margin: -4px 0 10px;
   padding: 6px 10px;
@@ -645,6 +649,9 @@ html, body {
 
 .month-body {
   flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: minmax(110px, 1fr);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--surface2) transparent;
@@ -654,7 +661,7 @@ html, body {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   border-bottom: 0.5px solid var(--border);
-  min-height: 110px;
+  min-height: 0;
 }
 .month-row:last-child { border-bottom: none; }
 
@@ -2890,9 +2897,11 @@ body {
   background: var(--bg);
 }
 
-/* Quiet color field keeps calendar surfaces readable. */
+/* Four transform-only color fields retain motion without repainting cards. */
 body::before,
-body::after {
+body::after,
+.app::before,
+.app::after {
   content: '';
   position: fixed;
   z-index: -1;
@@ -2903,35 +2912,43 @@ body::after {
   border-radius: 46% 54% 62% 38% / 42% 38% 62% 58%;
   pointer-events: none;
   filter: blur(64px);
-  opacity: 0.2;
+  opacity: 0.3;
   transform: translate3d(0, 0, 0);
   will-change: transform;
 }
 
-/* Drift only — no border-radius animation. border-radius is a paint property
-   (unlike transform, which is compositor-only): animating it forces the browser
-   to repaint this whole blurred layer every frame, and every glass-events
-   backdrop-filter element on screen must then resample that freshly-painted
-   layer, every frame, to render its own blur. Day view (~3 glass elements) and
-   year view (0 — no glass there) never exposed the cost; week (~20) and month
-   (~75) did, at exactly that boundary — which is what "flickers in week/month,
-   fine in day/year" was pointing at. Root-caused via element-count instrumentation
-   (see PR); root cause is the paint/backdrop-filter interaction, not a leak or a
-   race. Transform-only drift keeps the corners visibly swirling without forcing
-   that repaint.
-   */
 body::before {
   top: -22vw;
   right: -12vw;
   background: #7c3aed;
-  animation: liquid-drift-a 18s ease-in-out infinite;
+  animation: liquid-drift-a 11s ease-in-out infinite;
 }
 
 body::after {
   bottom: -25vw;
   left: -14vw;
   background: #0891b2;
-  animation: liquid-drift-b 21s ease-in-out infinite;
+  animation: liquid-drift-b 13s ease-in-out infinite;
+}
+
+.app::before {
+  top: -20vw;
+  left: -16vw;
+  width: 46vw;
+  height: 46vw;
+  background: #34d399;
+  opacity: 0.24;
+  animation: liquid-drift-c 15s ease-in-out infinite;
+}
+
+.app::after {
+  bottom: -22vw;
+  right: -14vw;
+  width: 46vw;
+  height: 46vw;
+  background: #f87171;
+  opacity: 0.24;
+  animation: liquid-drift-d 12.5s ease-in-out infinite;
 }
 
 [data-theme="light"] body::before,
@@ -3038,21 +3055,33 @@ body::after {
   -webkit-backdrop-filter: blur(22px) saturate(125%);
 }
 
-/* Slow transform-only drift avoids repainting glass surfaces. */
+/* Transform scale supplies jelly motion without animating paint properties. */
 @keyframes liquid-drift-a {
-  0%   { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96); }
-  22%  { transform: translate3d(1vw, 6vw, 0) rotate(6deg) scale(1.05); }
-  48%  { transform: translate3d(5vw, 1vw, 0) rotate(16deg) scale(0.99); }
-  71%  { transform: translate3d(3vw, -4vw, 0) rotate(4deg) scale(1.02); }
-  100% { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96); }
+  0%, 100% { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96, 1.04); }
+  22% { transform: translate3d(1vw, 6vw, 0) rotate(6deg) scale(1.08, 0.93); }
+  48% { transform: translate3d(5vw, 1vw, 0) rotate(16deg) scale(0.97, 1.06); }
+  71% { transform: translate3d(3vw, -4vw, 0) rotate(4deg) scale(1.04, 0.96); }
 }
 
 @keyframes liquid-drift-b {
-  0%   { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04); }
-  27%  { transform: translate3d(-1vw, -6vw, 0) rotate(-4deg) scale(0.98); }
-  55%  { transform: translate3d(-6vw, -1vw, 0) rotate(-16deg) scale(1.07); }
-  80%  { transform: translate3d(-2vw, 4vw, 0) rotate(-6deg) scale(1.01); }
-  100% { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04); }
+  0%, 100% { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04, 0.97); }
+  27% { transform: translate3d(-1vw, -6vw, 0) rotate(-4deg) scale(0.93, 1.08); }
+  55% { transform: translate3d(-6vw, -1vw, 0) rotate(-16deg) scale(1.09, 0.95); }
+  80% { transform: translate3d(-2vw, 4vw, 0) rotate(-6deg) scale(0.98, 1.04); }
+}
+
+@keyframes liquid-drift-c {
+  0%, 100% { transform: translate3d(2vw, -3vw, 0) rotate(6deg) scale(0.97, 1.05); }
+  30% { transform: translate3d(6vw, 2vw, 0) rotate(-5deg) scale(1.08, 0.94); }
+  58% { transform: translate3d(1vw, 5vw, 0) rotate(14deg) scale(0.95, 1.08); }
+  82% { transform: translate3d(-3vw, 0, 0) rotate(2deg) scale(1.05, 0.96); }
+}
+
+@keyframes liquid-drift-d {
+  0%, 100% { transform: translate3d(-3vw, 3vw, 0) rotate(-7deg) scale(1.05, 0.96); }
+  25% { transform: translate3d(-6vw, -2vw, 0) rotate(5deg) scale(0.94, 1.07); }
+  53% { transform: translate3d(-1vw, -5vw, 0) rotate(-13deg) scale(1.08, 0.94); }
+  78% { transform: translate3d(3vw, 1vw, 0) rotate(3deg) scale(0.97, 1.04); }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
@@ -3408,8 +3437,6 @@ body::after {
      get `relative` separately below so their ::before sheen can anchor. */
   isolation: isolate;
   border: 0.5px solid var(--glass-highlight);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
     inset 0 -1px 0 rgba(0, 0, 0, 0.1),
