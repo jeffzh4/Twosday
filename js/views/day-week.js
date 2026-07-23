@@ -245,6 +245,7 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
       : '') +
     `<div class="ev-actions">` +
       `<button class="ev-act" data-a="dup"  style="color:${p.text}" title="Repeat event" aria-label="Repeat ${escHtml(ev.text)}">&#10697;</button>` +
+      `<button class="ev-act" data-a="share" style="color:${p.text}" title="Share link" aria-label="Share ${escHtml(ev.text)}">&#8599;</button>` +
       `<button class="ev-act" data-a="edit" style="color:${p.text}" title="Edit" aria-label="Edit ${escHtml(ev.text)}">&#9998;</button>` +
       `<button class="ev-act" data-a="done" style="color:${p.text}" aria-label="${ev.done ? 'Mark incomplete' : 'Mark complete'}: ${escHtml(ev.text)}">${ev.done ? '&#8617;' : '&#10003;'}</button>` +
       `<button class="ev-act" data-a="del"  style="color:${p.text}" aria-label="Delete ${escHtml(ev.text)}">&#215;</button>` +
@@ -275,6 +276,7 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
       const action = btn.dataset.a;
       if (action === 'edit') { openModal({ dateKey, editEvId: ev.id }); return; }
       if (action === 'dup')  { openRepeatModal(dateKey, ev); return; }
+      if (action === 'share') { openShareModal(ev, dateKey); return; }
       if (action === 'del') {
         // Recurring instance → ask which occurrences to remove.
         if (ev.recurrenceId && seriesCount(ev.recurrenceId, activeUser) > 1) {
