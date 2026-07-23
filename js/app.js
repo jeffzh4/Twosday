@@ -103,12 +103,31 @@ function renderUserPill() {
   if (nameEl && currentAccount) nameEl.textContent = currentAccount.username;
 }
 
+function renderFocusRail() {
+  const body = document.getElementById('focus-rail-body');
+  if (!body) return;
+  const now = new Date();
+  const todayKey = getDateKey(now);
+  const events = getEventsForDate(todayKey, activeUser).filter(ev => !ev.done).sort((a, b) => a.start - b.start);
+  const next = events.find(ev => ev.end >= now.getHours() + now.getMinutes() / 60) || null;
+  const free = typeof findMutualFreeWindows === 'function'
+    ? findMutualFreeWindows({ startDate: now, days: 1, duration: 1, windowStart: Math.max(8, now.getHours()), windowEnd: 22 })[0]
+    : null;
+  body.innerHTML = next
+    ? `<div class="focus-event"><span class="focus-event-dot"></span><div><strong>${escHtml(next.text)}</strong><span>${fmtFull(next.start)} – ${fmtFull(next.end)}</span></div></div>`
+    : '<div class="focus-empty">no upcoming events today</div>';
+  body.insertAdjacentHTML('beforeend', free
+    ? `<div class="focus-free"><span>open window</span><strong>${fmtFull(free.start)} – ${fmtFull(free.end)}</strong></div>`
+    : '<div class="focus-free muted">no one-hour opening left today</div>');
+}
+
 let _lastRenderedView = null;
 
 function render() {
   document.getElementById('nav-label').textContent = getNavLabel();
   renderViewSwitch();
   renderUserSwitcher();
+  renderFocusRail();
   updateHistoryButtons();
 
   if      (viewMode === 'day' || viewMode === 'week') renderGrid();
@@ -174,6 +193,16 @@ function bootApp() {
 
   document.getElementById('btn-settings').onclick = () => openSettingsModal();
   document.getElementById('btn-logout').onclick = logout;
+  const focusToggle = document.getElementById('focus-rail-toggle');
+  if (focusToggle) focusToggle.onclick = () => {
+    const rail = document.getElementById('focus-rail');
+    const collapsed = rail.classList.toggle('collapsed');
+    focusToggle.setAttribute('aria-expanded', String(!collapsed));
+    focusToggle.textContent = collapsed ? '+' : '−';
+    focusToggle.title = collapsed ? 'Expand today focus' : 'Collapse today focus';
+  };
+  window.addEventListener('online', () => { setSyncStatus('synced'); saveToLocalStorage(); });
+  window.addEventListener('offline', () => setSyncStatus('offline'));
 
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
@@ -206,6 +235,8 @@ function bootApp() {
   if (window.innerWidth <= 640 && viewMode === 'week') viewMode = 'day';
 
   applyTheme();
+  applyDensity();
+  setSyncStatus(navigator.onLine === false ? 'offline' : 'synced');
   render();
 
   // Firestore: initial fetch (prefer cloud if newer than local)

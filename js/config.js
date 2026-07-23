@@ -9,6 +9,13 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+// Let Firestore retain reads and queue writes while connection is unavailable.
+// Multi-tab mode keeps one browser's tabs from competing over its persistence lock.
+db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+  if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+    console.warn('Firestore offline persistence unavailable:', err);
+  }
+});
 
 // These are populated by auth.js after the user logs in. Declared with `let`
 // (not `const`) so they can be reassigned per-account.
