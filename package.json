@@ -3,6 +3,7 @@
     "test": "npm run test:core && npm run test:property && npm run test:rules",
     "test:core": "node tests/core-tests.js",
     "test:property": "node tests/property-tests.js",
+    "test:ui": "node tests/ui-regressions.js",
     "test:rules": "CI=1 FIREBASE_CLI_DISABLE_UPDATE_CHECK=true firebase emulators:exec --project demo-twosday --only firestore \"node tests/firestore-rules-tests.js\""
   },
   "devDependencies": {
