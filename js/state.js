@@ -156,8 +156,9 @@ function applyTheme() {
 }
 
 function applyDensity() {
-  const density = calendarDensity[activeUser] || 'comfortable';
-  document.documentElement.setAttribute('data-density', density);
+  // Compact mode previously changed label spacing without changing event
+  // geometry. Keep stored legacy values readable, but render one stable scale.
+  document.documentElement.setAttribute('data-density', 'comfortable');
 }
 
 function setSyncStatus(status) {
