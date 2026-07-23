@@ -366,45 +366,8 @@ html, body {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding-right: 210px;
 }
 
-/* ── focus rail ── */
-.focus-rail {
-  position: fixed;
-  z-index: 3;
-  top: 100px;
-  right: 24px;
-  bottom: 14px;
-  width: 190px;
-  padding: 14px;
-  border: 0.5px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--glass-bg);
-  backdrop-filter: blur(14px) saturate(120%);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
-  transition: width 0.2s ease, flex-basis 0.2s ease, padding 0.2s ease;
-}
-.focus-rail.collapsed { width: 42px; padding: 10px 8px; }
-.focus-rail.collapsed .focus-rail-body,
-.focus-rail.collapsed .focus-kicker,
-.focus-rail.collapsed h2 { display: none; }
-.focus-rail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.focus-kicker { color: var(--text-dim); font: 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
-.focus-rail h2 { margin: 3px 0 0; font-size: 17px; font-weight: 500; }
-.focus-rail-toggle { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 18px; }
-.focus-rail-toggle:hover { color: var(--accent); }
-.focus-rail-body { margin-top: 22px; display: grid; gap: 16px; }
-.focus-event { display: flex; gap: 9px; align-items: flex-start; }
-.focus-event-dot { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); flex: 0 0 auto; }
-.focus-event strong, .focus-event span { display: block; }
-.focus-event strong { color: var(--text); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
-.focus-event span { margin-top: 4px; color: var(--text-muted); font: 10px var(--mono); }
-.focus-free { padding-top: 12px; border-top: 0.5px solid var(--border); }
-.focus-free span, .focus-free strong { display: block; }
-.focus-free span { color: var(--text-dim); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
-.focus-free strong { margin-top: 5px; color: var(--accent); font: 11px var(--mono); }
-.focus-free.muted, .focus-empty { color: var(--text-dim); font-size: 11px; line-height: 1.45; }
 .sync-status { color: var(--text-dim); font: 10px var(--mono); white-space: nowrap; }
 .sync-status[data-state="pending"] { color: var(--accent); }
 .sync-status[data-state="offline"], .sync-status[data-state="error"] { color: #f87171; }
@@ -416,8 +379,6 @@ html, body {
 [data-density="compact"] .ev-time, [data-density="compact"] .ev-meta { font-size: 9px; }
 
 @media (max-width: 900px) {
-  .main-content { padding-right: 0; }
-  .focus-rail { display: none; }
 }
 
 /* ══════════════════════════════════════
@@ -2925,14 +2886,9 @@ body {
   background: var(--bg);
 }
 
-/* Four ambient corner blobs. Two ride on <body> so they show behind the auth
-   screen too; the other two ride on .app because <body> only has two
-   pseudo-elements. Each one drifts and morphs on its own timing so the field
-   never repeats in an obvious way. */
+/* Quiet color field keeps calendar surfaces readable. */
 body::before,
-body::after,
-.app::before,
-.app::after {
+body::after {
   content: '';
   position: fixed;
   z-index: -1;
@@ -2943,7 +2899,7 @@ body::after,
   border-radius: 46% 54% 62% 38% / 42% 38% 62% 58%;
   pointer-events: none;
   filter: blur(64px);
-  opacity: 0.36;
+  opacity: 0.2;
   transform: translate3d(0, 0, 0);
   will-change: transform;
 }
@@ -2964,38 +2920,18 @@ body::before {
   top: -22vw;
   right: -12vw;
   background: #7c3aed;
-  animation: liquid-drift-a 11s ease-in-out infinite;
+  animation: liquid-drift-a 18s ease-in-out infinite;
 }
 
 body::after {
   bottom: -25vw;
   left: -14vw;
   background: #0891b2;
-  animation: liquid-drift-b 13s ease-in-out infinite;
-}
-
-.app::before {
-  top: -20vw;
-  left: -16vw;
-  width: 46vw;
-  height: 46vw;
-  background: #34d399;
-  opacity: 0.3;
-  animation: liquid-drift-c 15s ease-in-out infinite;
-}
-
-.app::after {
-  bottom: -22vw;
-  right: -14vw;
-  width: 46vw;
-  height: 46vw;
-  background: #f87171;
-  opacity: 0.3;
-  animation: liquid-drift-d 12.5s ease-in-out infinite;
+  animation: liquid-drift-b 21s ease-in-out infinite;
 }
 
 [data-theme="light"] body::before,
-[data-theme="light"] body::after { opacity: 0.28; }
+[data-theme="light"] body::after { opacity: 0.16; }
 
 .header,
 .user-switcher,
@@ -3098,12 +3034,7 @@ body::after {
   -webkit-backdrop-filter: blur(22px) saturate(125%);
 }
 
-/* Drift = swirl around the corner, looped (0% === 100%) so there is no snap-back
-   — no `alternate`, which would ping-pong the same two points and read as
-   congealing there. Wobble = the jelly part: it morphs border-radius on its own
-   timing, out of phase with drift, so the silhouette keeps deforming mid-swirl.
-   Mismatched cycle lengths (11/13/15/12.5s drift against 7/8.5/9.5/10.5s wobble)
-   mean the combined motion doesn't repeat on any timescale a viewer tracks. */
+/* Slow transform-only drift avoids repainting glass surfaces. */
 @keyframes liquid-drift-a {
   0%   { transform: translate3d(-4vw, 2vw, 0) rotate(-8deg) scale(0.96); }
   22%  { transform: translate3d(1vw, 6vw, 0) rotate(6deg) scale(1.05); }
@@ -3118,22 +3049,6 @@ body::after {
   55%  { transform: translate3d(-6vw, -1vw, 0) rotate(-16deg) scale(1.07); }
   80%  { transform: translate3d(-2vw, 4vw, 0) rotate(-6deg) scale(1.01); }
   100% { transform: translate3d(3vw, -2vw, 0) rotate(8deg) scale(1.04); }
-}
-
-@keyframes liquid-drift-c {
-  0%   { transform: translate3d(2vw, -3vw, 0) rotate(6deg) scale(0.97); }
-  30%  { transform: translate3d(6vw, 2vw, 0) rotate(-5deg) scale(1.06); }
-  58%  { transform: translate3d(1vw, 5vw, 0) rotate(14deg) scale(1.01); }
-  82%  { transform: translate3d(-3vw, 0vw, 0) rotate(2deg) scale(0.99); }
-  100% { transform: translate3d(2vw, -3vw, 0) rotate(6deg) scale(0.97); }
-}
-
-@keyframes liquid-drift-d {
-  0%   { transform: translate3d(-3vw, 3vw, 0) rotate(-7deg) scale(1.05); }
-  25%  { transform: translate3d(-6vw, -2vw, 0) rotate(5deg) scale(0.97); }
-  53%  { transform: translate3d(-1vw, -5vw, 0) rotate(-13deg) scale(1.04); }
-  78%  { transform: translate3d(3vw, 1vw, 0) rotate(3deg) scale(0.98); }
-  100% { transform: translate3d(-3vw, 3vw, 0) rotate(-7deg) scale(1.05); }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
@@ -3163,9 +3078,7 @@ body::after {
 
 @media (prefers-reduced-motion: reduce) {
   body::before,
-  body::after,
-  .app::before,
-  .app::after { animation: none; }
+  body::after { animation: none; }
 }
 .cmdk-bg { align-items: flex-start; }
 .cmdk {
@@ -3318,20 +3231,10 @@ body::after {
 
 [data-theme="light"] body::after {
   background: #a855f7;
-  opacity: 0.28;
+  opacity: 0.16;
 }
 
 [data-theme="light"] body { background: var(--bg); }
-
-[data-theme="light"] .app::before {
-  background: #10b981;
-  opacity: 0.26;
-}
-
-[data-theme="light"] .app::after {
-  background: #f43f5e;
-  opacity: 0.24;
-}
 
 [data-theme="light"] .ev,
 [data-theme="light"] .month-ev-pill {
