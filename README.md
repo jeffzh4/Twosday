@@ -56,12 +56,12 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 - Property-based invariant tests alongside example-based and Firestore-rules tests
 - Legacy-account migration after verified sign-in
 - Real-time Firestore synchronization with self-echo suppression
-- `localStorage` cache and offline fallback
+- A tested calendar-store seam coordinating `localStorage` caching, Firestore writes, duplicate-write suppression, and bounded reconciliation retries
 - Keyboard-operable calendar controls, focus-managed dialogs, visible focus states, and reduced-motion support
 
 ## Technical Design
 
-Twosday is intentionally framework-free: one HTML shell, a focused CSS layer, and small feature modules loaded in dependency order. Calendar data remains plain JavaScript objects, making state transitions easy to inspect while still supporting real-time persistence.
+Twosday is intentionally framework-free: one HTML shell, a focused CSS layer, and small feature modules loaded in dependency order. Calendar data remains plain JavaScript objects, making state transitions easy to inspect while still supporting real-time persistence. `calendar-store.js` gives cache and Firestore work a dedicated interface, keeping sync details out of the calendar views.
 
 Each account owns three Firestore documents:
 
@@ -77,10 +77,11 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 npm test
 ```
 
-The suite combines Node-based core logic tests, property-based invariant tests, and Firebase Emulator authorization tests.
+The suite combines Node-based core logic tests, calendar-store adapter tests, property-based invariant tests, UI regression guards, and Firebase Emulator authorization tests.
 
 - Core coverage: date helpers, shared-event mirroring, undo/redo, sync deduplication, analytics, import parsing, conflicts, profile rename, seeded demo data, recurrence expansion and series edits, and CRDT merge reconciliation
 - Property coverage (`fast-check`): event-duration invariants, and merge order-independence, idempotence, and no-duplicate-id guarantees across thousands of generated inputs
+- Store coverage: cache persistence, remote-write de-duplication, loading guards, and bounded reconvergence timing
 - Rules coverage: anonymous denial, account privacy, cross-account isolation, owner immutability, schema validation, and safe legacy migration
 
 ## Run Locally
@@ -105,6 +106,7 @@ Twosday/
 ├── js/
 │   ├── auth.js                # Authentication, session restore, and migration
 │   ├── state.js               # Calendar state, persistence, and undo/redo
+│   ├── calendar-store.js      # Cache/Firestore persistence coordinator and adapters
 │   ├── events.js              # Event creation, editing, drag, resize, and mirroring
 │   ├── analytics.js           # Derived scheduling analytics
 │   ├── find-time.js           # Mutual availability search
@@ -113,6 +115,7 @@ Twosday/
 │   └── views/                 # Day/week, month, and year renderers
 └── tests/
     ├── core-tests.js          # Core behavior regression tests
+    ├── calendar-store-tests.js # Store adapter and synchronization checks
     └── firestore-rules-tests.js # Firebase Emulator authorization tests
 ```
 
