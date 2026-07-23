@@ -115,6 +115,7 @@ async function findAccountForAuthUser(user) {
 }
 
 function activateAccount(username, account) {
+  if (typeof resetCalendarStore === 'function') resetCalendarStore();
   currentAccount = { username, ...account };
 
   USERS = account.profiles.slice();

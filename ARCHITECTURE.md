@@ -27,7 +27,9 @@ Each account maps to three Firestore documents:
 - notes data: per-profile notes
 - presence data: active browser sessions, current view, and heartbeat timestamp
 
-The calendar listener ignores its own client echo. Remote snapshots are **merged**, not applied wholesale, so two profiles editing at once no longer clobber each other. `mergeCalendars` (in `reconcile.js`) is a last-write-wins element-set CRDT keyed by event id: for an id on both sides the higher `updatedAt` wins, ties break deterministically on serialized form (so both clients converge regardless of arrival order), and tombstones suppress ids the other side deleted. The merge is a pure, idempotent, order-independent function — after merging, a client whose result differs from the remote document writes the merged state back so both sides settle on the same state (the idempotence guarantees this cannot loop). A `try/catch` falls back to the previous wholesale-apply if a merge ever throws. Audit logs merge by union of entry ids. Local storage is a fast cache and offline fallback.
+`calendar-store.js` is the persistence seam. Its `CalendarStore` interface coordinates a local-storage cache adapter and a Firestore adapter, owns debounced writes and duplicate-write suppression, and bounds reconvergence attempts. `state.js` supplies the calendar-shaped payload plus the pure reconciliation callback; view modules never talk to either adapter directly.
+
+The Firestore adapter ignores its own client echo. Remote snapshots are **merged**, not applied wholesale, so two profiles editing at once no longer clobber each other. `mergeCalendars` (in `reconcile.js`) is a last-write-wins element-set CRDT keyed by event id: for an id on both sides the higher `updatedAt` wins, ties break deterministically on serialized form (so both clients converge regardless of arrival order), and tombstones suppress ids the other side deleted. The merge is a pure, idempotent, order-independent function — after merging, a client whose result differs from the remote document writes the merged state back so both sides settle on the same state. A fallback applies the remote snapshot if reconciliation itself throws. Audit logs merge by union of entry ids.
 
 ## Authentication and Authorization
 
@@ -41,7 +43,7 @@ Previously claimed accounts are migrated after a successful Firebase Auth login.
 
 ## Core Workflows
 
-- Event editing flows through `modal.js`, `events.js`, and `state.js`.
+- Event editing flows through `modal.js`, `events.js`, `state.js`, and the `CalendarStore` persistence seam.
 - Shared-event writes call `syncSharedEvent` so mirrored copies stay aligned.
 - Free-window detection unions both profiles' busy intervals, de-dupes shared mirrors, and finds gaps.
 - Analytics reads normalized events into derived metrics without mutating calendar state.
@@ -55,6 +57,7 @@ Three suites run under `npm test`:
 
 - **`tests/core-tests.js`** — example-based pure-logic checks in a Node VM context: date/month helpers, shared-event mirroring and undo/redo, sync-signature dedup, password-hash guard, stats/ICS/rename, demo-seed idempotency, free-window search, analytics, ICS parsing, conflict collection, recurrence expansion and series edit/delete, and the reconciliation merge (LWW, tombstones, idempotence, audit-log union).
 - **`tests/property-tests.js`** — invariants checked across thousands of generated inputs with `fast-check`: `normalizeEvent` always yields a positive-duration event in `[0,24]`; `mergeCalendars` is order-independent, idempotent, and never keeps duplicate ids; `expandRecurrence` is bounded, monotonic, and emits valid date keys. This is the correctness-under-arbitrary-input discipline used for financial reconciliation logic.
+- **`tests/calendar-store-tests.js`** — adapter and coordinator checks for cache restore/save, duplicate-write suppression, loading guards, and reconvergence timing.
 - **`tests/firestore-rules-tests.js`** — owner isolation, schema checks, immutability, and the legacy migration path against the local Firestore Emulator.
 
 Run everything:

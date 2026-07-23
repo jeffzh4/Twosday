@@ -23,6 +23,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run application tests
-        run: npm run test:core && npm run test:property && npm run test:ui
+        run: npm run test:core && npm run test:property && npm run test:store && npm run test:ui
       - name: Run Firestore rules tests
         run: npm run test:rules
