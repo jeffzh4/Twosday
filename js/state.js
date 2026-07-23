@@ -158,6 +158,7 @@ function applyTheme() {
 let _saveDebounce = null;
 let _isLoadingFromFirestore = false;
 let _lastSyncedSig = null;   // signature of the data last sent to Firestore
+let _lastReconvergeAt = 0;   // throttle guard — see startFirestoreListener
 
 // Unique ID for this browser session — written into every Firestore save so the
 // listener can tell "is this my own echo?" and skip it, while still applying
@@ -348,13 +349,24 @@ function startFirestoreListener() {
       }
       // Converge: if our merged result carries anything the remote document
       // lacked (e.g. our newer local edits), push it back so both sides settle
-      // on the same state. The merge is idempotent, so this cannot loop.
+      // on the same state. The merge is idempotent, so in steady state this
+      // settles in one round trip. Throttled as a backstop: two clients that
+      // each auto-reconverge on every snapshot from the other can otherwise
+      // ping-pong resaves as fast as round-trip latency allows (observed as
+      // fast as every ~1.3s), which forces a full render() each time — visible
+      // as UI flashing even though every individual write is "correct."
       const remoteSig = JSON.stringify(remoteAll)
         + '|' + JSON.stringify(data.userTheme || userTheme)
         + '|' + JSON.stringify(data.tombstones || {});
       if (mergedSig !== remoteSig) {
-        _lastSyncedSig = null;
-        saveToFirestore();
+        const now = Date.now();
+        if (now - _lastReconvergeAt > 3000) {
+          _lastReconvergeAt = now;
+          _lastSyncedSig = null;
+          saveToFirestore();
+        }
+        // else: skip this round's push-back. The next genuine local edit (or
+        // the next remote snapshot after the throttle window) will carry it.
       } else {
         _lastSyncedSig = mergedSig;
       }

@@ -2893,23 +2893,33 @@ body::after,
   filter: blur(64px);
   opacity: 0.36;
   transform: translate3d(0, 0, 0);
-  will-change: transform, border-radius;
+  will-change: transform;
 }
 
+/* Drift only — no border-radius animation. border-radius is a paint property
+   (unlike transform, which is compositor-only): animating it forces the browser
+   to repaint this whole blurred layer every frame, and every glass-events
+   backdrop-filter element on screen must then resample that freshly-painted
+   layer, every frame, to render its own blur. Day view (~3 glass elements) and
+   year view (0 — no glass there) never exposed the cost; week (~20) and month
+   (~75) did, at exactly that boundary — which is what "flickers in week/month,
+   fine in day/year" was pointing at. Root-caused via element-count instrumentation
+   (see PR); root cause is the paint/backdrop-filter interaction, not a leak or a
+   race. Transform-only drift keeps the corners visibly swirling without forcing
+   that repaint.
+   */
 body::before {
   top: -22vw;
   right: -12vw;
   background: #7c3aed;
-  animation: liquid-drift-a 11s ease-in-out infinite,
-             liquid-wobble-a 7s ease-in-out infinite;
+  animation: liquid-drift-a 11s ease-in-out infinite;
 }
 
 body::after {
   bottom: -25vw;
   left: -14vw;
   background: #0891b2;
-  animation: liquid-drift-b 13s ease-in-out infinite,
-             liquid-wobble-b 8.5s ease-in-out infinite;
+  animation: liquid-drift-b 13s ease-in-out infinite;
 }
 
 .app::before {
@@ -2919,8 +2929,7 @@ body::after {
   height: 46vw;
   background: #34d399;
   opacity: 0.3;
-  animation: liquid-drift-c 15s ease-in-out infinite,
-             liquid-wobble-c 9.5s ease-in-out infinite;
+  animation: liquid-drift-c 15s ease-in-out infinite;
 }
 
 .app::after {
@@ -2930,8 +2939,7 @@ body::after {
   height: 46vw;
   background: #f87171;
   opacity: 0.3;
-  animation: liquid-drift-d 12.5s ease-in-out infinite,
-             liquid-wobble-d 10.5s ease-in-out infinite;
+  animation: liquid-drift-d 12.5s ease-in-out infinite;
 }
 
 [data-theme="light"] body::before,
@@ -3074,34 +3082,6 @@ body::after {
   53%  { transform: translate3d(-1vw, -5vw, 0) rotate(-13deg) scale(1.04); }
   78%  { transform: translate3d(3vw, 1vw, 0) rotate(3deg) scale(0.98); }
   100% { transform: translate3d(-3vw, 3vw, 0) rotate(-7deg) scale(1.05); }
-}
-
-@keyframes liquid-wobble-a {
-  0%, 100% { border-radius: 46% 54% 62% 38% / 42% 38% 62% 58%; }
-  25%      { border-radius: 62% 38% 44% 56% / 56% 62% 38% 44%; }
-  50%      { border-radius: 38% 62% 56% 44% / 62% 44% 56% 38%; }
-  75%      { border-radius: 54% 46% 38% 62% / 44% 56% 44% 56%; }
-}
-
-@keyframes liquid-wobble-b {
-  0%, 100% { border-radius: 58% 42% 38% 62% / 54% 46% 54% 46%; }
-  25%      { border-radius: 42% 58% 62% 38% / 38% 62% 38% 62%; }
-  50%      { border-radius: 64% 36% 46% 54% / 46% 54% 62% 38%; }
-  75%      { border-radius: 40% 60% 54% 46% / 60% 40% 46% 54%; }
-}
-
-@keyframes liquid-wobble-c {
-  0%, 100% { border-radius: 52% 48% 44% 56% / 48% 56% 44% 52%; }
-  25%      { border-radius: 38% 62% 58% 42% / 62% 40% 60% 38%; }
-  50%      { border-radius: 60% 40% 36% 64% / 40% 62% 38% 60%; }
-  75%      { border-radius: 44% 56% 62% 38% / 56% 44% 56% 44%; }
-}
-
-@keyframes liquid-wobble-d {
-  0%, 100% { border-radius: 44% 56% 58% 42% / 60% 42% 58% 40%; }
-  25%      { border-radius: 60% 40% 42% 58% / 44% 60% 40% 56%; }
-  50%      { border-radius: 38% 62% 60% 40% / 58% 38% 62% 42%; }
-  75%      { border-radius: 56% 44% 38% 62% / 42% 56% 44% 58%; }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
