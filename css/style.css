@@ -379,11 +379,6 @@ html, body {
 .sync-status[data-state="offline"], .sync-status[data-state="error"] { color: #f87171; }
 .sync-status[data-state="synced"] { color: #6ee7b7; }
 
-[data-density="compact"] .hour-label { height: 48px; }
-[data-density="compact"] .ev { min-height: 18px; }
-[data-density="compact"] .ev-title { font-size: 11px; }
-[data-density="compact"] .ev-time, [data-density="compact"] .ev-meta { font-size: 9px; }
-
 @media (max-width: 900px) {
 }
 

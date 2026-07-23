@@ -2,6 +2,15 @@
 
 const EMOJI_PRESETS = ['☕','🌙','🌸','😎','🏃','⭐','🎯','🦋','🌿','💫','🎵','🍀','🔥','✨','🌊'];
 
+function getFloatingPopoverPosition(triggerRect, pickerRect, viewportWidth, viewportHeight) {
+  const left = Math.max(8, Math.min(triggerRect.left, viewportWidth - pickerRect.width - 8));
+  const below = triggerRect.bottom + 6;
+  const top = below + pickerRect.height <= viewportHeight - 8
+    ? below
+    : Math.max(8, triggerRect.top - pickerRect.height - 6);
+  return { left, top };
+}
+
 // ── Compute stats across both profiles ───────────────────────────────────────
 function computeStats() {
   const now = new Date();
@@ -173,14 +182,6 @@ function openSettingsModal() {
 
       <!-- ── Username ── -->
       <div class="settings-section">
-        <div class="settings-section-title">calendar density</div>
-        <select id="s-density" class="settings-density-select" aria-label="Calendar density">
-          <option value="comfortable" ${calendarDensity[activeUser] !== 'compact' ? 'selected' : ''}>comfortable</option>
-          <option value="compact" ${calendarDensity[activeUser] === 'compact' ? 'selected' : ''}>compact</option>
-        </select>
-      </div>
-
-      <div class="settings-section">
         <div class="settings-section-title">username</div>
         <div class="field">
           <input id="s-new-username" placeholder="new username"
@@ -231,7 +232,7 @@ function openSettingsModal() {
         <div class="field profile-field">
           <div class="emoji-picker-wrap">
             <button class="emoji-picker-btn" id="s-emoji-btn1" type="button" title="pick an emoji">${escHtml(emojis[0]) || '+'}</button>
-            <div class="emoji-picker-popover" id="s-emoji-popover1">${emojiOptsHTML}</div>
+            <div class="emoji-picker-popover" id="s-emoji-popover1" role="listbox" aria-label="Profile 1 emoji" hidden aria-hidden="true">${emojiOptsHTML}</div>
           </div>
           <label>profile 1</label>
           <input id="s-profile1" value="${escHtml(USERS[0])}" autocomplete="off" />
@@ -239,7 +240,7 @@ function openSettingsModal() {
         <div class="field profile-field">
           <div class="emoji-picker-wrap">
             <button class="emoji-picker-btn" id="s-emoji-btn2" type="button" title="pick an emoji">${escHtml(emojis[1]) || '+'}</button>
-            <div class="emoji-picker-popover" id="s-emoji-popover2">${emojiOptsHTML}</div>
+            <div class="emoji-picker-popover" id="s-emoji-popover2" role="listbox" aria-label="Profile 2 emoji" hidden aria-hidden="true">${emojiOptsHTML}</div>
           </div>
           <label>profile 2</label>
           <input id="s-profile2" value="${escHtml(USERS[1])}" autocomplete="off" />
@@ -268,7 +269,7 @@ function openSettingsModal() {
     // directly, bypassing _closeModal), detach this stray document listener.
     if (!bg.isConnected) { document.removeEventListener('click', _closePopovers); return; }
     if (e && e.target.closest && e.target.closest('.emoji-picker-wrap')) return;
-    bg.querySelectorAll('.emoji-picker-popover.open').forEach(p => p.classList.remove('open'));
+    bg.querySelectorAll('.emoji-picker-popover.open').forEach(closeEmojiPopover);
   }
   function _closeModal() {
     document.removeEventListener('click', _closePopovers);
@@ -287,21 +288,38 @@ function openSettingsModal() {
     const btn     = document.getElementById(btnId);
     const popover = document.getElementById(popoverId);
 
+    // Keep picker inside the dialog backdrop for focus management, but outside
+    // the scrollable modal so overflow and glass transforms cannot clip it.
+    bg.appendChild(popover);
+    popover.dataset.triggerId = btnId;
+    btn.setAttribute('aria-haspopup', 'listbox');
+    btn.setAttribute('aria-controls', popoverId);
+    btn.setAttribute('aria-expanded', 'false');
+
     // Highlight the already-selected emoji (if any)
     const current = btn.textContent.trim();
     popover.querySelectorAll('.emoji-opt').forEach(opt => {
-      opt.classList.toggle('active', opt.dataset.emoji === current);
+      opt.setAttribute('role', 'option');
+      const isSelected = opt.dataset.emoji === current;
+      opt.classList.toggle('active', isSelected);
+      opt.setAttribute('aria-selected', String(isSelected));
     });
 
     btn.addEventListener('click', e => {
       e.stopPropagation();
       const isOpen = popover.classList.contains('open');
-      bg.querySelectorAll('.emoji-picker-popover.open').forEach(p => p.classList.remove('open'));
+      bg.querySelectorAll('.emoji-picker-popover.open').forEach(closeEmojiPopover);
       if (!isOpen) {
         const r = btn.getBoundingClientRect();
-        popover.style.top  = (r.bottom + 6) + 'px';
-        popover.style.left = r.left + 'px';
+        popover.hidden = false;
+        popover.setAttribute('aria-hidden', 'false');
         popover.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+
+        const pickerRect = popover.getBoundingClientRect();
+        const position = getFloatingPopoverPosition(r, pickerRect, window.innerWidth, window.innerHeight);
+        popover.style.top = position.top + 'px';
+        popover.style.left = position.left + 'px';
       }
     });
 
@@ -309,16 +327,29 @@ function openSettingsModal() {
       opt.addEventListener('click', e => {
         e.stopPropagation();
         btn.textContent = opt.dataset.emoji;
-        popover.querySelectorAll('.emoji-opt').forEach(o => o.classList.remove('active'));
+        popover.querySelectorAll('.emoji-opt').forEach(o => {
+          o.classList.remove('active');
+          o.setAttribute('aria-selected', 'false');
+        });
         opt.classList.add('active');
-        popover.classList.remove('open');
+        opt.setAttribute('aria-selected', 'true');
+        closeEmojiPopover(popover);
+        btn.focus();
       });
     });
   }
 
+  function closeEmojiPopover(popover) {
+    popover.classList.remove('open');
+    popover.hidden = true;
+    popover.setAttribute('aria-hidden', 'true');
+    const trigger = document.getElementById(popover.dataset.triggerId);
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  }
+
   // Close popovers if the modal is scrolled (picker would detach from button)
   bg.querySelector('.settings-modal').addEventListener('scroll', () => {
-    bg.querySelectorAll('.emoji-picker-popover.open').forEach(p => p.classList.remove('open'));
+    bg.querySelectorAll('.emoji-picker-popover.open').forEach(closeEmojiPopover);
   });
 
   setupEmojiPicker('s-emoji-btn1', 's-emoji-popover1');
@@ -328,12 +359,6 @@ function openSettingsModal() {
     _closeModal();
     openAnalyticsModal();
   };
-  document.getElementById('s-density').onchange = e => {
-    calendarDensity[activeUser] = e.target.value;
-    applyDensity();
-    render();
-  };
-
   // ── Connect Google ────────────────────────────────────────────────────────
   const connectGoogleBtn = document.getElementById('s-connect-google');
   if (connectGoogleBtn) {
@@ -498,9 +523,6 @@ function openSettingsModal() {
 
     setMsg('s-profiles-msg', 'saving…', false);
 
-    if (p1 !== old1) renameProfile(old1, p1);
-    if (p2 !== old2) renameProfile(old2, p2);
-
     const updatedAccount = {
       ...currentAccount,
       profiles: [p1, p2],
@@ -514,6 +536,7 @@ function openSettingsModal() {
       setMsg('s-profiles-msg', 'save failed: ' + err.message); return;
     }
 
+    renameProfiles([old1, old2], [p1, p2]);
     currentAccount = { ...currentAccount, profiles: [p1, p2], profileEmojis: [e1, e2] };
 
     saveToLocalStorage();
@@ -550,25 +573,23 @@ function openSettingsModal() {
   };
 }
 
-// ── Rename a profile across all in-memory state ───────────────────────────────
-function renameProfile(oldName, newName) {
-  Object.keys(allData).forEach(dk => {
-    if (allData[dk] && allData[dk][oldName] !== undefined) {
-      allData[dk][newName] = allData[dk][oldName];
-      delete allData[dk][oldName];
-    }
-  });
-
-  if (userNotes[oldName] !== undefined) {
-    userNotes[newName] = userNotes[oldName];
-    delete userNotes[oldName];
-  }
-  if (userTheme[oldName] !== undefined) {
-    userTheme[newName] = userTheme[oldName];
-    delete userTheme[oldName];
+// Rename both profiles atomically so swaps cannot overwrite either profile's
+// events or preferences before the second rename runs.
+function renameProfiles(oldNames, newNames) {
+  function remap(record) {
+    const values = oldNames.map(name => record[name]);
+    oldNames.forEach(name => { delete record[name]; });
+    newNames.forEach((name, index) => {
+      if (values[index] !== undefined) record[name] = values[index];
+    });
   }
 
-  const idx = USERS.indexOf(oldName);
-  if (idx >= 0) USERS[idx] = newName;
-  if (activeUser === oldName) activeUser = newName;
+  Object.keys(allData).forEach(dateKey => remap(allData[dateKey]));
+  remap(userNotes);
+  remap(userTheme);
+  remap(calendarDensity);
+
+  const activeIndex = oldNames.indexOf(activeUser);
+  USERS = newNames.slice();
+  if (activeIndex >= 0) activeUser = newNames[activeIndex];
 }
