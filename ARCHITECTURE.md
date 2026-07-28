@@ -42,7 +42,7 @@ The former `schedules/accounts` registry stored multiple users' account metadata
 - Firebase Authentication owns password verification and account credentials. Calendar metadata and browser storage do not retain password hashes.
 - `auth.js` uses an escalating local retry delay after five failed authentication requests. This protects ordinary browser usage against rapid retries; it is not a server-side bot control.
 - Firestore Rules enforce owner UID equality for every account, calendar, note, and presence document. Public access is limited to direct reads of unguessable, time-limited event-share tokens; collection queries remain denied.
-- `config.js` initializes Firebase only on `twosday.dev`, `www.twosday.dev`, or local development hosts. Alternate Vercel hostnames redirect to the canonical domain before a Firebase client is initialized.
+- `vercel.json` redirects every `*.vercel.app` deployment to the canonical domain. `config.js` initializes Firebase only on `twosday.dev`, `www.twosday.dev`, or local development hosts, providing a second guard if the redirect is bypassed.
 - `vercel.json` applies baseline browser security headers. Preview access must also be protected in Vercel's Deployment Protection settings.
 - Firebase App Check is a required launch operation, not a client-side fallback: configure reCAPTCHA Enterprise, then enforce App Check for Firestore and Firebase Authentication before enabling public registration.
 
