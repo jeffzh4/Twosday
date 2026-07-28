@@ -128,12 +128,10 @@ function render() {
   saveToLocalStorage();
 }
 
-// ── Boot: called by auth.js once an account is active ────────────────────────
-function bootApp() {
-  renderUserPill();
-  if (typeof initPwa === 'function') initPwa();
-
-  // Button listeners
+// ── Wiring ────────────────────────────────────────────────────────────────────
+// One-time listener setup, kept apart from the boot sequence below: the wiring
+// is order-insensitive, the boot sequence very much is not.
+function wireAppShell() {
   document.getElementById('btn-prev').onclick  = () => navigate(-1);
   document.getElementById('btn-next').onclick  = () => navigate(1);
   document.getElementById('btn-today').onclick = gotoToday;
@@ -179,7 +177,9 @@ function bootApp() {
 
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
+}
 
+function wireKeyboardShortcuts() {
   document.addEventListener('keydown', e => {
     const meta = e.metaKey || e.ctrlKey;
     if (meta && e.key.toLowerCase() === 'k') { e.preventDefault(); openCommandPalette(); return; }
@@ -198,8 +198,15 @@ function bootApp() {
       if (e.key === 'n') { e.preventDefault(); openModal({ dateKey: getDateKey(currentDate) }); }
     }
   });
+}
 
-  // ── Init ────────────────────────────────────────────────────────────────────
+// ── Boot: called by auth.js once an account is active ────────────────────────
+function bootApp() {
+  renderUserPill();
+  if (typeof initPwa === 'function') initPwa();
+  wireAppShell();
+  wireKeyboardShortcuts();
+
   loadFromLocalStorage();
   loadNotes();
   if (typeof applyTestingDemoSeed === 'function') applyTestingDemoSeed();
@@ -219,17 +226,14 @@ function bootApp() {
     if (syncBar) syncBar.style.display = 'none';
     if (!snap.exists) return;
     const data = snap.data();
-    const localRaw = localStorage.getItem(STORAGE_KEY);
-    const localSaved = localRaw ? (JSON.parse(localRaw).savedAt || 0) : 0;
-    if (data.savedAt && data.savedAt > localSaved) {
+    if (isRemoteNewer(STORAGE_KEY, data.savedAt)) {
       _isLoadingFromFirestore = true;
       applyParsedData(data, false);
       applyTheme();
       _isLoadingFromFirestore = false;
       if (typeof applyTestingDemoSeed === 'function') applyTestingDemoSeed();
       render();
-    }
-    if (!(data.savedAt && data.savedAt > localSaved) && typeof applyTestingDemoSeed === 'function' && applyTestingDemoSeed()) {
+    } else if (typeof applyTestingDemoSeed === 'function' && applyTestingDemoSeed()) {
       render();
     }
   }).catch(e => {
@@ -240,9 +244,7 @@ function bootApp() {
   NOTES_DOC.get().then(snap => {
     if (!snap.exists) return;
     const data = snap.data();
-    const localRaw = localStorage.getItem(NOTES_KEY);
-    const localSaved = localRaw ? (JSON.parse(localRaw)._savedAt || 0) : 0;
-    if (data.savedAt && data.savedAt > localSaved && data.notes) {
+    if (data.notes && isRemoteNewer(NOTES_KEY, data.savedAt, '_savedAt')) {
       USERS.forEach(u => {
         if (Array.isArray(data.notes[u])) userNotes[u] = data.notes[u];
       });
