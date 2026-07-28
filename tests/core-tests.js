@@ -332,11 +332,15 @@ run('isRemoteNewer compares against the cached savedAt, per field name', () => {
   assert.strictEqual(exec(`isRemoteNewer('bad-key', 100)`), true);
 });
 
-run('isHashed recognizes sha-256 digests, rejects plaintext', () => {
-  assert.strictEqual(exec(`isHashed('${'a'.repeat(64)}')`), true);
-  assert.strictEqual(exec(`isHashed('hunter2')`), false);
-  assert.strictEqual(exec(`isHashed('${'a'.repeat(63)}')`), false);  // too short
-  assert.strictEqual(exec(`isHashed('${'g'.repeat(64)}')`), false);  // non-hex
+run('auth retry backoff starts after repeated failures and clears on success', () => {
+  exec(`clearAuthFailures()`);
+  const now = 1_000_000;
+  for (let i = 0; i < 4; i++) exec(`recordAuthFailure(localStorage, ${now})`);
+  assert.strictEqual(exec(`authRetryAfterMs(localStorage, ${now})`), 0);
+  exec(`recordAuthFailure(localStorage, ${now})`);
+  assert.strictEqual(exec(`authRetryAfterMs(localStorage, ${now})`), 15_000);
+  exec(`clearAuthFailures()`);
+  assert.strictEqual(exec(`authRetryAfterMs(localStorage, ${now})`), 0);
 });
 
 run('computeStats aggregates totals, shared, done, top color, and busiest day', () => {

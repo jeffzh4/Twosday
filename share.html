@@ -18,7 +18,10 @@
   <div class="share-card" id="share-card">
     <div class="share-status" id="share-status">loading event…</div>
   </div>
-  <a class="share-footer-link" href="/">made with twosday — a shared calendar for two</a>
+  <div class="share-footer-links">
+    <a class="share-footer-link" href="/">made with twosday — a shared calendar for two</a>
+    <a class="share-footer-link" href="/privacy.html">privacy</a>
+  </div>
 </main>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -36,7 +39,7 @@
     statusEl.textContent = msg;
   }
 
-  if (!token) { fail('this link is missing its event id.'); return; }
+  if (!/^[0-9a-z]{22}$/.test(token)) { fail('this link is invalid.'); return; }
 
   db.collection('shares').doc(token).get()
     .then(snap => {

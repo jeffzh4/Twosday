@@ -35,7 +35,16 @@ The Firestore adapter ignores its own client echo. Remote snapshots are **merged
 
 Firebase Authentication is the credential source of truth. Account metadata lives at `accounts/{username}` with an immutable `ownerUid`; calendar, notes, and presence documents repeat that UID plus an `accountId`. Firestore rules permit access only when `request.auth.uid` matches the owner and the data document path matches the account metadata.
 
-Previously claimed accounts are migrated after a successful Firebase Auth login. The old `schedules/accounts` registry is available only to authenticated users and is permanently read-only. `tests/firestore-rules-tests.js` verifies account privacy, data isolation, schema checks, owner immutability, and the migration path against the local Firestore Emulator.
+The former `schedules/accounts` registry stored multiple users' account metadata in one document. Firestore Rules cannot return only selected fields of a document, so the registry is retired and denied to every client. Current account records are owner-scoped at `accounts/{username}` and do not contain password hashes. `tests/firestore-rules-tests.js` verifies account privacy, data isolation, schema checks, owner immutability, token validation, and registry denial against the local Firestore Emulator.
+
+## Security Boundaries
+
+- Firebase Authentication owns password verification and account credentials. Calendar metadata and browser storage do not retain password hashes.
+- `auth.js` uses an escalating local retry delay after five failed authentication requests. This protects ordinary browser usage against rapid retries; it is not a server-side bot control.
+- Firestore Rules enforce owner UID equality for every account, calendar, note, and presence document. Public access is limited to direct reads of unguessable, time-limited event-share tokens; collection queries remain denied.
+- `config.js` initializes Firebase only on `twosday.dev`, `www.twosday.dev`, or local development hosts. Alternate Vercel hostnames redirect to the canonical domain before a Firebase client is initialized.
+- `vercel.json` applies baseline browser security headers. Preview access must also be protected in Vercel's Deployment Protection settings.
+- Firebase App Check is a required launch operation, not a client-side fallback: configure reCAPTCHA Enterprise, then enforce App Check for Firestore and Firebase Authentication before enabling public registration.
 
 ## Accessibility
 
@@ -55,10 +64,10 @@ Previously claimed accounts are migrated after a successful Firebase Auth login.
 
 Three suites run under `npm test`:
 
-- **`tests/core-tests.js`** — example-based pure-logic checks in a Node VM context: date/month helpers, shared-event mirroring and undo/redo, sync-signature dedup, password-hash guard, stats/ICS/rename, demo-seed idempotency, free-window search, analytics, ICS parsing, conflict collection, recurrence expansion and series edit/delete, and the reconciliation merge (LWW, tombstones, idempotence, audit-log union).
+- **`tests/core-tests.js`** — example-based pure-logic checks in a Node VM context: date/month helpers, shared-event mirroring and undo/redo, sync-signature dedup, authentication retry backoff, stats/ICS/rename, demo-seed idempotency, free-window search, analytics, ICS parsing, conflict collection, recurrence expansion and series edit/delete, and the reconciliation merge (LWW, tombstones, idempotence, audit-log union).
 - **`tests/property-tests.js`** — invariants checked across thousands of generated inputs with `fast-check`: `normalizeEvent` always yields a positive-duration event in `[0,24]`; `mergeCalendars` is order-independent, idempotent, and never keeps duplicate ids; `expandRecurrence` is bounded, monotonic, and emits valid date keys. This is the correctness-under-arbitrary-input discipline used for financial reconciliation logic.
 - **`tests/calendar-store-tests.js`** — adapter and coordinator checks for cache restore/save, duplicate-write suppression, loading guards, and reconvergence timing.
-- **`tests/firestore-rules-tests.js`** — owner isolation, schema checks, immutability, and the legacy migration path against the local Firestore Emulator.
+- **`tests/firestore-rules-tests.js`** — owner isolation, schema checks, immutability, share-token validation, and retired-registry denial against the local Firestore Emulator.
 
 Run everything:
 
