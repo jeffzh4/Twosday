@@ -76,14 +76,9 @@ function deleteRecurringSeries(recurrenceId, user, fromDateKey) {
   let label = '';
   series.forEach(({ dateKey, ev }) => {
     if (fromDateKey && dateKey < fromDateKey) return;
-    const arr = allData[dateKey] && allData[dateKey][user];
-    if (!arr) return;
-    const idx = arr.indexOf(ev);
-    if (idx < 0) return;
+    if (!removeEvent(dateKey, user, ev)) return;
     label = ev.text;
     if (ev.shared) syncSharedEvent(user, ev.sharedId, dateKey, 'delete');
-    if (typeof tombstone === 'function') tombstone(ev.id);
-    arr.splice(idx, 1);
     removed++;
   });
   if (removed && typeof logAudit === 'function') {

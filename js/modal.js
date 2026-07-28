@@ -260,13 +260,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     const wasShared = editEv.shared;
     const oldSharedId = editEv.sharedId;
 
-    if (dk !== oldDk) {
-      const oldArr = getEventsForDate(oldDk, activeUser);
-      const oi = oldArr.indexOf(editEv);
-      if (oi >= 0) oldArr.splice(oi, 1);
-      ensureDateUser(dk, activeUser);
-      allData[dk][activeUser].push(editEv);
-    }
+    if (dk !== oldDk) moveEventToDate(oldDk, dk, activeUser, editEv);
 
     editEv.text = name;
     editEv.start = s;
@@ -358,9 +352,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         color: selectedColor, location, description, recurrenceId, recurrence: rule,
       });
       markEventUpdated(newEv, activeUser);
-      ensureDateUser(dKey, activeUser);
-      allData[dKey][activeUser].push(newEv);
-      sortDateUser(dKey, activeUser);
+      insertEvent(dKey, activeUser, newEv);
 
       if (isShared) {
         syncSharedEvent(activeUser, sharedId, dKey, 'add', {

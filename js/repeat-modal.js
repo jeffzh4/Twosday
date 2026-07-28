@@ -127,9 +127,7 @@ function openRepeatModal(srcDateKey, srcEv) {
         done: false, shared: srcEv.shared, sharedId, color: srcEv.color,
       });
       markEventUpdated(newEv, activeUser);
-      ensureDateUser(dateKey, activeUser);
-      allData[dateKey][activeUser].push(newEv);
-      sortDateUser(dateKey, activeUser);
+      insertEvent(dateKey, activeUser, newEv);
 
       if (srcEv.shared) {
         syncSharedEvent(activeUser, sharedId, dateKey, 'add', {
