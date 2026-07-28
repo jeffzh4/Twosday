@@ -1,4 +1,15 @@
-// Firebase
+// Firebase browser configuration. Firebase web API keys identify a project;
+// authorization is enforced by Firebase Auth, Firestore Rules, and App Check.
+// Do not initialize a production data client on an alternate Vercel hostname.
+const TWOSDAY_TRUSTED_HOSTS = new Set(['twosday.dev', 'www.twosday.dev', 'localhost', '127.0.0.1']);
+const TWOSDAY_TRUSTED_DEPLOYMENT = location.protocol === 'file:' || TWOSDAY_TRUSTED_HOSTS.has(location.hostname);
+
+if (!TWOSDAY_TRUSTED_DEPLOYMENT) {
+  const target = `https://www.twosday.dev${location.pathname}${location.search}${location.hash}`;
+  location.replace(target);
+  throw new Error('Twosday data access is disabled on non-production deployments.');
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyBJ3GEf1i6BXEcVIStBS-7iE1Hk4dCR_Kc",
   authDomain: "jhschedule4.firebaseapp.com",

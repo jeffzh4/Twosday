@@ -26,7 +26,6 @@ function account(ownerUid, overrides = {}) {
     authUid: ownerUid,
     authClaimed: true,
     authEmail: `${ownerUid}@twosday.local`,
-    password: 'a'.repeat(64),
     profiles: ['alex', 'jamie'],
     firestoreDoc: ownerUid,
     notesDoc: `${ownerUid}-notes`,
@@ -127,27 +126,29 @@ async function run() {
     }));
     console.log('ok - only the linked owner can claim a legacy data document');
 
-    // Read must stay public: migrating an unclaimed legacy account is the one
-    // operation a client performs before it has a Firebase Auth session at all.
-    await assertSucceeds(getDoc(doc(anonymous, 'schedules/accounts')));
-    await assertSucceeds(getDoc(doc(alice, 'schedules/accounts')));
+    // The retired registry contains account metadata as one shared document.
+    // Rules cannot safely expose selected fields from a document, so no client
+    // may read it.
+    await assertFails(getDoc(doc(anonymous, 'schedules/accounts')));
+    await assertFails(getDoc(doc(alice, 'schedules/accounts')));
     await assertFails(updateDoc(doc(anonymous, 'schedules/accounts'), { savedAt: Date.now() }));
     await assertFails(updateDoc(doc(alice, 'schedules/accounts'), { savedAt: Date.now() }));
-    console.log('ok - the legacy account registry is publicly readable and never writable');
+    console.log('ok - the retired account registry is unreachable to clients');
 
     await assertFails(setDoc(doc(anonymous, 'shares/anon-token'), share('alice')));
     await assertFails(setDoc(doc(alice, 'shares/spoofed-token'), share('bob')));
     await assertFails(setDoc(doc(alice, 'shares/malformed-token'), { ownerUid: 'alice', event: 'not-a-map' }));
-    await assertSucceeds(setDoc(doc(alice, 'shares/alice-token'), share('alice')));
+    await assertFails(setDoc(doc(alice, 'shares/short-token'), share('alice')));
+    await assertSucceeds(setDoc(doc(alice, 'shares/aaaaaaaaaaaaaaaaaaaaaa'), share('alice')));
     console.log('ok - share links are owner-stamped and shape-validated on write');
 
     // The token in the URL is the recipient's only credential, so a direct get
     // must work unauthenticated.
-    await assertSucceeds(getDoc(doc(anonymous, 'shares/alice-token')));
-    await assertFails(updateDoc(doc(anonymous, 'shares/alice-token'), { createdAt: Date.now() }));
-    await assertFails(updateDoc(doc(bob, 'shares/alice-token'), share('bob')));
-    await assertFails(deleteDoc(doc(bob, 'shares/alice-token')));
-    await assertSucceeds(deleteDoc(doc(alice, 'shares/alice-token')));
+    await assertSucceeds(getDoc(doc(anonymous, 'shares/aaaaaaaaaaaaaaaaaaaaaa')));
+    await assertFails(updateDoc(doc(anonymous, 'shares/aaaaaaaaaaaaaaaaaaaaaa'), { createdAt: Date.now() }));
+    await assertFails(updateDoc(doc(bob, 'shares/aaaaaaaaaaaaaaaaaaaaaa'), share('bob')));
+    await assertFails(deleteDoc(doc(bob, 'shares/aaaaaaaaaaaaaaaaaaaaaa')));
+    await assertSucceeds(deleteDoc(doc(alice, 'shares/aaaaaaaaaaaaaaaaaaaaaa')));
     console.log('ok - anyone can open a share token but only its owner can change it');
 
     // Enumeration guard: without list, an unknown token cannot be discovered.
