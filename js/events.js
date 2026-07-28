@@ -1,14 +1,10 @@
 // ── Event CRUD ────────────────────────────────────────────────────────────────
 function deleteEvent(dateKey, user, evId) {
-  ensureDateUser(dateKey, user);
-  const arr = allData[dateKey][user];
-  const idx = arr.findIndex(e => e.id === evId);
-  if (idx < 0) return;
-  const ev = arr[idx];
+  const ev = getEventsForDate(dateKey, user).find(e => e.id === evId);
+  if (!ev) return;
   if (ev.shared) syncSharedEvent(user, ev.sharedId, dateKey, 'delete');
-  tombstone(ev.id);
   logAudit('deleted', ev.text);
-  arr.splice(idx, 1);
+  removeEvent(dateKey, user, ev);
 }
 
 function toggleDone(dateKey, user, evId) {
@@ -33,11 +29,9 @@ function syncSharedEvent(user, sharedId, dateKey, action, updates) {
   const idx = arr.findIndex(e => e.sharedId === sharedId);
 
   if (action === 'add' && idx === -1) {
-    arr.push(clone(updates));
-    sortDateUser(dateKey, other);
+    insertEvent(dateKey, other, clone(updates));
   } else if (action === 'delete' && idx !== -1) {
-    tombstone(arr[idx].id);   // tombstone the mirror too, so a merge can't revive it
-    arr.splice(idx, 1);
+    removeEvent(dateKey, other, arr[idx]);   // tombstone the mirror too, so a merge can't revive it
   } else if (action === 'toggle-done' && idx !== -1) {
     arr[idx].done = updates.done;
     arr[idx].updatedAt = updates.updatedAt || Date.now();
@@ -128,12 +122,9 @@ function onDragMove(e) {
       const body = target && target.closest('.col-body');
       if (body && body.dataset.datekey && body.dataset.datekey !== dateKey) {
         const newDk = body.dataset.datekey;
-        arr.splice(arr.indexOf(ev), 1);
-        if (ev.shared) syncSharedEvent(activeUser, ev.sharedId, dateKey, 'delete');
-        ensureDateUser(newDk, activeUser);
-        allData[newDk][activeUser].push(ev);
-        sortDateUser(newDk, activeUser);
+        moveEventToDate(dateKey, newDk, activeUser, ev);
         if (ev.shared) {
+          syncSharedEvent(activeUser, ev.sharedId, dateKey, 'delete');
           syncSharedEvent(activeUser, ev.sharedId, newDk, 'add', {
             ...clone(ev), id: uid(), shared: true, sharedId: ev.sharedId,
           });

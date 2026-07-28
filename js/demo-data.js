@@ -333,9 +333,7 @@ function applyTestingDemoSeed() {
       updatedBy: 'demo seed',
     });
 
-    ensureDateUser(def.date, primaryUser);
-    allData[def.date][primaryUser].push(ev);
-    sortDateUser(def.date, primaryUser);
+    insertEvent(def.date, primaryUser, ev);
 
     if (def.shared) {
       const mirrorUser = getOtherUser(primaryUser);
@@ -345,9 +343,7 @@ function applyTestingDemoSeed() {
         shared: true,
         sharedId,
       };
-      ensureDateUser(def.date, mirrorUser);
-      allData[def.date][mirrorUser].push(mirror);
-      sortDateUser(def.date, mirrorUser);
+      insertEvent(def.date, mirrorUser, mirror);
     }
 
     changed = true;
