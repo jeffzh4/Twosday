@@ -115,9 +115,7 @@ function importParsedEvents(events, user, shared) {
       updatedAt: importedAt + idx,
       updatedBy: user,
     });
-    ensureDateUser(item.dateKey, user);
-    allData[item.dateKey][user].push(ev);
-    sortDateUser(item.dateKey, user);
+    insertEvent(item.dateKey, user, ev);
     if (shared) {
       syncSharedEvent(user, sharedId, item.dateKey, 'add', {
         ...clone(ev), id: uid(), shared: true, sharedId,

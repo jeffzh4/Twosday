@@ -62,6 +62,7 @@ function getTheme() { return 'dark'; }
 
 load('js/utils.js');
 load('js/state.js');
+load('js/calendar-data.js');
 load('js/reconcile.js');
 load('js/audit.js');
 exec(`activeUser = 'alex'; viewMode = 'week'; currentDate = new Date(2026, 5, 14);`);
@@ -194,6 +195,47 @@ run('deleting a shared event removes its mirror', () => {
   `);
   assert.strictEqual(exec(`allData['2026-06-15'].alex.length`), 0);
   assert.strictEqual(exec(`allData['2026-06-15'].jamie.length`), 0);
+});
+
+run('insertEvent keeps the day sorted by start time', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    insertEvent('2026-06-17', 'alex', normalizeEvent({ id:'late', text:'late', start:16, end:17 }));
+    insertEvent('2026-06-17', 'alex', normalizeEvent({ id:'early', text:'early', start:8, end:9 }));
+  `);
+  assert.strictEqual(exec(`allData['2026-06-17'].alex.map(e => e.id).join(',')`), 'early,late');
+});
+
+run('removeEvent tombstones so a merge cannot resurrect the event', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    tombstones = {};
+    removeEvent('2026-06-18', 'alex',
+      insertEvent('2026-06-18', 'alex', normalizeEvent({ id:'gone', text:'gone', start:9, end:10 })));
+  `);
+  assert.strictEqual(exec(`allData['2026-06-18'].alex.length`), 0);
+  assert.strictEqual(exec(`typeof tombstones['gone']`), 'number');
+});
+
+run('moveEventToDate relocates without tombstoning', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    tombstones = {};
+    moveEventToDate('2026-06-19', '2026-06-20', 'alex',
+      insertEvent('2026-06-19', 'alex', normalizeEvent({ id:'m1', text:'moved', start:9, end:10 })));
+  `);
+  assert.strictEqual(exec(`allData['2026-06-19'].alex.length`), 0);
+  assert.strictEqual(exec(`allData['2026-06-20'].alex[0].id`), 'm1');
+  // A tombstone here would tell the next merge to delete the copy just re-inserted.
+  assert.strictEqual(exec(`'m1' in tombstones`), false);
+});
+
+run('removeEventById is a no-op for an unknown event or day', () => {
+  exec(`Object.keys(allData).forEach(k => delete allData[k]);`);
+  assert.strictEqual(exec(`removeEventById('2026-06-21', 'alex', 'nope')`), null);
+  exec(`insertEvent('2026-06-21', 'alex', normalizeEvent({ id:'keep', text:'keep', start:9, end:10 }));`);
+  assert.strictEqual(exec(`removeEventById('2026-06-21', 'alex', 'nope')`), null);
+  assert.strictEqual(exec(`allData['2026-06-21'].alex.length`), 1);
 });
 
 run('undo and redo restore event snapshots', () => {
