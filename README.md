@@ -77,7 +77,7 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 - Passwords are handled only by Firebase Authentication. Twosday does not write password hashes to Firestore or browser storage.
 - Browser sign-in and sign-up flows apply an escalating retry delay after repeated failed requests. This is a user-facing guard, not a replacement for server-side abuse protection.
 - Before a public launch, register a reCAPTCHA Enterprise provider in Firebase App Check, add its site key to the web client, and enforce App Check for Cloud Firestore and Firebase Authentication. Also review the Firebase API key's API restrictions and tighten the `identitytoolkit.googleapis.com` quota to expected traffic.
-- Every `*.vercel.app` deployment redirects to the canonical domain before app code loads; `config.js` also refuses Firebase initialization on non-production hostnames. In Vercel, enable **Settings → Deployment Protection → Vercel Authentication** for preview deployments as the stronger dashboard-level control.
+- The default Vercel domain redirects to the canonical domain before app code loads; `config.js` also refuses Firebase initialization on any non-production hostname. In Vercel, enable **Settings → Deployment Protection → Vercel Authentication** for preview deployments as the stronger dashboard-level control.
 - Create or forward `privacy@twosday.dev` before publishing the privacy policy link publicly.
 
 ## Testing
