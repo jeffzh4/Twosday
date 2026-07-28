@@ -182,8 +182,31 @@ const CLIENT_ID = uid();
 // the user is only navigating dates/views, which mutates no event data. Includes
 // tombstones so a delete (which removes an event AND records a tombstone) always
 // counts as a change worth syncing.
+// Both sides of a merge — local and remote — are measured with this one format.
+// If the two were assembled separately they could drift as fields are added,
+// and a drifted comparison makes needsReconverge either permanently true (a
+// write loop) or permanently false (a merge that never converges).
+function calendarSignature(all, theme, density, tombs) {
+  return JSON.stringify(all) + '|' + JSON.stringify(theme) + '|' + JSON.stringify(density) + '|' + JSON.stringify(tombs);
+}
+
 function _syncSig() {
-  return JSON.stringify(allData) + '|' + JSON.stringify(userTheme) + '|' + JSON.stringify(calendarDensity) + '|' + JSON.stringify(tombstones);
+  return calendarSignature(allData, userTheme, calendarDensity, tombstones);
+}
+
+// Is a remote document newer than what this browser last cached? The cached
+// timestamp field differs per document (calendar writes `savedAt`, notes writes
+// `_savedAt`), which is why the field name is a parameter rather than assumed.
+function isRemoteNewer(storageKey, remoteSavedAt, savedAtField = 'savedAt') {
+  if (!remoteSavedAt) return false;
+  let localSaved = 0;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) localSaved = JSON.parse(raw)[savedAtField] || 0;
+  } catch (e) {
+    localSaved = 0;   // unreadable cache — treat the remote copy as newer
+  }
+  return remoteSavedAt > localSaved;
 }
 
 function applyParsedData(parsed, applyViewState) {
@@ -284,6 +307,29 @@ function migrateWeekFormat(allWeeks) {
   });
 }
 
+// Merge a remote snapshot into local state and report what changed. Kept free of
+// rendering and toasts so the reconciliation path — the part that decides whether
+// the two calendars have actually converged — is reachable from a test.
+function reconcileRemoteSnapshot(data) {
+  const localSig = _syncSig();
+  const remoteAll = normalizeAllData(data.allData, USERS);
+  const merged = mergeCalendars(allData, remoteAll, tombstones, data.tombstones || {}, USERS);
+  replaceAllData(merged.allData);
+  tombstones = merged.tombstones;
+  auditLog = mergeAuditLogs(auditLog, data.auditLog, AUDIT_CAP);
+  if (data.userTheme) USERS.forEach(u => { if (data.userTheme[u]) userTheme[u] = data.userTheme[u]; });
+  if (data.calendarDensity) USERS.forEach(u => { if (['comfortable', 'compact'].includes(data.calendarDensity[u])) calendarDensity[u] = data.calendarDensity[u]; });
+
+  const signature = _syncSig();
+  const remoteSig = calendarSignature(
+    remoteAll,
+    data.userTheme || userTheme,
+    data.calendarDensity || calendarDensity,
+    data.tombstones || {},
+  );
+  return { signature, changedLocally: signature !== localSig, needsReconverge: signature !== remoteSig };
+}
+
 function getCalendarStore() {
   if (calendarStore) return calendarStore;
   if (typeof createCalendarStore !== 'function') throw new Error('calendar store module is unavailable');
@@ -317,25 +363,12 @@ function getCalendarStore() {
       showToast("couldn't sync — check your connection");
     },
     mergeSnapshot: data => {
-      const localSig = _syncSig();
-      const remoteAll = normalizeAllData(data.allData, USERS);
-      const merged = mergeCalendars(allData, remoteAll, tombstones, data.tombstones || {}, USERS);
-      replaceAllData(merged.allData);
-      tombstones = merged.tombstones;
-      auditLog = mergeAuditLogs(auditLog, data.auditLog, AUDIT_CAP);
-      if (data.userTheme) USERS.forEach(u => { if (data.userTheme[u]) userTheme[u] = data.userTheme[u]; });
-      if (data.calendarDensity) USERS.forEach(u => { if (['comfortable', 'compact'].includes(data.calendarDensity[u])) calendarDensity[u] = data.calendarDensity[u]; });
-
-      const mergedSig = _syncSig();
-      const remoteSig = JSON.stringify(remoteAll)
-        + '|' + JSON.stringify(data.userTheme || userTheme)
-        + '|' + JSON.stringify(data.calendarDensity || calendarDensity)
-        + '|' + JSON.stringify(data.tombstones || {});
+      const result = reconcileRemoteSnapshot(data);
       applyTheme();
       applyDensity();
       render();
-      if (mergedSig !== localSig) showToast('merged changes from the other calendar', 'info');
-      return { signature: mergedSig, needsReconverge: mergedSig !== remoteSig };
+      if (result.changedLocally) showToast('merged changes from the other calendar', 'info');
+      return { signature: result.signature, needsReconverge: result.needsReconverge };
     },
     applyFallbackSnapshot: (data, error) => {
       console.warn('Merge failed, applying remote snapshot directly:', error);

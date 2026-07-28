@@ -269,6 +269,69 @@ run('sync signature changes only when event data changes', () => {
   assert.notStrictEqual(sig1, exec(`_syncSig()`));         // changes on mutation
 });
 
+run('local and remote signatures share one format', () => {
+  // The guard against the two sides drifting: _syncSig must be exactly what
+  // calendarSignature produces for the same four inputs.
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    tombstones = {};
+    insertEvent('2026-07-01', 'alex', normalizeEvent({ id:'s1', text:'sig', start:9, end:10 }));
+  `);
+  assert.strictEqual(
+    exec(`_syncSig()`),
+    exec(`calendarSignature(allData, userTheme, calendarDensity, tombstones)`),
+  );
+});
+
+run('reconcileRemoteSnapshot merges remote events and reports convergence', () => {
+  const res = exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    tombstones = {}; auditLog = [];
+    insertEvent('2026-07-02', 'alex', normalizeEvent({ id:'mine', text:'mine', start:9, end:10, updatedAt: 1000 }));
+    reconcileRemoteSnapshot({
+      allData: { '2026-07-02': { alex: [
+        { id:'mine',  text:'mine',  start:9,  end:10, updatedAt: 1000 },
+        { id:'yours', text:'yours', start:14, end:15, updatedAt: 2000 },
+      ], jamie: [] } },
+      tombstones: {},
+    });
+  `);
+  // Local gained the remote-only event, so local changed and both sides now agree.
+  assert.strictEqual(exec(`allData['2026-07-02'].alex.map(e => e.id).join(',')`), 'mine,yours');
+  assert.strictEqual(res.changedLocally, true);
+  assert.strictEqual(res.needsReconverge, false);
+});
+
+run('reconcileRemoteSnapshot asks to reconverge when the remote is missing local events', () => {
+  const res = exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    tombstones = {}; auditLog = [];
+    insertEvent('2026-07-03', 'alex', normalizeEvent({ id:'local-only', text:'x', start:9, end:10, updatedAt: 5000 }));
+    reconcileRemoteSnapshot({ allData: { '2026-07-03': { alex: [], jamie: [] } }, tombstones: {} });
+  `);
+  // No tombstone for it, so the merge keeps the local event — the remote copy is
+  // now stale and has to be written back.
+  assert.strictEqual(exec(`allData['2026-07-03'].alex.length`), 1);
+  assert.strictEqual(res.needsReconverge, true);
+});
+
+run('isRemoteNewer compares against the cached savedAt, per field name', () => {
+  exec(`localStorage.setItem('cal-key', JSON.stringify({ savedAt: 500 }));`);
+  assert.strictEqual(exec(`isRemoteNewer('cal-key', 900)`), true);
+  assert.strictEqual(exec(`isRemoteNewer('cal-key', 100)`), false);
+  assert.strictEqual(exec(`isRemoteNewer('cal-key', 0)`), false);      // remote never saved
+  assert.strictEqual(exec(`isRemoteNewer('absent-key', 100)`), true);  // nothing cached locally
+
+  // Notes documents record the timestamp under a different key.
+  exec(`localStorage.setItem('notes-key', JSON.stringify({ _savedAt: 500 }));`);
+  assert.strictEqual(exec(`isRemoteNewer('notes-key', 900, '_savedAt')`), true);
+  assert.strictEqual(exec(`isRemoteNewer('notes-key', 100, '_savedAt')`), false);
+
+  // A corrupt cache must not throw — treat it as "no local copy".
+  exec(`localStorage.setItem('bad-key', 'not json');`);
+  assert.strictEqual(exec(`isRemoteNewer('bad-key', 100)`), true);
+});
+
 run('isHashed recognizes sha-256 digests, rejects plaintext', () => {
   assert.strictEqual(exec(`isHashed('${'a'.repeat(64)}')`), true);
   assert.strictEqual(exec(`isHashed('hunter2')`), false);
