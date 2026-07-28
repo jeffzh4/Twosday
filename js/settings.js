@@ -11,6 +11,17 @@ function getFloatingPopoverPosition(triggerRect, pickerRect, viewportWidth, view
   return { left, top };
 }
 
+// Firebase refuses to change an account's email or password on a stale sign-in,
+// so both of those flows have to re-prove the current password first. Throws on
+// a missing session or a bad password; callers report the failure to the user.
+async function reauthenticate(password) {
+  const authUser = firebase.auth().currentUser;
+  if (!authUser) throw new Error('sign in again before changing your account');
+  const credential = firebase.auth.EmailAuthProvider.credential(authUser.email, password);
+  await authUser.reauthenticateWithCredential(credential);
+  return authUser;
+}
+
 // ── Compute stats across both profiles ───────────────────────────────────────
 function computeStats() {
   const now = new Date();
@@ -88,15 +99,11 @@ function exportICS(user) {
 
   lines.push('END:VCALENDAR');
 
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `twosday-${user}-${getDateKey(new Date())}.ics`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadFile(
+    `twosday-${user}-${getDateKey(new Date())}.ics`,
+    lines.join('\r\n'),
+    'text/calendar;charset=utf-8',
+  );
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
@@ -118,16 +125,11 @@ function exportCSV(user) {
     });
   });
 
-  const csv = rows.map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `twosday-${user}-${getDateKey(new Date())}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadFile(
+    `twosday-${user}-${getDateKey(new Date())}.csv`,
+    rows.map(r => r.join(',')).join('\n'),
+    'text/csv;charset=utf-8',
+  );
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
@@ -420,9 +422,7 @@ function openSettingsModal() {
     const newAuthEmail = syntheticEmail(newUsername);
 
     try {
-      if (!authUser) throw new Error('sign in again before changing your username');
-      const credential = firebase.auth.EmailAuthProvider.credential(authUser.email, pwd);
-      await authUser.reauthenticateWithCredential(credential);
+      await reauthenticate(pwd);
       await authUser.updateEmail(newAuthEmail);
       updatedAccount.authEmail = newAuthEmail;
       await saveAccountRecord(newUsername, updatedAccount);
@@ -479,10 +479,7 @@ function openSettingsModal() {
     delete updatedAccount.username;
 
     try {
-      const authUser = firebase.auth().currentUser;
-      if (!authUser) throw new Error('sign in again before changing your password');
-      const credential = firebase.auth.EmailAuthProvider.credential(authUser.email, cur);
-      await authUser.reauthenticateWithCredential(credential);
+      const authUser = await reauthenticate(cur);
       await authUser.updatePassword(newPwd);
       await saveAccountRecord(currentAccount.username, updatedAccount);
     } catch (err) {
