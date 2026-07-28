@@ -1,22 +1,53 @@
 let _idCounter = 0;
 function uid() { return 'ev_' + Date.now() + '_' + (++_idCounter); }
 
-// ── Password hashing (Web Crypto API — SHA-256) ───────────────────────────────
-async function hashPassword(password) {
-  const data = new TextEncoder().encode(password);
-  const buf  = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+// ── Authentication attempt backoff ──────────────────────────────────────────
+// This protects normal browser retries. Firebase Auth and App Check remain the
+// server-side controls; localStorage alone is not a bot boundary.
+const AUTH_THROTTLE_KEY = 'twosday_auth_throttle_v1';
+const AUTH_FAILURE_RESET_MS = 30 * 60 * 1000;
+const AUTH_FAILURES_BEFORE_DELAY = 5;
+const AUTH_BASE_DELAY_MS = 15 * 1000;
+const AUTH_MAX_DELAY_MS = 15 * 60 * 1000;
+
+function readAuthThrottle(storage = localStorage, now = Date.now()) {
+  try {
+    const parsed = JSON.parse(storage.getItem(AUTH_THROTTLE_KEY) || 'null');
+    if (!parsed || typeof parsed !== 'object') return { failures: 0, blockedUntil: 0, lastFailureAt: 0 };
+    if (!Number.isFinite(parsed.lastFailureAt) || now - parsed.lastFailureAt > AUTH_FAILURE_RESET_MS) {
+      return { failures: 0, blockedUntil: 0, lastFailureAt: 0 };
+    }
+    return {
+      failures: Math.max(0, Number(parsed.failures) || 0),
+      blockedUntil: Math.max(0, Number(parsed.blockedUntil) || 0),
+      lastFailureAt: parsed.lastFailureAt,
+    };
+  } catch (e) {
+    return { failures: 0, blockedUntil: 0, lastFailureAt: 0 };
+  }
 }
 
-// Returns true if the string looks like a SHA-256 hex digest (64 hex chars).
-function isHashed(str) {
-  return typeof str === 'string' && /^[0-9a-f]{64}$/.test(str);
+function authRetryAfterMs(storage = localStorage, now = Date.now()) {
+  return Math.max(0, readAuthThrottle(storage, now).blockedUntil - now);
 }
 
-// Verify a plaintext input against either a stored hash or a legacy plaintext value.
-async function verifyPassword(input, stored) {
-  if (isHashed(stored)) return (await hashPassword(input)) === stored;
-  return input === stored; // legacy plaintext fallback
+function recordAuthFailure(storage = localStorage, now = Date.now()) {
+  const previous = readAuthThrottle(storage, now);
+  const failures = previous.failures + 1;
+  const exponent = failures - AUTH_FAILURES_BEFORE_DELAY;
+  const delay = exponent >= 0 ? Math.min(AUTH_BASE_DELAY_MS * (2 ** exponent), AUTH_MAX_DELAY_MS) : 0;
+  const next = { failures, blockedUntil: now + delay, lastFailureAt: now };
+  storage.setItem(AUTH_THROTTLE_KEY, JSON.stringify(next));
+  return next;
+}
+
+function clearAuthFailures(storage = localStorage) {
+  storage.removeItem(AUTH_THROTTLE_KEY);
+}
+
+function formatRetryDelay(ms) {
+  const seconds = Math.max(1, Math.ceil(ms / 1000));
+  return seconds >= 60 ? `${Math.ceil(seconds / 60)} minute${seconds >= 120 ? 's' : ''}` : `${seconds} seconds`;
 }
 
 // ── Toast notifications ───────────────────────────────────────────────────────

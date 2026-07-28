@@ -4,7 +4,7 @@
 
 Twosday helps two people coordinate individual plans, shared events, conflicts, and open time without turning a personal calendar into a cluttered group workspace.
 
-[Live project](https://twosday.dev) · [Architecture notes](ARCHITECTURE.md) · [Run the test suite](#testing)
+[Live project](https://twosday.dev) · [Privacy policy](https://www.twosday.dev/privacy.html) · [Architecture notes](ARCHITECTURE.md) · [Run the test suite](#testing)
 
 <!-- Add assets/twosday-demo.gif here after recording the README walkthrough. -->
 
@@ -54,7 +54,7 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 - Firestore rules that protect account, calendar, notes, and presence documents
 - Deterministic conflict reconciliation: concurrent edits merge via a last-write-wins CRDT with delete tombstones, instead of one profile clobbering the other
 - Property-based invariant tests alongside example-based and Firestore-rules tests
-- Legacy-account migration after verified sign-in
+- Authentication retry backoff and owner-scoped data access
 - Real-time Firestore synchronization with self-echo suppression
 - A tested calendar-store seam coordinating `localStorage` caching, Firestore writes, duplicate-write suppression, and bounded reconciliation retries
 - Keyboard-operable calendar controls, focus-managed dialogs, visible focus states, and reduced-motion support
@@ -69,7 +69,16 @@ Each account owns three Firestore documents:
 - **Notes:** profile-scoped freeform notes
 - **Presence:** short-lived sessions, current view, and heartbeat metadata
 
-Firebase Auth establishes the account owner. Firestore rules require that owner UID for all protected reads and writes, while the previous account registry is retained only as an authenticated, read-only migration source. More detail is available in [ARCHITECTURE.md](ARCHITECTURE.md).
+Firebase Auth establishes the account owner. Firestore rules require that owner UID for all protected reads and writes. The former shared legacy account registry is retired and denied to all clients because Firestore rules cannot safely reveal selected fields from one shared document. More detail is available in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Security Operations
+
+- Firebase web configuration is intentionally committed: its API key identifies the Firebase project; it does not authorize calendar access. Firebase Auth, Firestore Rules, and App Check provide the access boundary.
+- Passwords are handled only by Firebase Authentication. Twosday does not write password hashes to Firestore or browser storage.
+- Browser sign-in and sign-up flows apply an escalating retry delay after repeated failed requests. This is a user-facing guard, not a replacement for server-side abuse protection.
+- Before a public launch, register a reCAPTCHA Enterprise provider in Firebase App Check, add its site key to the web client, and enforce App Check for Cloud Firestore and Firebase Authentication. Also review the Firebase API key's API restrictions and tighten the `identitytoolkit.googleapis.com` quota to expected traffic.
+- The application refuses to initialize Firebase on non-production Vercel hostnames. In Vercel, also enable **Settings → Deployment Protection → Vercel Authentication** for preview deployments. This is a dashboard setting, not something a repository file can enforce.
+- Create or forward `privacy@twosday.dev` before publishing the privacy policy link publicly.
 
 ## Testing
 
@@ -82,7 +91,7 @@ The suite combines Node-based core logic tests, calendar-store adapter tests, pr
 - Core coverage: date helpers, shared-event mirroring, undo/redo, sync deduplication, analytics, import parsing, conflicts, profile rename, seeded demo data, recurrence expansion and series edits, and CRDT merge reconciliation
 - Property coverage (`fast-check`): event-duration invariants, and merge order-independence, idempotence, and no-duplicate-id guarantees across thousands of generated inputs
 - Store coverage: cache persistence, remote-write de-duplication, loading guards, and bounded reconvergence timing
-- Rules coverage: anonymous denial, account privacy, cross-account isolation, owner immutability, schema validation, and safe legacy migration
+- Rules coverage: anonymous denial, account privacy, cross-account isolation, retired-registry denial, owner immutability, share-token validation, and schema validation
 
 ## Run Locally
 
@@ -100,11 +109,12 @@ Java is required to run the Firestore Emulator tests. The browser app itself has
 ```text
 Twosday/
 ├── index.html                 # Application shell and authentication UI
+├── privacy.html               # Public-facing privacy policy
 ├── css/style.css              # Themes, responsive layout, and accessibility styles
 ├── firestore.rules            # Owner-scoped Firestore authorization
 ├── firebase.json              # Firebase and Emulator configuration
 ├── js/
-│   ├── auth.js                # Authentication, session restore, and migration
+│   ├── auth.js                # Authentication, retry backoff, and session restore
 │   ├── state.js               # Calendar state, persistence, and undo/redo
 │   ├── calendar-store.js      # Cache/Firestore persistence coordinator and adapters
 │   ├── events.js              # Event creation, editing, drag, resize, and mirroring

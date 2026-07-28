@@ -2,19 +2,23 @@
 //
 // New account metadata lives at accounts/{username}. Each record carries the
 // Firebase Auth UID that owns it, and every calendar/notes/presence document is
-// stamped with that same UID. The old schedules/accounts registry is read only
-// after authentication and is used solely to migrate previously claimed users.
+// stamped with that same UID. Firebase Authentication is the only password
+// authority; calendar metadata never stores password material.
 
 const ACCOUNTS_CACHE_KEY = 'twosday_accounts_v1';
 const SESSION_KEY = 'twosday_session_v1';
 const ACCOUNT_COLLECTION = () => db.collection('accounts');
 const ACCOUNT_DOC = username => ACCOUNT_COLLECTION().doc(username);
-const LEGACY_ACCOUNTS_DOC = () => db.collection('schedules').doc('accounts');
-
 let currentAccount = null;
+let authRequestActive = false;
 
 function syntheticEmail(username) {
   return `${username.toLowerCase()}@twosday.local`;
+}
+
+function withoutLegacyPassword(account) {
+  const { password, ...safeAccount } = account || {};
+  return safeAccount;
 }
 
 async function claimFirebaseAuth(username, password) {
@@ -37,7 +41,12 @@ function waitForFirebaseAuth() {
 }
 
 function getCachedAccounts() {
-  try { return JSON.parse(localStorage.getItem(ACCOUNTS_CACHE_KEY) || '{}'); }
+  try {
+    const cached = JSON.parse(localStorage.getItem(ACCOUNTS_CACHE_KEY) || '{}');
+    const safe = Object.fromEntries(Object.entries(cached).map(([username, account]) => [username, withoutLegacyPassword(account)]));
+    localStorage.setItem(ACCOUNTS_CACHE_KEY, JSON.stringify(safe));
+    return safe;
+  }
   catch (e) { return {}; }
 }
 
@@ -57,7 +66,11 @@ async function loadAccountRecord(username, allowCache = true) {
   try {
     const snap = await ACCOUNT_DOC(username).get();
     if (snap.exists) {
-      const account = snap.data();
+      const storedAccount = snap.data();
+      const account = withoutLegacyPassword(storedAccount);
+      if (storedAccount.password && firebase.auth().currentUser && firebase.auth().currentUser.uid === account.ownerUid) {
+        await saveAccountRecord(username, account);
+      }
       cacheAccount(username, account);
       return account;
     }
@@ -70,48 +83,23 @@ async function loadAccountRecord(username, allowCache = true) {
 async function saveAccountRecord(username, account) {
   const ownerUid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
   if (!ownerUid || account.ownerUid !== ownerUid) throw new Error('account ownership could not be verified');
-  await ACCOUNT_DOC(username).set({ ...account, updatedAt: Date.now() });
-  cacheAccount(username, account);
-}
-
-async function migrateLegacyAccount(username, uid, verifiedLegacyAccount = null) {
-  let account = verifiedLegacyAccount;
-  if (!account) {
-    const legacySnap = await LEGACY_ACCOUNTS_DOC().get();
-    const legacyAccounts = legacySnap.exists && legacySnap.data().accounts;
-    account = legacyAccounts && legacyAccounts[username];
-    if (!account || account.authUid !== uid) return null;
-  }
-
-  const migrated = {
-    ...account,
-    ownerUid: uid,
-    authUid: uid,
-    authClaimed: true,
-    authEmail: account.authEmail || syntheticEmail(username),
-    migratedAt: Date.now(),
-  };
-  await saveAccountRecord(username, migrated);
-  return migrated;
+  const persisted = { ...withoutLegacyPassword(account), updatedAt: Date.now() };
+  await ACCOUNT_DOC(username).set(persisted);
+  cacheAccount(username, persisted);
 }
 
 async function findAccountForAuthUser(user) {
   const snap = await ACCOUNT_COLLECTION().where('ownerUid', '==', user.uid).limit(1).get();
   if (!snap.empty) {
     const doc = snap.docs[0];
-    const account = doc.data();
+    const storedAccount = doc.data();
+    const account = withoutLegacyPassword(storedAccount);
+    if (storedAccount.password) await saveAccountRecord(doc.id, account);
     cacheAccount(doc.id, account);
     return { username: doc.id, account };
   }
 
-  // Signed-in compatibility path for records created before owner-scoped docs.
-  const legacySnap = await LEGACY_ACCOUNTS_DOC().get();
-  const legacy = legacySnap.exists && legacySnap.data().accounts;
-  const entry = legacy && Object.entries(legacy).find(([, account]) => account.authUid === user.uid);
-  if (!entry) return null;
-  const [username] = entry;
-  const account = await migrateLegacyAccount(username, user.uid);
-  return account ? { username, account } : null;
+  return null;
 }
 
 function activateAccount(username, account) {
@@ -157,6 +145,7 @@ async function prepareAccount(username, account) {
 }
 
 async function handleGoogleSignIn(formId = 'login') {
+  if (!beginAuthRequest(formId)) return;
   setError(formId, 'connecting to Google...');
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -164,17 +153,20 @@ async function handleGoogleSignIn(formId = 'login') {
     const found = await findAccountForAuthUser(result.user);
     if (!found) {
       await firebase.auth().signOut();
+      finishAuthRequest(false);
       setError(formId, 'no Twosday account is linked to this Google account yet - log in with your username and password, then connect Google in settings.');
       return;
     }
 
     await prepareAccount(found.username, found.account);
     saveSession(found.username);
+    finishAuthRequest(true);
     setError(formId, '');
     hideAuth();
     bootApp();
   } catch (err) {
-    if (err.code === 'auth/popup-closed-by-user') { setError(formId, ''); return; }
+    if (err.code === 'auth/popup-closed-by-user') { finishAuthRequest(false, false); setError(formId, ''); return; }
+    finishAuthRequest(false);
     setError(formId, 'Google sign-in failed: ' + err.message);
   }
 }
@@ -207,6 +199,23 @@ function hideAuth() {
 
 function setError(formId, msg) {
   document.getElementById(formId + '-error').textContent = msg || '';
+}
+
+function beginAuthRequest(formId) {
+  if (authRequestActive) return false;
+  const wait = authRetryAfterMs();
+  if (wait) {
+    setError(formId, `too many attempts — try again in ${formatRetryDelay(wait)}`);
+    return false;
+  }
+  authRequestActive = true;
+  return true;
+}
+
+function finishAuthRequest(succeeded, countFailure = true) {
+  authRequestActive = false;
+  if (succeeded) clearAuthFailures();
+  else if (countFailure) recordAuthFailure();
 }
 
 function selectAuthTab(which) {
@@ -246,58 +255,24 @@ function setupAuthListeners() {
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
     if (!username || !password) { setError('login', 'username and password required'); return; }
+    if (!beginAuthRequest('login')) return;
 
     setError('login', 'checking...');
-    let user;
-    let account;
     try {
       const cred = await firebaseAuthSignIn(syntheticEmail(username), password);
-      user = cred.user;
-      account = await loadAccountRecord(username, false);
-      if (!account) account = await migrateLegacyAccount(username, user.uid);
+      const account = await loadAccountRecord(username, false);
+      if (!account || account.ownerUid !== cred.user.uid) throw new Error('account ownership could not be verified');
+      await prepareAccount(username, account);
+      saveSession(username);
+      finishAuthRequest(true);
+      setError('login', '');
+      hideAuth();
+      bootApp();
     } catch (authError) {
-      // Never-claimed legacy account: sign-in failed because no Firebase Auth
-      // user exists for it yet. Prefer a cached copy of the legacy registry
-      // (avoids a round trip), but always fall back to a live read — the
-      // registry is publicly readable specifically so this bootstrap works on
-      // any device, not just the one that originally cached it.
-      let legacyAccount = getCachedAccounts()[username];
-      if (!legacyAccount || legacyAccount.ownerUid) {
-        try {
-          const legacySnap = await LEGACY_ACCOUNTS_DOC().get();
-          const legacyAccounts = legacySnap.exists && legacySnap.data().accounts;
-          legacyAccount = legacyAccounts && legacyAccounts[username];
-        } catch (e) {
-          legacyAccount = null;
-        }
-      }
-      if (!legacyAccount || legacyAccount.ownerUid || !(await verifyPassword(password, legacyAccount.password))) {
-        setError('login', 'invalid username or password');
-        return;
-      }
-      try {
-        const claim = await claimFirebaseAuth(username, password);
-        user = firebase.auth().currentUser;
-        account = await migrateLegacyAccount(username, claim.ownerUid, legacyAccount);
-      } catch (claimError) {
-        setError('login', claimError.code === 'auth/weak-password'
-          ? 'this account\'s saved password is too short to secure (Firebase requires 6+ characters) - contact the project owner to reset it'
-          : 'secure account migration failed - try again or contact the project owner');
-        return;
-      }
-    }
-
-    if (!user || !account || account.ownerUid !== user.uid) {
       await firebase.auth().signOut();
+      finishAuthRequest(false);
       setError('login', 'invalid username or password');
-      return;
     }
-
-    await prepareAccount(username, account);
-    saveSession(username);
-    setError('login', '');
-    hideAuth();
-    bootApp();
   };
 
   document.getElementById('signup-form').onsubmit = async e => {
@@ -315,6 +290,7 @@ function setupAuthListeners() {
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) { setError('signup', 'username can only contain letters, numbers, _ and -'); return; }
     if (!/^[a-zA-Z0-9]+$/.test(profile1) || !/^[a-zA-Z0-9]+$/.test(profile2)) { setError('signup', 'profile names: letters and numbers only'); return; }
     if (profile1.length > 15 || profile2.length > 15) { setError('signup', 'profile names must be 15 characters or less'); return; }
+    if (!beginAuthRequest('signup')) return;
 
     setError('signup', 'creating secure account...');
     let authUser = null;
@@ -322,7 +298,6 @@ function setupAuthListeners() {
       const claim = await claimFirebaseAuth(username, password);
       authUser = firebase.auth().currentUser;
       const account = {
-        password: await hashPassword(password),
         profiles: [profile1, profile2],
         firestoreDoc: username,
         notesDoc: username + '-notes',
@@ -335,11 +310,13 @@ function setupAuthListeners() {
       await saveAccountRecord(username, account);
       await prepareAccount(username, account);
       saveSession(username);
+      finishAuthRequest(true);
       setError('signup', '');
       hideAuth();
       bootApp();
     } catch (err) {
       if (authUser) authUser.delete().catch(() => {});
+      finishAuthRequest(false);
       setError('signup', err.code === 'auth/email-already-in-use' ? 'that username is taken' : 'failed to create account: ' + err.message);
     }
   };
@@ -353,8 +330,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const authUser = await waitForFirebaseAuth();
   if (session && session.username && authUser) {
     try {
-      let account = await loadAccountRecord(session.username, true);
-      if (!account || !account.ownerUid) account = await migrateLegacyAccount(session.username, authUser.uid);
+      const account = await loadAccountRecord(session.username, true);
       if (account && account.ownerUid === authUser.uid) {
         await prepareAccount(session.username, account);
         hideAuth();

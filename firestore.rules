@@ -67,6 +67,10 @@ service cloud.firestore {
         && data.expiresAt is number;
     }
 
+    function validShareToken(token) {
+      return token.size() == 22 && token.matches('^[0-9a-z]{22}$');
+    }
+
     // Read-only public share links. A share document is a flattened copy of one
     // event, never a pointer into the owner's calendar, so an anonymous reader
     // learns nothing beyond what the sender chose to publish.
@@ -78,6 +82,7 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow create: if signedIn()
+        && validShareToken(token)
         && request.resource.data.ownerUid == request.auth.uid
         && validShare(request.resource.data);
       allow update: if signedIn()
@@ -101,16 +106,10 @@ service cloud.firestore {
     }
 
     match /schedules/{docId} {
-      // Existing installations used one shared account registry. It is now a
-      // read-only migration source and can never be changed by clients. Read
-      // access must stay public (not signedIn()-gated): migrating an unclaimed
-      // legacy account is the one operation a client performs before it has any
-      // Firebase Auth session, so gating the read on signedIn() would make that
-      // account permanently unreachable. Only password hashes live here, never
-      // plaintext, and this document cannot be written by clients under any
-      // condition below.
-      allow read: if docId == 'accounts';
-      allow write: if docId == 'accounts' && false;
+      // A previous version stored all account metadata in one document. A
+      // document-level rule cannot expose one user's fields without exposing
+      // every user's fields, so this retired registry is denied to all clients.
+      allow read, write: if docId == 'accounts' && false;
 
       allow create: if docId != 'accounts'
         && validOwnedSchedule(docId, request.resource.data);

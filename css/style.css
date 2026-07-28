@@ -2336,6 +2336,13 @@ html, body {
   font-size: 10px;
 }
 
+.auth-privacy-link {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-decoration: none;
+}
+.auth-privacy-link:hover { color: var(--accent); }
+
 /* ══════════════════════════════════════
    USER PILL (logged-in indicator + logout)
 ══════════════════════════════════════ */
@@ -3411,12 +3418,38 @@ body::after {
   padding: 18px 0;
 }
 
+.share-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .share-footer-link {
   font-size: 12px;
   color: var(--text-dim);
   text-decoration: none;
 }
 .share-footer-link:hover { color: var(--accent); }
+
+.privacy-page {
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.privacy-view {
+  width: min(760px, 100%);
+  margin: 48px auto;
+}
+
+.privacy-card { padding: clamp(24px, 5vw, 48px); }
+.privacy-card h1 { margin: 0 0 8px; font-size: 28px; font-weight: 500; }
+.privacy-card h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 500; }
+.privacy-card p,
+.privacy-card li { color: var(--text-muted); font-size: 14px; line-height: 1.65; }
+.privacy-card p { margin: 0 0 14px; }
+.privacy-card ul { margin: 0 0 14px; padding-left: 20px; }
+.privacy-card a { color: var(--accent); }
+.privacy-updated { color: var(--text-dim) !important; font-family: var(--mono); font-size: 11px !important; }
 
 /* ══════════════════════════════════════
    GLASS EVENT BLOCKS (iOS 26 "Liquid Glass" treatment)
