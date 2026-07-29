@@ -79,6 +79,7 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 - The production web app is registered with Firebase App Check using reCAPTCHA Enterprise. The client activates it only on `twosday.dev` and `www.twosday.dev`; monitor App Check metrics before enforcing it for Cloud Firestore or Firebase Authentication. Also review the Firebase API key's API restrictions and tighten the `identitytoolkit.googleapis.com` quota to expected traffic.
 - The default Vercel domain redirects to the canonical domain before app code loads; `config.js` also refuses Firebase initialization on any non-production hostname. In Vercel, enable **Settings → Deployment Protection → Vercel Authentication** for preview deployments as the stronger dashboard-level control.
 - Create or forward `privacy@twosday.dev` before publishing the privacy policy link publicly.
+- See [Security Policy](SECURITY.md), [Content Security Policy](docs/CONTENT-SECURITY-POLICY.md), and [Security Operations](docs/SECURITY-OPERATIONS.md) for reporting, browser policy, and release controls.
 
 ## Testing
 

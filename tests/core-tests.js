@@ -595,7 +595,7 @@ run('share payload copies only public event fields', () => {
     }, '2026-07-19');
   })()`);
   const keys = Object.keys(plain(payload)).sort();
-  assert.deepStrictEqual(keys, ['dateKey', 'description', 'end', 'location', 'sharedBy', 'start', 'title']);
+  assert.deepStrictEqual(keys, ['dateKey', 'description', 'end', 'location', 'start', 'title']);
   // The recipient must never receive anything that identifies the calendar.
   assert.strictEqual(payload.id, undefined);
   assert.strictEqual(payload.sharedId, undefined);

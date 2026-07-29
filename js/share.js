@@ -20,8 +20,8 @@ function shareUrlFor(token) {
   return `${location.origin}/share.html?t=${encodeURIComponent(token)}`;
 }
 
-// Only the fields a recipient needs to show up in the right place at the right
-// time. No ids, no account name, no profile list, no sharedId.
+// Only fields a recipient needs. No ids, profile names, account metadata, or
+// shared-event linkage cross the public-share boundary.
 function buildSharePayload(ev, dateKey) {
   return {
     title: ev.text || 'event',
@@ -30,7 +30,6 @@ function buildSharePayload(ev, dateKey) {
     end: ev.end,
     location: ev.location || null,
     description: ev.description || null,
-    sharedBy: activeUser || null,
   };
 }
 
@@ -85,7 +84,7 @@ function openShareModal(ev, dateKey) {
   bg.innerHTML = `
     <div class="modal share-modal">
       <h3>share event</h3>
-      <p class="share-copy">creates a read-only link to <strong>${escHtml(ev.text)}</strong>. anyone with the link can see the time, location, and description — nothing else on your calendar.</p>
+      <p class="share-copy">creates a read-only link to <strong>${escHtml(ev.text)}</strong>. anyone who receives it can see this event's time, location, and description until it expires. do not share sensitive details.</p>
       <div class="share-link-row">
         <input id="share-url" readonly placeholder="generating link…" />
         <button class="mbtn mbtn-save" id="share-copy">copy</button>
