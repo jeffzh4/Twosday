@@ -3,6 +3,7 @@
 // Do not initialize a production data client on an alternate Vercel hostname.
 const TWOSDAY_TRUSTED_HOSTS = new Set(['twosday.dev', 'www.twosday.dev', 'localhost', '127.0.0.1']);
 const TWOSDAY_TRUSTED_DEPLOYMENT = location.protocol === 'file:' || TWOSDAY_TRUSTED_HOSTS.has(location.hostname);
+const TWOSDAY_PRODUCTION_HOSTS = new Set(['twosday.dev', 'www.twosday.dev']);
 
 if (!TWOSDAY_TRUSTED_DEPLOYMENT) {
   const target = `https://www.twosday.dev${location.pathname}${location.search}${location.hash}`;
@@ -19,6 +20,17 @@ const firebaseConfig = {
   appId: "1:699230921946:web:caeac0208e66a4f01c71e3",
 };
 firebase.initializeApp(firebaseConfig);
+
+// The Enterprise site key is public by design. Restrict provider activation to
+// the registered production domains so local development does not require a
+// debug token. Enforce App Check in Firebase only after production monitoring.
+if (TWOSDAY_PRODUCTION_HOSTS.has(location.hostname) && firebase.appCheck) {
+  firebase.appCheck().activate(
+    new firebase.appCheck.ReCaptchaEnterpriseProvider('6LcrP2otAAAAAHb7Ee4x4bK1-Riq1KD9etEHEJGg'),
+    true
+  );
+}
+
 const db = firebase.firestore();
 // Let Firestore retain reads and queue writes while connection is unavailable.
 // Multi-tab mode keeps one browser's tabs from competing over its persistence lock.
