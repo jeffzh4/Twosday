@@ -149,7 +149,15 @@ async function run() {
     await assertFails(updateDoc(doc(bob, 'shares/aaaaaaaaaaaaaaaaaaaaaa'), share('bob')));
     await assertFails(deleteDoc(doc(bob, 'shares/aaaaaaaaaaaaaaaaaaaaaa')));
     await assertSucceeds(deleteDoc(doc(alice, 'shares/aaaaaaaaaaaaaaaaaaaaaa')));
-    console.log('ok - anyone can open a share token but only its owner can change it');
+    console.log('ok - an unexpired share token is read-only outside its owner');
+
+    await env.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'shares/bbbbbbbbbbbbbbbbbbbbbb'), share('alice', {
+        expiresAt: Date.now() - 1_000,
+      }));
+    });
+    await assertFails(getDoc(doc(anonymous, 'shares/bbbbbbbbbbbbbbbbbbbbbb')));
+    console.log('ok - expired share tokens are denied by Firestore rules');
 
     // Enumeration guard: without list, an unknown token cannot be discovered.
     await assertFails(getDocs(collection(anonymous, 'shares')));
