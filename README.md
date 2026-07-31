@@ -47,6 +47,7 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 - Cross-date event search
 - Calendar insights for scheduled hours, completion, shared time, category mix, weekly load, and profile balance
 - `.ics` import preview plus `.ics` and `.csv` export
+- Optional Google Calendar busy-time overlay with selected calendars, session-only OAuth access, and no external event data persisted in Twosday
 
 ### Quality and resilience
 
@@ -88,6 +89,8 @@ npm test
 ```
 
 The suite combines Node-based core logic tests, calendar-store adapter tests, property-based invariant tests, UI regression guards, and Firebase Emulator authorization tests.
+
+It also includes a Playwright browser smoke test that runs against mocked Firebase data, covering app startup, view navigation, keyboard interaction, event editing, and modal recovery without touching a real account. See [Google Calendar overlay setup](docs/GOOGLE-CALENDAR-OVERLAY.md) for the optional OAuth configuration.
 
 - Core coverage: date helpers, shared-event mirroring, undo/redo, sync deduplication, analytics, import parsing, conflicts, profile rename, seeded demo data, recurrence expansion and series edits, and CRDT merge reconciliation
 - Property coverage (`fast-check`): event-duration invariants, and merge order-independence, idempotence, and no-duplicate-id guarantees across thousands of generated inputs

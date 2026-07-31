@@ -4,6 +4,10 @@
 const TWOSDAY_TRUSTED_HOSTS = new Set(['twosday.dev', 'www.twosday.dev', 'localhost', '127.0.0.1']);
 const TWOSDAY_TRUSTED_DEPLOYMENT = location.protocol === 'file:' || TWOSDAY_TRUSTED_HOSTS.has(location.hostname);
 const TWOSDAY_PRODUCTION_HOSTS = new Set(['twosday.dev', 'www.twosday.dev']);
+// Google OAuth web client used only for the optional, read-only Calendar
+// overlay. This identifier is public; tokens are memory-only and never stored.
+// See docs/GOOGLE-CALENDAR-OVERLAY.md before setting this value.
+const TWOSDAY_GOOGLE_CALENDAR_CLIENT_ID = '';
 
 if (!TWOSDAY_TRUSTED_DEPLOYMENT) {
   const target = `https://www.twosday.dev${location.pathname}${location.search}${location.hash}`;

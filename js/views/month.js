@@ -34,6 +34,7 @@ function renderMonthView() {
       const isCurrentMonth = date.getMonth() === month;
       const isToday = dateKey === todayKey;
       const events = getEventsForDate(dateKey, activeUser);
+      const externalEvents = typeof getGoogleCalendarEvents === 'function' ? getGoogleCalendarEvents(dateKey) : [];
 
       const cell = document.createElement('div');
       cell.className = 'month-cell' +
@@ -52,7 +53,7 @@ function renderMonthView() {
       events.slice(0, maxShow).forEach(ev => {
         const p = palette(ev);
         const pill = document.createElement('div');
-        pill.className = 'month-ev-pill' + (ev.done ? ' done' : '');
+        pill.className = 'month-ev-pill ' + (ev.shared ? 'shared-event' : 'personal-event') + (ev.done ? ' done' : '');
         pill.tabIndex = 0;
         pill.setAttribute('role', 'button');
         pill.setAttribute('aria-label', `Edit ${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}`);
@@ -66,6 +67,15 @@ function renderMonthView() {
         onKeyboardActivate(pill, () => pill.click());
         cell.appendChild(pill);
       });
+
+      if (externalEvents.length) {
+        const busy = document.createElement('div');
+        busy.className = 'month-external-pill';
+        busy.textContent = `Google busy${externalEvents.length > 1 ? ` · ${externalEvents.length}` : ''}`;
+        busy.title = `${externalEvents.length} read-only Google Calendar block${externalEvents.length === 1 ? '' : 's'}`;
+        busy.addEventListener('click', event => event.stopPropagation());
+        cell.appendChild(busy);
+      }
 
       if (events.length > maxShow) {
         const more = document.createElement('div');

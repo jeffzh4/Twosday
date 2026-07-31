@@ -7,6 +7,7 @@ const settings = fs.readFileSync('js/settings.js', 'utf8');
 const state = fs.readFileSync('js/state.js', 'utf8');
 const serviceWorker = fs.readFileSync('sw.js', 'utf8');
 const index = fs.readFileSync('index.html', 'utf8');
+const googleCalendar = fs.readFileSync('js/google-calendar.js', 'utf8');
 
 const onDragEnd = events.slice(events.indexOf('function onDragEnd()'), events.indexOf('\n}', events.indexOf('function onDragEnd()')) + 2);
 if (!/if \(didMove\) render\(\)/.test(onDragEnd)) {
@@ -47,5 +48,15 @@ localScripts.forEach(script => {
     throw new Error(`offline shell regression: ${script} is missing from service worker assets`);
   }
 });
+
+if (!/let googleCalendarEvents = \{\}/.test(googleCalendar) || /buildPayload:[\s\S]*googleCalendarEvents/.test(state)) {
+  throw new Error('Google Calendar privacy regression: external event data must remain memory-only');
+}
+if (!/external: true/.test(googleCalendar) || /summary/.test(googleCalendar.slice(googleCalendar.indexOf('function normalizeGoogleCalendarEvent'), googleCalendar.indexOf('function getGoogleOverlayRange')))) {
+  throw new Error('Google Calendar privacy regression: overlay records must be marked external and omit event titles');
+}
+if (!/external-event/.test(dayWeek) || !/event\.stopPropagation\(\)/.test(dayWeek.slice(dayWeek.indexOf('function buildExternalEventEl'), dayWeek.indexOf('function buildEventEl')))) {
+  throw new Error('Google Calendar immutability regression: external blocks must not enter event editing flows');
+}
 
 console.log('ui regression guards passed');

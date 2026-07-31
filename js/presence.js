@@ -11,6 +11,7 @@ let localPresenceSessions = {};
 let _presenceTimer = null;
 let _presenceDebounce = null;
 let _presenceUnsub = null;
+let renderedPresenceIds = new Set();
 
 function getPresenceSnapshot() {
   return {
@@ -149,7 +150,7 @@ function renderPresence() {
   }
 
   const shown = active.slice(0, 3).map(s => `
-    <span class="presence-viewer">
+    <span class="presence-viewer${renderedPresenceIds.has(s.clientId) ? '' : ' presence-arrival'}">
       <span class="presence-dot online"></span>
       <strong>${escHtml(s.profile || 'someone')}</strong>
       <span>viewing ${escHtml(s.viewMode || 'calendar')}</span>
@@ -166,6 +167,7 @@ function renderPresence() {
     <span class="presence-divider"></span>
     <span class="presence-update">${updateText}</span>
   `;
+  renderedPresenceIds = new Set(active.map(session => session.clientId));
 }
 
 function startPresence() {
