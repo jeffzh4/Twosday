@@ -45,17 +45,19 @@ function renderYearView() {
         const isCurrentMonth = date.getMonth() === m;
         const isToday = dateKey === todayKey;
         const hasEvents = getEventsForDate(dateKey, activeUser).length > 0;
+        const hasExternalEvents = typeof getGoogleCalendarEvents === 'function' && getGoogleCalendarEvents(dateKey).length > 0;
 
         const cell = document.createElement('div');
         cell.className = 'mini-cell' +
           (isCurrentMonth ? '' : ' other-month') +
           (isToday ? ' today' : '') +
-          (hasEvents && isCurrentMonth ? ' has-events' : '');
+          (hasEvents && isCurrentMonth ? ' has-events' : '') +
+          (hasExternalEvents && isCurrentMonth ? ' has-external-events' : '');
         cell.textContent = date.getDate();
         cell.title = dateKey;
         cell.tabIndex = 0;
         cell.setAttribute('role', 'button');
-        cell.setAttribute('aria-label', `${date.toLocaleDateString()}, ${hasEvents ? 'has events' : 'no events'}`);
+        cell.setAttribute('aria-label', `${date.toLocaleDateString()}, ${hasEvents ? 'has events' : 'no events'}${hasExternalEvents ? ', Google Calendar busy' : ''}`);
 
         cell.addEventListener('click', () => {
           currentDate = new Date(date);

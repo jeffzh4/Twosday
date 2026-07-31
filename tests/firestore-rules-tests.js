@@ -153,7 +153,9 @@ async function run() {
 
     await env.withSecurityRulesDisabled(async context => {
       await setDoc(doc(context.firestore(), 'shares/bbbbbbbbbbbbbbbbbbbbbb'), share('alice', {
-        expiresAt: Date.now() - 1_000,
+        // A fixed historical timestamp avoids an emulator-clock race around
+        // a just-expired value.
+        expiresAt: 1,
       }));
     });
     await assertFails(getDoc(doc(anonymous, 'shares/bbbbbbbbbbbbbbbbbbbbbb')));

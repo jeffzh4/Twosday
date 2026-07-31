@@ -228,6 +228,14 @@ function openSettingsModal() {
         <div class="settings-msg" id="s-google-msg"></div>
       </div>
 
+      <div class="settings-section">
+        <div class="settings-section-title">Google Calendar overlay</div>
+        <div class="settings-msg">show selected Google calendars as read-only busy time. Event details and access tokens stay out of Twosday storage.</div>
+        <button class="mbtn" id="s-google-calendar-connect" type="button">connect Google Calendar</button>
+        <div class="settings-msg" id="s-google-calendar-msg" role="status" aria-live="polite"></div>
+        <div class="google-calendar-picker" id="s-google-calendar-picker"></div>
+      </div>
+
       <!-- ── Profile names + emoji ── -->
       <div class="settings-section">
         <div class="settings-section-title">profile names</div>
@@ -361,6 +369,7 @@ function openSettingsModal() {
     _closeModal();
     openAnalyticsModal();
   };
+  if (typeof setupGoogleCalendarSettings === 'function') setupGoogleCalendarSettings();
   // ── Connect Google ────────────────────────────────────────────────────────
   const connectGoogleBtn = document.getElementById('s-connect-google');
   if (connectGoogleBtn) {

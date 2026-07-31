@@ -126,6 +126,7 @@ function render() {
   if (typeof renderPresence === 'function') renderPresence();
   if (typeof queuePresenceUpdate === 'function') queuePresenceUpdate();
   saveToLocalStorage();
+  if (typeof refreshGoogleCalendarOverlay === 'function') refreshGoogleCalendarOverlay();
 }
 
 // ── Wiring ────────────────────────────────────────────────────────────────────
@@ -255,6 +256,7 @@ function bootApp() {
   startFirestoreListener();
   startNotesListener();
   if (typeof startPresence === 'function') startPresence();
+  if (typeof restoreGoogleCalendarOverlay === 'function') restoreGoogleCalendarOverlay();
 
   setInterval(positionNowLine, 30000);
   setInterval(() => { if (typeof renderPresence === 'function') renderPresence(); }, 30000);
