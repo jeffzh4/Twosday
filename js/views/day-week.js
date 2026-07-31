@@ -164,7 +164,7 @@ function renderDayColumn(date) {
 
   // Mousedown on empty space → drag-to-create
   body.addEventListener('mousedown', e => {
-    if (e.button !== 0 || e.target.closest('.ev') || e.target.closest('.resize-handle')) return;
+    if (e.button !== 0 || e.target.closest('.ev') || e.target.closest('.external-event') || e.target.closest('.resize-handle')) return;
     e.preventDefault();
     const y = e.clientY - body.getBoundingClientRect().top;
     const startH = clampTime(Math.round((y / PX_PER_HOUR + START_H) / STEP_H) * STEP_H);
@@ -178,16 +178,17 @@ function renderDayColumn(date) {
 
   // Double-click to add event — snaps to STEP_H (15 min)
   body.addEventListener('dblclick', e => {
-    if (e.target.closest('.ev')) return;
+    if (e.target.closest('.ev') || e.target.closest('.external-event')) return;
     const y = e.clientY - body.getBoundingClientRect().top;
     const startAt = clampTime(Math.round((y / PX_PER_HOUR + START_H) / STEP_H) * STEP_H);
     openModal({ dateKey, startH: startAt });
   });
 
   const events = getEventsForDate(dateKey, activeUser);
+  const externalEvents = typeof getGoogleCalendarEvents === 'function' ? getGoogleCalendarEvents(dateKey) : [];
   const layout = computeLayout(events);
 
-  if (!events.length) {
+  if (!events.length && !externalEvents.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
     if (viewMode === 'day') {
@@ -198,12 +199,28 @@ function renderDayColumn(date) {
     body.appendChild(empty);
   }
 
+  externalEvents.forEach(ev => body.appendChild(buildExternalEventEl(ev)));
+
   events.forEach(ev => {
     body.appendChild(buildEventEl(ev, dateKey, layout[ev.id] || { col: 0, total: 1 }));
   });
 
   col.appendChild(body);
   return col;
+}
+
+function buildExternalEventEl(ev) {
+  const div = document.createElement('div');
+  const top = (ev.start - START_H) * PX_PER_HOUR;
+  const height = Math.max((ev.end - ev.start) * PX_PER_HOUR, 20);
+  div.className = 'external-event' + (ev.allDay ? ' external-all-day' : '');
+  div.style.cssText = `top:${top}px;height:${height}px;`;
+  div.setAttribute('aria-hidden', 'true');
+  div.title = ev.allDay ? 'Google Calendar: busy all day' : `Google Calendar: busy ${fmtFull(ev.start)} – ${fmtFull(ev.end)}`;
+  div.innerHTML = `<span class="external-event-label">${ev.allDay ? 'Google busy · all day' : 'Google busy'}</span>`;
+  div.addEventListener('mousedown', event => event.stopPropagation());
+  div.addEventListener('dblclick', event => event.stopPropagation());
+  return div;
 }
 
 function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
@@ -213,7 +230,7 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
   const conflict = hasConflict(activeUser, dateKey, ev);
 
   const div = document.createElement('div');
-  div.className = 'ev' + (ev.done ? ' done' : '') + (conflict ? ' conflict' : '');
+  div.className = 'ev ' + (ev.shared ? 'shared-event' : 'personal-event') + (ev.done ? ' done' : '') + (conflict ? ' conflict' : '');
   div.tabIndex = 0;
   div.setAttribute('role', 'button');
   div.setAttribute('aria-label', `${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}${ev.shared ? ', shared' : ''}${ev.done ? ', completed' : ''}`);
