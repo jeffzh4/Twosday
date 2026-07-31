@@ -8,6 +8,18 @@ Twosday helps two people coordinate individual plans, shared events, conflicts, 
 
 <!-- Add assets/twosday-demo.gif here after recording the README walkthrough. -->
 
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [Product requirements](docs/PRODUCT-REQUIREMENTS.md) | Product thesis, user jobs, principles, scope, and open decisions. |
+| [Design decisions](docs/DESIGN-DECISIONS.md) | Interface rationale for calendar hierarchy, event language, motion, themes, and accessibility. |
+| [Architecture](ARCHITECTURE.md) | Data model, sync and reconciliation, authorization, and test strategy. |
+| [Roadmap](docs/ROADMAP.md) | Prioritized next work, decision criteria, and explicit non-plans. |
+| [Known limitations](docs/KNOWN-LIMITATIONS.md) | Current product, operational, and public-readiness limits. |
+| [Security policy](SECURITY.md) | Security boundaries and vulnerability reporting. |
+| [Changelog](CHANGELOG.md) | Repository milestones and release context. |
+
 ## Why It Stands Out
 
 | Collaboration | Scheduling intelligence | Engineering depth |
