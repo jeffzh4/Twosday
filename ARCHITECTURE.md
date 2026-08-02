@@ -62,11 +62,14 @@ The former `schedules/accounts` registry stored multiple users' account metadata
 
 ## Testing
 
-Three suites run under `npm test`:
+Seven suites run under `npm test`:
 
 - **`tests/core-tests.js`** — example-based pure-logic checks in a Node VM context: date/month helpers, shared-event mirroring and undo/redo, sync-signature dedup, authentication retry backoff, stats/ICS/rename, demo-seed idempotency, free-window search, analytics, ICS parsing, conflict collection, recurrence expansion and series edit/delete, and the reconciliation merge (LWW, tombstones, idempotence, audit-log union).
 - **`tests/property-tests.js`** — invariants checked across thousands of generated inputs with `fast-check`: `normalizeEvent` always yields a positive-duration event in `[0,24]`; `mergeCalendars` is order-independent, idempotent, and never keeps duplicate ids; `expandRecurrence` is bounded, monotonic, and emits valid date keys. This is the correctness-under-arbitrary-input discipline used for financial reconciliation logic.
 - **`tests/calendar-store-tests.js`** — adapter and coordinator checks for cache restore/save, duplicate-write suppression, loading guards, and reconvergence timing.
+- **`tests/ui-regressions.js`** — regression guards for rendering behavior that has broken before (flicker, layout drift) but has no natural home in the pure-logic suite.
+- **`tests/google-calendar-tests.js`** — privacy-preserving normalization checks for the optional Google Calendar overlay: only busy-time fields survive, titles/descriptions/attendees never do.
+- **`tests/browser-smoke.js`** — a Playwright smoke test against mocked Firebase data, covering app startup, view navigation, keyboard interaction, event editing, and modal recovery without touching a real account.
 - **`tests/firestore-rules-tests.js`** — owner isolation, schema checks, immutability, share-token validation, and retired-registry denial against the local Firestore Emulator.
 
 Run everything:
