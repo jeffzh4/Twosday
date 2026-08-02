@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <title>Twosday</title>
-  <rect x="8" y="14" width="48" height="44" rx="6" fill="#ffffff" stroke="#2a2a26" stroke-width="3.5"/>
-  <rect x="8" y="14" width="48" height="14" rx="6" fill="#5b4ee6"/>
-  <rect x="8" y="22" width="48" height="6" fill="#5b4ee6"/>
-  <rect x="18" y="7" width="5" height="14" rx="2" fill="#2a2a26"/>
-  <rect x="41" y="7" width="5" height="14" rx="2" fill="#2a2a26"/>
-  <path d="M32 52 C18 42, 12 36, 12 28 C12 22, 17 18, 22 18 C26 18, 30 21, 32 25 C34 21, 38 18, 42 18 C47 18, 52 22, 52 28 C52 36, 46 42, 32 52 Z" fill="#e8546e"/>
-</svg>
