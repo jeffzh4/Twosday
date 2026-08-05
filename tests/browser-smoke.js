@@ -5,6 +5,7 @@ const path = require('path');
 const { chromium } = require('@playwright/test');
 
 const root = path.resolve(__dirname, '..');
+const captureDir = process.env.TWOSDAY_CAPTURE_DIR || null;
 const firebaseMock = `
 (() => {
   const account = { profiles: ['jeff', 'helen'], firestoreDoc: 'smoke-data', notesDoc: 'smoke-notes', ownerUid: 'smoke-owner', authClaimed: true, googleCalendar: { calendarIds: [] } };
@@ -71,6 +72,51 @@ function server() {
   await page.waitForSelector('#s-google-calendar-connect');
   await page.keyboard.press('Escape');
   assert.strictEqual(await page.locator('.modal-bg').count(), 0, 'Escape must restore the normal app flow');
+
+  // Mobile has a purpose-built agenda instead of squeezing desktop's time grid.
+  const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  await mobile.route('https://www.gstatic.com/firebasejs/**', route => route.fulfill({ contentType: 'application/javascript', body: firebaseMock }));
+  await mobile.addInitScript(() => {
+    localStorage.setItem('twosday_session_v1', JSON.stringify({ username: 'smoke', savedAt: Date.now() }));
+    localStorage.setItem('twosday_v2_smoke', JSON.stringify({
+      allData: {
+        '2026-07-21': {
+          jeff: [{ id: 'mobile-seed', sharedId: 'mobile-share', text: 'mobile smoke event', start: 9, end: 10, shared: true, done: false }],
+          helen: [{ id: 'mobile-mirror', sharedId: 'mobile-share', text: 'mobile smoke event', start: 9, end: 10, shared: true, done: false }],
+        },
+      },
+      activeUser: 'jeff', viewMode: 'day', currentDate: '2026-07-21T12:00:00.000Z', userTheme: { jeff: 'dark', helen: 'light' }, calendarDensity: {}, tombstones: {}, auditLog: [], savedAt: Date.now(),
+    }));
+  });
+  await mobile.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+  await mobile.waitForSelector('.mobile-agenda');
+  if (captureDir) { fs.mkdirSync(captureDir, { recursive: true }); await mobile.screenshot({ path: path.join(captureDir, 'mobile-day.png') }); }
+  assert.strictEqual(await mobile.locator('.grid-wrap').count(), 0, 'mobile day must not render the desktop time grid');
+  assert.strictEqual(await mobile.locator('.mobile-nav').count(), 1, 'mobile navigation should render');
+  await mobile.locator('.mobile-agenda-event').click();
+  await mobile.waitForSelector('#m-name');
+  if (captureDir) { await mobile.waitForTimeout(250); await mobile.screenshot({ path: path.join(captureDir, 'mobile-event-editor.png') }); }
+  assert.strictEqual(await mobile.locator('.modal-bg > .modal').count(), 1, 'mobile event edit should use the standard editor');
+  assert.strictEqual(await mobile.locator('.mobile-event-quick-actions button').count(), 4, 'mobile editor should preserve repeat, share, completion, and delete actions');
+  await mobile.locator('#m-cancel').click();
+  await mobile.getByRole('button', { name: 'Week' }).click();
+  await mobile.waitForSelector('.mobile-week-agenda');
+  if (captureDir) { await mobile.waitForTimeout(100); await mobile.screenshot({ path: path.join(captureDir, 'mobile-week.png') }); }
+  assert.strictEqual(await mobile.locator('.mobile-week-day').count(), 7, 'mobile week should show seven agenda days');
+  await mobile.getByRole('button', { name: 'More' }).click();
+  await mobile.waitForSelector('.mobile-more-sheet');
+  if (captureDir) { await mobile.waitForTimeout(250); await mobile.screenshot({ path: path.join(captureDir, 'mobile-more.png') }); }
+  assert.strictEqual(await mobile.getByRole('button', { name: 'find time' }).count(), 1, 'mobile more sheet should retain secondary tools');
+  assert.strictEqual(await mobile.getByRole('button', { name: 'year view' }).count(), 1, 'mobile more sheet should retain year view');
+  assert.strictEqual(await mobile.getByRole('button', { name: 'activity' }).count(), 1, 'mobile more sheet should retain activity history');
+  await mobile.getByRole('button', { name: 'year view' }).click();
+  await mobile.waitForSelector('.year-view');
+  assert.strictEqual(await mobile.locator('.mobile-more-sheet').count(), 0, 'mobile more actions should close before changing views');
+  await mobile.getByRole('button', { name: 'Month' }).click();
+  await mobile.waitForSelector('.month-view');
+  if (captureDir) { await mobile.waitForTimeout(100); await mobile.screenshot({ path: path.join(captureDir, 'mobile-month.png') }); }
+  assert.strictEqual(await mobile.locator('.month-cell').count() > 0, true, 'mobile month should retain the calendar scan view');
+  await mobile.close();
   console.log('browser smoke tests passed');
   } finally {
     if (browser) await browser.close();
