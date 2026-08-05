@@ -109,6 +109,7 @@ function render() {
   document.getElementById('nav-label').textContent = getNavLabel();
   renderViewSwitch();
   renderUserSwitcher();
+  if (typeof renderMobileNavigation === 'function') renderMobileNavigation();
   updateHistoryButtons();
 
   if      (viewMode === 'day' || viewMode === 'week') renderGrid();
