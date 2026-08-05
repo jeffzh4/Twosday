@@ -13,6 +13,14 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   const metaHTML = isEdit && editEv.updatedAt
     ? `<div class="event-meta">last updated ${fmtRelativeTime(editEv.updatedAt)} by ${escHtml(editEv.updatedBy || activeUser)}</div>`
     : '';
+  const mobileQuickActions = isEdit && typeof isMobileCalendarViewport === 'function' && isMobileCalendarViewport()
+    ? `<div class="mobile-event-quick-actions" aria-label="Event actions">
+        <button type="button" id="m-repeat" title="Repeat event">repeat</button>
+        <button type="button" id="m-share" title="Create share link">share</button>
+        <button type="button" id="m-done">${editEv.done ? 'reopen' : 'complete'}</button>
+        <button type="button" id="m-delete" class="danger">delete</button>
+      </div>`
+    : '';
 
   // Recurrence control: full picker on new events; a note on recurring edits.
   const recurHTML = isEdit
@@ -37,6 +45,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   bg.innerHTML = `
     <div class="modal">
       <h3>${isEdit ? 'edit event' : 'new event'}</h3>
+      ${mobileQuickActions}
       <div class="field">
         <label>name</label>
         <input id="m-name" value="${isEdit ? escHtml(editEv.text) : ''}" placeholder="e.g. chem lab" autofocus />
@@ -251,6 +260,38 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   }
 
   document.getElementById('m-cancel').onclick = () => bg.remove();
+
+  if (isEdit && document.getElementById('m-repeat')) {
+    document.getElementById('m-repeat').onclick = () => {
+      bg.remove();
+      openRepeatModal(dateKey, editEv);
+    };
+    document.getElementById('m-share').onclick = () => {
+      bg.remove();
+      openShareModal(editEv, dateKey);
+    };
+    document.getElementById('m-done').onclick = () => {
+      pushHistory();
+      toggleDone(dateKey, activeUser, editEv.id);
+      bg.remove();
+      render();
+    };
+    document.getElementById('m-delete').onclick = () => {
+      bg.remove();
+      if (editEv.recurrenceId && seriesCount(editEv.recurrenceId, activeUser) > 1) {
+        openRecurrenceScopeModal({ verb: 'delete', onChoose: scope => {
+          pushHistory();
+          if (scope === 'this') deleteEvent(dateKey, activeUser, editEv.id);
+          else deleteRecurringSeries(editEv.recurrenceId, activeUser, scope === 'future' ? dateKey : null);
+          render();
+        }});
+        return;
+      }
+      pushHistory();
+      deleteEvent(dateKey, activeUser, editEv.id);
+      render();
+    };
+  }
 
   // Single-event edit: date move, shared-toggle handling, field updates. Used for
   // non-recurring events and for the 'this event only' scope (which detaches the

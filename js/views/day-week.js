@@ -39,6 +39,17 @@ function computeLayout(events) {
 function renderGrid() {
   const content = document.getElementById('main-content');
 
+  if (typeof isMobileCalendarViewport === 'function' && isMobileCalendarViewport()) {
+    if (viewMode === 'day') {
+      renderMobileDayAgenda(content);
+      return;
+    }
+    if (viewMode === 'week') {
+      renderMobileWeekAgenda(content);
+      return;
+    }
+  }
+
   // Preserve scroll position across re-renders (add/edit/delete/toggle).
   // If there is no existing grid-wrap (first load or switching from month/year),
   // savedScroll stays null and we fall through to scroll-to-now below.
@@ -86,6 +97,108 @@ function renderGrid() {
     const targetH = Math.max(6, now.getHours() - 1);
     wrap.scrollTop = (targetH - START_H) * PX_PER_HOUR - 30;
   }
+}
+
+function buildMobileDateStrip() {
+  const strip = document.createElement('div');
+  strip.className = 'mobile-date-strip';
+  const selectedKey = getDateKey(currentDate);
+  const todayKey = getDateKey(new Date());
+  for (let offset = -3; offset <= 3; offset++) {
+    const date = new Date(currentDate);
+    date.setDate(date.getDate() + offset);
+    const key = getDateKey(date);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mobile-date-btn' + (key === selectedKey ? ' active' : '') + (key === todayKey ? ' today' : '');
+    button.setAttribute('aria-label', `${DAY_NAMES_LONG[date.getDay()]}, ${date.toLocaleDateString()}`);
+    button.setAttribute('aria-pressed', String(key === selectedKey));
+    button.innerHTML = `<span>${DAYS[date.getDay()]}</span><strong>${date.getDate()}</strong>`;
+    button.addEventListener('click', () => {
+      currentDate = new Date(date);
+      viewMode = 'day';
+      render();
+    });
+    strip.appendChild(button);
+  }
+  return strip;
+}
+
+function buildMobileAgendaCard(ev, dateKey) {
+  const p = palette(ev);
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'mobile-agenda-event ' + (ev.shared ? 'shared-event' : 'personal-event') + (ev.done ? ' done' : '');
+  card.style.setProperty('--mobile-event-bg', p.bg);
+  card.style.setProperty('--mobile-event-text', p.text);
+  card.setAttribute('aria-label', `Edit ${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}${ev.shared ? ', shared' : ''}`);
+  card.innerHTML = `<span class="mobile-event-time">${fmtFull(ev.start)}<small>${fmtDuration(ev.start, ev.end)}</small></span><span class="mobile-event-copy"><strong>${escHtml(ev.text)}</strong>${ev.shared ? '<em>shared</em>' : ''}${ev.location ? `<small>${escHtml(ev.location)}</small>` : ''}</span>`;
+  card.addEventListener('click', () => openModal({ dateKey, editEvId: ev.id }));
+  return card;
+}
+
+function buildMobileExternalCard(ev) {
+  const card = document.createElement('div');
+  card.className = 'mobile-agenda-external';
+  card.setAttribute('aria-label', ev.allDay ? 'Google Calendar busy all day' : `Google Calendar busy, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}`);
+  card.innerHTML = `<span>${ev.allDay ? 'all day' : fmtFull(ev.start)}</span><strong>Google Calendar busy</strong>`;
+  return card;
+}
+
+function renderMobileDayAgenda(content) {
+  content.innerHTML = '';
+  const dateKey = getDateKey(currentDate);
+  const events = getEventsForDate(dateKey, activeUser);
+  const externalEvents = typeof getGoogleCalendarEvents === 'function' ? getGoogleCalendarEvents(dateKey) : [];
+  const agenda = document.createElement('section');
+  agenda.className = 'mobile-agenda';
+  agenda.setAttribute('aria-label', `Agenda for ${currentDate.toLocaleDateString()}`);
+  agenda.appendChild(buildMobileDateStrip());
+
+  const heading = document.createElement('div');
+  heading.className = 'mobile-agenda-heading';
+  heading.innerHTML = `<div><span>${getDateKey(currentDate) === getDateKey(new Date()) ? 'today' : DAYS[currentDate.getDay()]}</span><h2>${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getDate()}</h2></div><button type="button" class="mobile-agenda-add" aria-label="Add event on ${currentDate.toLocaleDateString()}">+</button>`;
+  heading.querySelector('button').addEventListener('click', () => openModal({ dateKey }));
+  agenda.appendChild(heading);
+
+  const list = document.createElement('div');
+  list.className = 'mobile-agenda-list';
+  [...events, ...externalEvents].sort((a, b) => a.start - b.start).forEach(ev => {
+    list.appendChild(ev.external ? buildMobileExternalCard(ev) : buildMobileAgendaCard(ev, dateKey));
+  });
+  if (!list.children.length) {
+    list.innerHTML = '<div class="mobile-agenda-empty"><strong>nothing scheduled</strong><span>add something when you are ready</span></div>';
+  }
+  agenda.appendChild(list);
+  content.appendChild(agenda);
+}
+
+function renderMobileWeekAgenda(content) {
+  content.innerHTML = '';
+  const agenda = document.createElement('section');
+  agenda.className = 'mobile-week-agenda';
+  agenda.setAttribute('aria-label', 'Week agenda');
+  getWeekDates(currentDate).forEach(date => {
+    const dateKey = getDateKey(date);
+    const events = getEventsForDate(dateKey, activeUser);
+    const externalEvents = typeof getGoogleCalendarEvents === 'function' ? getGoogleCalendarEvents(dateKey) : [];
+    const section = document.createElement('section');
+    section.className = 'mobile-week-day' + (dateKey === getDateKey(new Date()) ? ' today' : '');
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'mobile-week-heading';
+    head.innerHTML = `<span>${DAYS[date.getDay()]}</span><strong>${MONTH_SHORT[date.getMonth()]} ${date.getDate()}</strong><em>${events.length + externalEvents.length || 'free'}</em>`;
+    head.setAttribute('aria-label', `Open ${DAY_NAMES_LONG[date.getDay()]}, ${date.toLocaleDateString()}`);
+    head.addEventListener('click', () => { currentDate = new Date(date); viewMode = 'day'; render(); });
+    section.appendChild(head);
+    const list = document.createElement('div');
+    list.className = 'mobile-week-events';
+    [...events, ...externalEvents].sort((a, b) => a.start - b.start).forEach(ev => list.appendChild(ev.external ? buildMobileExternalCard(ev) : buildMobileAgendaCard(ev, dateKey)));
+    if (!list.children.length) list.innerHTML = '<span class="mobile-week-free">free</span>';
+    section.appendChild(list);
+    agenda.appendChild(section);
+  });
+  content.appendChild(agenda);
 }
 
 function renderDayColumn(date) {
