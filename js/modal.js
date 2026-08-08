@@ -9,6 +9,10 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
 
   const startVal = isEdit ? editEv.start : startH;
   const endVal   = isEdit ? editEv.end   : Math.min(endH !== null ? endH : startH + 1, END_H);
+  // HTML time inputs wrap 24:00 to 00:00. Keep a separate state bit so an
+  // event dragged through midnight survives the editor as an end-of-day value.
+  let endsAtMidnight = endVal === END_H;
+  const endInputValue = endsAtMidnight ? '00:00' : decimalToTimeInput(endVal);
   const sharedVal = isEdit ? editEv.shared : sharedDefault;
   const metaHTML = isEdit && editEv.updatedAt
     ? `<div class="event-meta">last updated ${fmtRelativeTime(editEv.updatedAt)} by ${escHtml(editEv.updatedBy || activeUser)}</div>`
@@ -52,7 +56,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
       </div>
       <div class="field-row">
         <div class="field"><label>start</label><input type="time" id="m-start" value="${decimalToTimeInput(startVal)}" /></div>
-        <div class="field"><label>end</label><input type="time" id="m-end" value="${decimalToTimeInput(endVal)}" /></div>
+        <div class="field"><label>end</label><input type="time" id="m-end" value="${endInputValue}" /><span class="midnight-note" id="m-end-midnight" ${endsAtMidnight ? '' : 'hidden'}>ends at 12:00 am</span></div>
       </div>
       <div class="field">
         <label>date</label>
@@ -90,6 +94,13 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
   document.body.appendChild(bg);
   makeModalAccessible(bg, { initialFocusSelector: '#m-name' });
+
+  const endInput = document.getElementById('m-end');
+  const midnightNote = document.getElementById('m-end-midnight');
+  endInput.addEventListener('input', () => {
+    if (endInput.value !== '00:00') endsAtMidnight = false;
+    midnightNote.hidden = !endsAtMidnight;
+  });
 
   // ── Color picker ─────────────────────────────────────────────────────────────
   function loadCustomColors() {
@@ -212,8 +223,8 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   function updateConflict() {
     const dk = document.getElementById('m-date').value;
     const s = timeInputToDecimal(document.getElementById('m-start').value);
-    const enRaw = timeInputToDecimal(document.getElementById('m-end').value);
-    const en = enRaw > s ? enRaw : s + STEP_H;
+    const enRaw = timeInputToDecimal(endInput.value);
+    const en = endsAtMidnight ? END_H : (enRaw > s ? enRaw : s + STEP_H);
     const shared = document.getElementById('m-shared').checked;
     const res = detectConflicts({
       user: activeUser, dateKey: dk, start: s, end: en,
@@ -346,8 +357,8 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     if (!name) return;
 
     const s = timeInputToDecimal(document.getElementById('m-start').value);
-    const enRaw = timeInputToDecimal(document.getElementById('m-end').value);
-    const endTime = enRaw > s ? enRaw : s + STEP_H;
+    const enRaw = timeInputToDecimal(endInput.value);
+    const endTime = endsAtMidnight ? END_H : (enRaw > s ? enRaw : s + STEP_H);
     const dk = document.getElementById('m-date').value;
     const isShared = document.getElementById('m-shared').checked;
     const location = document.getElementById('m-location').value.trim() || null;
