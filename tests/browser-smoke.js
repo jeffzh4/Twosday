@@ -62,6 +62,24 @@ function server() {
   await page.waitForSelector('.month-view');
   await page.keyboard.press('d');
   await page.waitForSelector('.grid-wrap');
+
+  // Dragging to the end of the day must preserve midnight rather than falling
+  // back to the calendar's minimum 15-minute duration.
+  const dayBody = page.locator('.col-body');
+  await page.locator('#grid-wrap').evaluate(el => { el.scrollTop = el.scrollHeight; });
+  const bodyBox = await dayBody.boundingBox();
+  assert(bodyBox, 'day grid body should have a measurable position');
+  const dragX = bodyBox.x + bodyBox.width / 2;
+  const dragStartY = bodyBox.y + 22.5 * 60;
+  await page.mouse.move(dragX, dragStartY);
+  await page.mouse.down();
+  await page.mouse.move(dragX, bodyBox.y + bodyBox.height - 2, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForSelector('#m-end');
+  assert.strictEqual(await page.locator('#m-end').inputValue(), '00:00', 'dragging to midnight should display 12:00 AM');
+  assert.strictEqual(await page.locator('#m-end-midnight').isVisible(), true, 'midnight state should be explicit in the editor');
+  await page.locator('#m-cancel').click();
+
   await page.locator('.ev[data-id="seed"]').click();
   await page.waitForSelector('#m-name');
   await page.locator('#m-name').fill('edited smoke event');

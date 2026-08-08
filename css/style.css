@@ -893,6 +893,13 @@ html, body {
 .field input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
 .field select option { background: var(--surface2); color: var(--text); }
+.midnight-note {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 10px;
+  line-height: 1.2;
+}
 
 .field-row { display: flex; gap: 8px; }
 .field-row .field { flex: 1; }
