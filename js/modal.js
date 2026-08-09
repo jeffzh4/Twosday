@@ -14,11 +14,18 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   let endsAtMidnight = endVal === END_H;
   const endInputValue = endsAtMidnight ? '00:00' : decimalToTimeInput(endVal);
   const sharedVal = isEdit ? editEv.shared : sharedDefault;
+  const timeZone = isEdit ? normalizeTimeZone(editEv.timeZone) : getDeviceTimeZone();
+  const reminderMinutes = isEdit ? (editEv.reminderMinutes || 0) : 0;
   const metaHTML = isEdit && editEv.updatedAt
     ? `<div class="event-meta">last updated ${fmtRelativeTime(editEv.updatedAt)} by ${escHtml(editEv.updatedBy || activeUser)}</div>`
     : '';
   const mobileQuickActions = isEdit && typeof isMobileCalendarViewport === 'function' && isMobileCalendarViewport()
-    ? `<div class="mobile-event-quick-actions" aria-label="Event actions">
+    ? `<div class="mobile-event-reschedule" aria-label="Quick reschedule">
+        <button type="button" id="m-earlier">−15 min</button>
+        <button type="button" id="m-later">+15 min</button>
+        <button type="button" id="m-tomorrow">tomorrow</button>
+      </div>
+      <div class="mobile-event-quick-actions" aria-label="Event actions">
         <button type="button" id="m-repeat" title="Repeat event">repeat</button>
         <button type="button" id="m-share" title="Create share link">share</button>
         <button type="button" id="m-done">${editEv.done ? 'reopen' : 'complete'}</button>
@@ -62,6 +69,21 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         <label>date</label>
         <input type="date" id="m-date" value="${dateKey}" />
       </div>
+      <div class="field event-timezone">
+        <label>time zone</label>
+        <div class="event-timezone-value" title="Event time is stored as a local schedule in this zone">${escHtml(timeZoneSummary(timeZone))}</div>
+      </div>
+      <div class="field">
+        <label for="m-reminder">reminder</label>
+        <select id="m-reminder">
+          <option value="0"${reminderMinutes === 0 ? ' selected' : ''}>none</option>
+          <option value="5"${reminderMinutes === 5 ? ' selected' : ''}>5 minutes before</option>
+          <option value="15"${reminderMinutes === 15 ? ' selected' : ''}>15 minutes before</option>
+          <option value="30"${reminderMinutes === 30 ? ' selected' : ''}>30 minutes before</option>
+          <option value="60"${reminderMinutes === 60 ? ' selected' : ''}>1 hour before</option>
+        </select>
+        <span class="field-help">browser reminder while Twosday is open</span>
+      </div>
       <div class="field">
         <label>location</label>
         <input type="text" id="m-location" value="${isEdit && editEv.location ? escHtml(editEv.location) : ''}" placeholder="e.g. 123 Main St, Zoom link" />
@@ -100,6 +122,10 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   endInput.addEventListener('input', () => {
     if (endInput.value !== '00:00') endsAtMidnight = false;
     midnightNote.hidden = !endsAtMidnight;
+  });
+  const reminderInput = document.getElementById('m-reminder');
+  reminderInput.addEventListener('change', async () => {
+    if (Number(reminderInput.value) > 0) await requestReminderPermission();
   });
 
   // ── Color picker ─────────────────────────────────────────────────────────────
@@ -273,6 +299,31 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   document.getElementById('m-cancel').onclick = () => bg.remove();
 
   if (isEdit && document.getElementById('m-repeat')) {
+    const quickReschedule = direction => {
+      if (editEv.recurrenceId) {
+        showToast('edit repeating events from the full editor');
+        return;
+      }
+      const duration = editEv.end - editEv.start;
+      let targetDate = dateKey;
+      let start = editEv.start;
+      if (direction === 'earlier') start = Math.max(START_H, start - STEP_H);
+      if (direction === 'later') start = Math.min(END_H - duration, start + STEP_H);
+      if (direction === 'tomorrow') {
+        const next = parseDateKey(dateKey);
+        next.setDate(next.getDate() + 1);
+        targetDate = getDateKey(next);
+      }
+      if (targetDate === dateKey && start === editEv.start) return;
+      pushHistory();
+      applySingleEdit(
+        editEv.text, start, start + duration, targetDate, editEv.shared,
+        editEv.location, editEv.description, Number(reminderInput.value) || 0,
+      );
+    };
+    document.getElementById('m-earlier').onclick = () => quickReschedule('earlier');
+    document.getElementById('m-later').onclick = () => quickReschedule('later');
+    document.getElementById('m-tomorrow').onclick = () => quickReschedule('tomorrow');
     document.getElementById('m-repeat').onclick = () => {
       bg.remove();
       openRepeatModal(dateKey, editEv);
@@ -307,7 +358,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   // Single-event edit: date move, shared-toggle handling, field updates. Used for
   // non-recurring events and for the 'this event only' scope (which detaches the
   // instance from its series first, turning it into an exception).
-  function applySingleEdit(name, s, endTime, dk, isShared, location, description) {
+  function applySingleEdit(name, s, endTime, dk, isShared, location, description, nextReminderMinutes) {
     const oldDk = dateKey;
     const wasShared = editEv.shared;
     const oldSharedId = editEv.sharedId;
@@ -320,6 +371,8 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     editEv.color = selectedColor;
     editEv.location = location;
     editEv.description = description;
+    editEv.reminderMinutes = nextReminderMinutes;
+    editEv.timeZone = timeZone;
     markEventUpdated(editEv, activeUser);
 
     if (wasShared && !isShared) {
@@ -337,6 +390,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
       } else {
         syncSharedEvent(activeUser, oldSharedId, dk, 'edit', {
           text: name, start: s, end: endTime, color: selectedColor, location, description,
+          reminderMinutes: nextReminderMinutes, timeZone,
           updatedAt: editEv.updatedAt, updatedBy: editEv.updatedBy,
         });
       }
@@ -363,6 +417,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     const isShared = document.getElementById('m-shared').checked;
     const location = document.getElementById('m-location').value.trim() || null;
     const description = document.getElementById('m-description').value.trim() || null;
+    const nextReminderMinutes = Number(reminderInput.value) || 0;
 
     if (isEdit) {
       // Recurring instance → ask which occurrences the edit applies to.
@@ -374,11 +429,11 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
           if (scope === 'this') {
             editEv.recurrenceId = null;
             editEv.recurrence = null;
-            applySingleEdit(name, s, endTime, dk, isShared, location, description);
+            applySingleEdit(name, s, endTime, dk, isShared, location, description, nextReminderMinutes);
           } else {
             // Time/text/color propagate; per-instance date and sharedness are left as-is.
             editRecurringSeries(recurrenceId, activeUser, scope === 'future' ? dateKey : null,
-              { text: name, start: s, end: endTime, color: selectedColor, location, description });
+              { text: name, start: s, end: endTime, color: selectedColor, location, description, reminderMinutes: nextReminderMinutes, timeZone });
             currentDate = parseDateKey(dateKey);
             render();
           }
@@ -386,7 +441,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         return;
       }
       pushHistory();
-      applySingleEdit(name, s, endTime, dk, isShared, location, description);
+      applySingleEdit(name, s, endTime, dk, isShared, location, description, nextReminderMinutes);
       return;
     }
 
@@ -402,6 +457,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         id: uid(), text: name, start: s, end: endTime,
         done: false, shared: isShared, sharedId,
         color: selectedColor, location, description, recurrenceId, recurrence: rule,
+        timeZone, reminderMinutes: nextReminderMinutes,
       });
       markEventUpdated(newEv, activeUser);
       insertEvent(dKey, activeUser, newEv);

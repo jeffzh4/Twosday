@@ -9,7 +9,7 @@
 // Firestore, Firebase Auth, and Google Fonts are never touched here. They are
 // cross-origin and handled by the Firebase SDK's own offline layer.
 
-const CACHE_VERSION = 'twosday-v8';
+const CACHE_VERSION = 'twosday-v9';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 const SHELL_ASSETS = [
@@ -17,6 +17,7 @@ const SHELL_ASSETS = [
   '/index.html',
   '/privacy.html',
   '/share.html',
+  '/404.html',
   '/css/style.css',
   '/manifest.webmanifest',
   '/favicon.svg',
@@ -25,6 +26,7 @@ const SHELL_ASSETS = [
   '/assets/icons/icon-512.png',
   '/js/config.js',
   '/js/utils.js',
+  '/js/diagnostics.js',
   '/js/state.js',
   '/js/calendar-data.js',
   '/js/reconcile.js',
@@ -46,6 +48,7 @@ const SHELL_ASSETS = [
   '/js/views/month.js',
   '/js/views/year.js',
   '/js/notes.js',
+  '/js/reminders.js',
   '/js/settings.js',
   '/js/command-palette.js',
   '/js/share.js',

@@ -1,7 +1,22 @@
 // Progressive web app wiring: service worker registration for the offline
-// shell. (The header install button was removed — browsers still surface
-// their own install affordance in the address bar / share sheet, since the
-// manifest and service worker remain in place.)
+// shell. The mobile More sheet surfaces the browser-provided install action
+// when it is available; no custom install UI is shown otherwise.
+let deferredInstallPrompt = null;
+
+function canInstallTwosday() {
+  return !!deferredInstallPrompt;
+}
+
+async function promptTwosdayInstall() {
+  if (!deferredInstallPrompt) {
+    showToast('install Twosday from your browser menu');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  if (typeof renderMobileNavigation === 'function') renderMobileNavigation();
+}
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
@@ -21,5 +36,15 @@ function registerServiceWorker() {
 }
 
 function initPwa() {
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    if (typeof renderMobileNavigation === 'function') renderMobileNavigation();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    showToast('Twosday installed', 'info');
+    if (typeof renderMobileNavigation === 'function') renderMobileNavigation();
+  });
   registerServiceWorker();
 }

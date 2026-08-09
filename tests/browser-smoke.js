@@ -96,6 +96,7 @@ function server() {
   await page.waitForSelector('#s-google-calendar-connect');
   await page.keyboard.press('Escape');
   assert.strictEqual(await page.locator('.modal-bg').count(), 0, 'Escape must restore the normal app flow');
+  assert.strictEqual(await page.evaluate(() => document.activeElement.id), 'btn-settings', 'closing a dialog must restore keyboard focus to its trigger');
 
   // Empty schedules still retain their calendar affordances, and connection
   // changes must be visible without a full application redraw.
@@ -131,6 +132,7 @@ function server() {
   await mobile.waitForSelector('#m-name');
   if (captureDir) { await mobile.waitForTimeout(250); await mobile.screenshot({ path: path.join(captureDir, 'mobile-event-editor.png') }); }
   assert.strictEqual(await mobile.locator('.modal-bg > .modal').count(), 1, 'mobile event edit should use the standard editor');
+  assert.strictEqual(await mobile.locator('.mobile-event-reschedule button').count(), 3, 'mobile editor should retain fast rescheduling controls');
   assert.strictEqual(await mobile.locator('.mobile-event-quick-actions button').count(), 4, 'mobile editor should preserve repeat, share, completion, and delete actions');
   await mobile.locator('#m-cancel').click();
   await mobile.getByRole('button', { name: 'Week' }).click();
@@ -150,6 +152,9 @@ function server() {
   await mobile.waitForSelector('.month-view');
   if (captureDir) { await mobile.waitForTimeout(100); await mobile.screenshot({ path: path.join(captureDir, 'mobile-month.png') }); }
   assert.strictEqual(await mobile.locator('.month-cell').count() > 0, true, 'mobile month should retain the calendar scan view');
+  await mobile.emulateMedia({ reducedMotion: 'reduce' });
+  const reducedDuration = await mobile.locator('.mobile-nav-btn').first().evaluate(el => parseFloat(getComputedStyle(el).transitionDuration));
+  assert(reducedDuration <= 0.02, 'reduced-motion preference must suppress interface transitions');
   await mobile.close();
   assert.deepStrictEqual(pageErrors, [], `browser runtime errors: ${pageErrors.join('; ')}`);
 
