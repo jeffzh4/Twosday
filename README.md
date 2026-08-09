@@ -18,6 +18,7 @@ Twosday helps two people coordinate individual plans, shared events, conflicts, 
 | [Roadmap](docs/ROADMAP.md) | Prioritized next work, decision criteria, and explicit non-plans. |
 | [Known limitations](docs/KNOWN-LIMITATIONS.md) | Current product, operational, and public-readiness limits. |
 | [Security policy](SECURITY.md) | Security boundaries and vulnerability reporting. |
+| [Release checklist](docs/RELEASE-CHECKLIST.md) | Repeatable browser, accessibility, metadata, performance, and dashboard checks. |
 | [Changelog](CHANGELOG.md) | Repository milestones and release context. |
 
 ## Why It Stands Out
@@ -100,9 +101,9 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 npm test
 ```
 
-The suite combines Node-based core logic tests, calendar-store adapter tests, property-based invariant tests, UI regression guards, and Firebase Emulator authorization tests.
+The suite combines Node-based core logic tests, calendar-store adapter tests, property-based invariant tests, UI regression guards, Firebase Emulator authorization tests, and static production-quality guards for public documents, sharing metadata, security headers, credential patterns, and asset budgets.
 
-It also includes a Playwright browser smoke test that runs against mocked Firebase data, covering app startup, view navigation, keyboard interaction, event editing, and modal recovery without touching a real account. See [Google Calendar overlay setup](docs/GOOGLE-CALENDAR-OVERLAY.md) for the optional OAuth configuration.
+It also includes a Playwright browser smoke test that runs against mocked Firebase data, covering app startup, view navigation, keyboard interaction, event editing, empty schedules, offline/reconnect status, public pages, and the 404 page without touching a real account. See [Google Calendar overlay setup](docs/GOOGLE-CALENDAR-OVERLAY.md) for the optional OAuth configuration, and use the [release checklist](docs/RELEASE-CHECKLIST.md) for dashboard and real-client checks.
 
 - Core coverage: date helpers, shared-event mirroring, undo/redo, sync deduplication, analytics, import parsing, conflicts, profile rename, seeded demo data, recurrence expansion and series edits, and CRDT merge reconciliation
 - Property coverage (`fast-check`): event-duration invariants, and merge order-independence, idempotence, and no-duplicate-id guarantees across thousands of generated inputs

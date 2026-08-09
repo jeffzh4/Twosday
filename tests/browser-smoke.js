@@ -26,7 +26,12 @@ function server() {
   return http.createServer((req, res) => {
     const requested = req.url === '/' ? 'index.html' : decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
     const file = path.resolve(root, requested);
-    if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
+    if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      const missing = path.join(root, '404.html');
+      res.writeHead(404, { 'content-type': 'text/html' });
+      fs.createReadStream(missing).pipe(res);
+      return;
+    }
     const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
     res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' });
     fs.createReadStream(file).pipe(res);
@@ -42,8 +47,9 @@ function server() {
   const port = app.address().port;
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  const pageErrors = [];
   page.setDefaultTimeout(5000);
-  page.on('pageerror', error => console.error('page error:', error.message));
+  page.on('pageerror', error => pageErrors.push(error.message));
   await page.route('https://www.gstatic.com/firebasejs/**', route => route.fulfill({ contentType: 'application/javascript', body: firebaseMock }));
   await page.addInitScript(() => {
     localStorage.setItem('twosday_session_v1', JSON.stringify({ username: 'smoke', savedAt: Date.now() }));
@@ -91,6 +97,16 @@ function server() {
   await page.keyboard.press('Escape');
   assert.strictEqual(await page.locator('.modal-bg').count(), 0, 'Escape must restore the normal app flow');
 
+  // Empty schedules still retain their calendar affordances, and connection
+  // changes must be visible without a full application redraw.
+  await page.locator('#btn-next').click();
+  assert.strictEqual(await page.locator('.ev').count(), 0, 'an empty day must not render stale events');
+  assert.strictEqual(await page.locator('.col-body').count(), 1, 'an empty day must remain ready for event creation');
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await page.waitForFunction(() => document.getElementById('sync-status').textContent === 'offline');
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => document.getElementById('sync-status').textContent === 'synced');
+
   // Mobile has a purpose-built agenda instead of squeezing desktop's time grid.
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   await mobile.route('https://www.gstatic.com/firebasejs/**', route => route.fulfill({ contentType: 'application/javascript', body: firebaseMock }));
@@ -135,6 +151,22 @@ function server() {
   if (captureDir) { await mobile.waitForTimeout(100); await mobile.screenshot({ path: path.join(captureDir, 'mobile-month.png') }); }
   assert.strictEqual(await mobile.locator('.month-cell').count() > 0, true, 'mobile month should retain the calendar scan view');
   await mobile.close();
+  assert.deepStrictEqual(pageErrors, [], `browser runtime errors: ${pageErrors.join('; ')}`);
+
+  // Public static routes stay readable without an account or production data.
+  const publicPage = await browser.newPage();
+  const publicErrors = [];
+  publicPage.on('pageerror', error => publicErrors.push(error.message));
+  await publicPage.route('https://www.gstatic.com/firebasejs/**', route => route.fulfill({ contentType: 'application/javascript', body: firebaseMock }));
+  await publicPage.goto(`http://127.0.0.1:${port}/privacy.html`, { waitUntil: 'domcontentloaded' });
+  await publicPage.getByRole('heading', { name: 'Privacy Policy' }).waitFor();
+  await publicPage.goto(`http://127.0.0.1:${port}/share.html`, { waitUntil: 'domcontentloaded' });
+  await publicPage.getByText('this link is invalid.').waitFor();
+  const missing = await publicPage.goto(`http://127.0.0.1:${port}/not-a-real-page`, { waitUntil: 'domcontentloaded' });
+  assert.strictEqual(missing.status(), 404, 'unknown routes must return HTTP 404');
+  await publicPage.getByRole('heading', { name: 'That page is not available.' }).waitFor();
+  assert.deepStrictEqual(publicErrors, [], `public route runtime errors: ${publicErrors.join('; ')}`);
+  await publicPage.close();
   console.log('browser smoke tests passed');
   } finally {
     if (browser) await browser.close();
