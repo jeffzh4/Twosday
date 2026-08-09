@@ -170,6 +170,24 @@ function renderMobileDayAgenda(content) {
     list.innerHTML = '<div class="mobile-agenda-empty"><strong>nothing scheduled</strong><span>add something when you are ready</span></div>';
   }
   agenda.appendChild(list);
+  let touchStart = null;
+  agenda.addEventListener('touchstart', event => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchStart = { x: touch.clientX, y: touch.clientY, interactive: !!event.target.closest('button, input, select, textarea') };
+  }, { passive: true });
+  agenda.addEventListener('touchend', event => {
+    if (!touchStart || touchStart.interactive || !event.changedTouches.length) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - touchStart.x;
+    const dy = touch.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+    const next = new Date(currentDate);
+    next.setDate(next.getDate() + (dx < 0 ? 1 : -1));
+    currentDate = next;
+    render();
+  }, { passive: true });
   content.appendChild(agenda);
 }
 

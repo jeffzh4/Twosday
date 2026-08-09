@@ -49,6 +49,8 @@ function openMobileMoreSheet() {
         <button type="button" data-mobile-action="theme"><span aria-hidden="true">&#9790;</span>theme</button>
         <button type="button" data-mobile-action="undo" ${appHistory.undo.length ? '' : 'disabled'}><span aria-hidden="true">&#8630;</span>undo</button>
         <button type="button" data-mobile-action="redo" ${appHistory.redo.length ? '' : 'disabled'}><span aria-hidden="true">&#8631;</span>redo</button>
+        <button type="button" data-mobile-action="install"><span aria-hidden="true">&#8681;</span>${typeof canInstallTwosday === 'function' && canInstallTwosday() ? 'install app' : 'install help'}</button>
+        <button type="button" data-mobile-action="sync"><span aria-hidden="true">&#8635;</span>${navigator.onLine === false ? 'offline' : 'sync status'}</button>
         <button type="button" data-mobile-action="settings"><span aria-hidden="true">&#9881;</span>settings</button>
         <button type="button" data-mobile-action="logout"><span aria-hidden="true">&#8594;</span>log out</button>
       </div>
@@ -75,6 +77,8 @@ function openMobileMoreSheet() {
         applyTheme();
         render();
       }
+      if (action === 'install') promptTwosdayInstall();
+      if (action === 'sync') showToast(navigator.onLine === false ? 'offline changes stay on this device until reconnect' : 'calendar is connected', 'info');
       if (action === 'settings') openSettingsModal();
       if (action === 'logout') logout();
     });

@@ -1,6 +1,6 @@
 # Twosday
 
-**A real-time shared calendar for two people, built with vanilla JavaScript and Firebase.**
+**A calm coordination calendar for two people, built with vanilla JavaScript and Firebase.**
 
 Twosday helps two people coordinate individual plans, shared events, conflicts, and open time without turning a personal calendar into a cluttered group workspace.
 
@@ -19,6 +19,9 @@ Twosday helps two people coordinate individual plans, shared events, conflicts, 
 | [Known limitations](docs/KNOWN-LIMITATIONS.md) | Current product, operational, and public-readiness limits. |
 | [Security policy](SECURITY.md) | Security boundaries and vulnerability reporting. |
 | [Release checklist](docs/RELEASE-CHECKLIST.md) | Repeatable browser, accessibility, metadata, performance, and dashboard checks. |
+| [Test strategy](docs/TEST-STRATEGY.md) | Layered regression coverage and production-safe verification. |
+| [Quality baseline](docs/QUALITY-BASELINE.md) | Reproducible local Lighthouse baseline and next audit steps. |
+| [Threat model](docs/THREAT-MODEL.md) | Assets, trust boundaries, controls, and present limits. |
 | [Changelog](CHANGELOG.md) | Repository milestones and release context. |
 
 ## Why It Stands Out
@@ -48,6 +51,7 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 - Shared events mirrored automatically between profiles
 - True recurring events with this / this-and-following / all-occurrences edit and delete
 - Drag, resize, duplicate, repeat, complete, undo, and redo event workflows
+- Source time-zone provenance on new events, plus optional browser-open reminders
 - Command palette (`⌘K`) over every action, with type-to-jump dates
 - Append-only change history recording who changed what and when, shared across both profiles
 - Live presence showing who is viewing and their current calendar context
@@ -72,6 +76,7 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 - Real-time Firestore synchronization with self-echo suppression
 - A tested calendar-store seam coordinating `localStorage` caching, Firestore writes, duplicate-write suppression, and bounded reconciliation retries
 - Keyboard-operable calendar controls, focus-managed dialogs, visible focus states, and reduced-motion support
+- Privacy-safe browser diagnostics, release indicator, and a production response audit that never reads calendar data
 
 ## Technical Design
 
@@ -100,6 +105,8 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 ```bash
 npm test
 ```
+
+After a deployment settles, run `npm run audit:production` to verify public status codes, headers, metadata, privacy page, and custom 404 behavior without signing in.
 
 The suite combines Node-based core logic tests, calendar-store adapter tests, property-based invariant tests, UI regression guards, Firebase Emulator authorization tests, and static production-quality guards for public documents, sharing metadata, security headers, credential patterns, and asset budgets.
 

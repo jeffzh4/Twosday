@@ -9,6 +9,9 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="alternate icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <meta name="theme-color" content="#121016">
 
   <meta property="og:type" content="website">
@@ -49,7 +52,7 @@
       <button class="auth-tab" id="signup-tab" data-tab="signup" role="tab" aria-controls="signup-form" aria-selected="false" tabindex="-1">sign up</button>
     </div>
 
-    <form class="auth-form" id="login-form" role="tabpanel" aria-labelledby="login-tab" autocomplete="on">
+    <form class="auth-form" id="login-form" aria-labelledby="login-tab" autocomplete="on">
       <label class="sr-only" for="login-username">username</label>
       <input type="text" id="login-username" placeholder="username" autocomplete="username" />
       <label class="sr-only" for="login-password">password</label>
@@ -68,7 +71,7 @@
       </button>
     </form>
 
-    <form class="auth-form hidden" id="signup-form" role="tabpanel" aria-labelledby="signup-tab" autocomplete="off" hidden>
+    <form class="auth-form hidden" id="signup-form" aria-labelledby="signup-tab" autocomplete="off" hidden>
       <label class="sr-only" for="signup-username">choose a username</label>
       <input type="text" id="signup-username" placeholder="choose a username" autocomplete="username" />
       <label class="sr-only" for="signup-password">choose a password</label>
@@ -171,6 +174,7 @@
 <!-- App scripts — order matters (global scope, no bundler) -->
 <script src="js/config.js?v=20260728-app-check"></script>
 <script src="js/utils.js?v=20260727-write-seam"></script>
+<script src="js/diagnostics.js?v=20260809-quality"></script>
 <script src="js/state.js?v=20260727-write-seam"></script>
 <script src="js/calendar-data.js?v=20260727-write-seam"></script>
 <script src="js/reconcile.js?v=20260727-write-seam"></script>
@@ -192,6 +196,7 @@
 <script src="js/views/month.js?v=20260727-write-seam"></script>
 <script src="js/views/year.js?v=20260727-write-seam"></script>
 <script src="js/notes.js?v=20260727-write-seam"></script>
+<script src="js/reminders.js?v=20260809-quality"></script>
 <script src="js/settings.js?v=20260727-write-seam"></script>
 <script src="js/command-palette.js?v=20260727-write-seam"></script>
 <script src="js/share.js?v=20260727-write-seam"></script>

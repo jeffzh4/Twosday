@@ -55,6 +55,11 @@ function normalizeEvent(raw) {
     description: typeof raw.description === 'string' ? raw.description : null,
     recurrenceId: raw.recurrenceId || null,
     recurrence: raw.recurrence && typeof raw.recurrence === 'object' ? raw.recurrence : null,
+    // Existing events keep their local schedule. New metadata records source
+    // IANA zone so a later travel/DST model never needs to guess provenance.
+    timeZone: normalizeTimeZone(raw.timeZone),
+    reminderMinutes: Number.isInteger(raw.reminderMinutes) && raw.reminderMinutes > 0 && raw.reminderMinutes <= 1440
+      ? raw.reminderMinutes : 0,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : null,
     updatedBy: typeof raw.updatedBy === 'string' ? raw.updatedBy : null,
   };

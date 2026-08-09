@@ -100,6 +100,15 @@ run('date helpers use local calendar keys', () => {
   assert.strictEqual(exec(`getWeekDates(new Date(2026, 5, 17))[0].getDay()`), 0);
 });
 
+run('event normalization keeps safe time-zone provenance and reminder bounds', () => {
+  const normalized = plain(exec(`normalizeEvent({ id:'tz', text:'flight', start:9, end:10, timeZone:'America/Los_Angeles', reminderMinutes:15 })`));
+  assert.strictEqual(normalized.timeZone, 'America/Los_Angeles');
+  assert.strictEqual(normalized.reminderMinutes, 15);
+  const invalid = plain(exec(`normalizeEvent({ id:'bad-tz', text:'event', start:9, end:10, timeZone:'not/a-zone', reminderMinutes:1441 })`));
+  assert.strictEqual(typeof invalid.timeZone, 'string');
+  assert.strictEqual(invalid.reminderMinutes, 0);
+});
+
 run('free-window detection de-dupes shared mirrors', () => {
   exec(`
     Object.keys(allData).forEach(k => delete allData[k]);
