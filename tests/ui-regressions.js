@@ -8,6 +8,11 @@ const state = fs.readFileSync('js/state.js', 'utf8');
 const serviceWorker = fs.readFileSync('sw.js', 'utf8');
 const index = fs.readFileSync('index.html', 'utf8');
 const googleCalendar = fs.readFileSync('js/google-calendar.js', 'utf8');
+const mobile = fs.readFileSync('js/mobile.js', 'utf8');
+const reminders = fs.readFileSync('js/reminders.js', 'utf8');
+const diagnostics = fs.readFileSync('js/diagnostics.js', 'utf8');
+const modal = fs.readFileSync('js/modal.js', 'utf8');
+const audit = fs.readFileSync('js/audit.js', 'utf8');
 
 const onDragEnd = events.slice(events.indexOf('function onDragEnd()'), events.indexOf('\n}', events.indexOf('function onDragEnd()')) + 2);
 if (!/if \(didMove\) render\(\)/.test(onDragEnd)) {
@@ -57,6 +62,22 @@ if (!/external: true/.test(googleCalendar) || /summary/.test(googleCalendar.slic
 }
 if (!/external-event/.test(dayWeek) || !/event\.stopPropagation\(\)/.test(dayWeek.slice(dayWeek.indexOf('function buildExternalEventEl'), dayWeek.indexOf('function buildEventEl')))) {
   throw new Error('Google Calendar immutability regression: external blocks must not enter event editing flows');
+}
+
+if (!/touchstart/.test(dayWeek) || !/touchend/.test(dayWeek) || !/Math\.abs\(dx\) < 72/.test(dayWeek)) {
+  throw new Error('mobile navigation regression: day agenda must retain guarded swipe navigation');
+}
+if (!/mobile-event-reschedule/.test(modal) || !/quickReschedule/.test(modal)) {
+  throw new Error('mobile reschedule regression: event editor must retain fast rescheduling actions');
+}
+if (!/Notification\.permission/.test(reminders) || !/event\.reminderMinutes/.test(reminders)) {
+  throw new Error('reminder regression: browser-open reminders must remain opt-in and event-scoped');
+}
+if (/JSON\.stringify\(allData\)|currentAccount|location\.search|error\.stack/.test(diagnostics)) {
+  throw new Error('diagnostics privacy regression: browser diagnostics must not collect calendar data, account data, query strings, or stacks');
+}
+if (!/undo latest local change/.test(audit)) {
+  throw new Error('recovery regression: change history must expose the latest local undo action');
 }
 
 console.log('ui regression guards passed');

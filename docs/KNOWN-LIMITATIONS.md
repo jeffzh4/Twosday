@@ -10,9 +10,9 @@ Twosday is an actively used private shared calendar and a portfolio project. Thi
 
 ## Calendar Behavior
 
-- Events use local date keys and decimal local hours. Time zones and travel-aware event semantics are not implemented.
+- Events use local date keys and decimal local hours. New events record their source IANA time zone, but travel-aware conversion and daylight-saving rescheduling are not implemented yet.
 - Google Calendar overlay is read-only busy time. It requires manual OAuth setup, does not write to Google, and intentionally hides external titles and details.
-- Reminders and push notifications are not implemented.
+- Optional browser reminders work only while Twosday is open. Background or push delivery is not implemented.
 - The product is scoped to two profiles; it is not designed for teams or group scheduling.
 
 ## Reliability and Operations

@@ -41,7 +41,7 @@ The current product is built for a pair who already coordinate their lives and w
 
 ## Non-Goals
 
-Twosday does not currently aim to be a team calendar, task manager, chat application, or full Google Calendar replacement. It also does not yet support account-to-account invitations, granular event permissions, push reminders, or time-zone-aware scheduling. Those are deliberate future decisions, not hidden promises.
+Twosday does not currently aim to be a team calendar, task manager, chat application, or full Google Calendar replacement. It also does not yet support account-to-account invitations, granular event permissions, background push reminders, or travel-aware time-zone conversion. Those are deliberate future decisions, not hidden promises.
 
 ## How Product Quality Is Judged
 

@@ -55,6 +55,7 @@ function openAuditModal() {
           <span class="audit-time" title="${new Date(entry.ts).toLocaleString()}">${escHtml(fmtRelativeTime(entry.ts))}</span>
         </li>`).join('')
     : '<li class="audit-empty">no changes recorded yet</li>';
+  const canUndo = Boolean(appHistory?.undo?.length);
 
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
@@ -64,7 +65,8 @@ function openAuditModal() {
         <h3>change history</h3>
         <button class="settings-close-btn" id="audit-close" aria-label="Close history">&times;</button>
       </div>
-      <p class="audit-copy">an append-only record of every calendar change, shared across both profiles.</p>
+      <p class="audit-copy">an append-only record of every calendar change, shared across both profiles. Undo restores the latest change in this browser session; sync keeps the durable record.</p>
+      <button class="settings-action-btn audit-recovery-btn" id="audit-undo" ${canUndo ? '' : 'disabled'}>undo latest local change</button>
       <ul class="audit-list">${rows}</ul>
     </div>
   `;
@@ -72,4 +74,8 @@ function openAuditModal() {
   makeModalAccessible(bg, { initialFocusSelector: '#audit-close' });
   bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
   document.getElementById('audit-close').onclick = () => bg.remove();
+  document.getElementById('audit-undo').onclick = () => {
+    undoAction();
+    bg.remove();
+  };
 }

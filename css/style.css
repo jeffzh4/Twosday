@@ -854,6 +854,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
 }
 
 .modal h3 {
@@ -899,6 +901,24 @@ html, body {
   color: var(--accent);
   font-size: 10px;
   line-height: 1.2;
+}
+.field-help,
+.event-timezone-value {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.event-timezone-value {
+  margin-top: 0;
+  padding: 7px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11px;
 }
 
 .field-row { display: flex; gap: 8px; }
@@ -3252,6 +3272,7 @@ body::after {
 .audit-modal { width: 460px; max-width: calc(100vw - 32px); }
 .audit-header { display: flex; align-items: center; justify-content: space-between; }
 .audit-copy { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.audit-recovery-btn { margin-top: 12px; }
 .audit-list {
   list-style: none;
   margin: 4px 0 0;
@@ -3632,7 +3653,7 @@ body::after {
   .mobile-agenda::-webkit-scrollbar,
   .mobile-week-agenda::-webkit-scrollbar { display: none; }
 
-  .mobile-agenda { flex-direction: column; gap: 12px; padding: 3px 1px 10px; }
+  .mobile-agenda { flex-direction: column; gap: 12px; padding: 3px 1px 10px; touch-action: pan-y; }
   .mobile-date-strip {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -3774,6 +3795,9 @@ body::after {
   .modal-bg:not(.mobile-more-sheet) > .modal::before { content: ''; display: block; width: 36px; height: 4px; margin: -7px auto 4px; border-radius: 99px; background: var(--border-hover); }
   .modal-bg:not(.mobile-more-sheet) .modal-btns { position: sticky; bottom: -18px; margin: 0 -16px -18px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 90%, transparent); }
   .mobile-event-quick-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .mobile-event-reschedule { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .mobile-event-reschedule button { min-height: 36px; border: 0.5px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: var(--radius-sm); background: var(--accent-dim); color: var(--accent); font-family: var(--font); font-size: 10px; cursor: pointer; }
+  .mobile-event-reschedule button:active { transform: translateY(1px); }
   .mobile-event-quick-actions button { min-height: 34px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text-muted); font-family: var(--font); font-size: 10px; cursor: pointer; }
   .mobile-event-quick-actions button:not(.danger):hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
   .mobile-event-quick-actions .danger { color: #f87171; }

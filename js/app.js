@@ -126,6 +126,7 @@ function render() {
 
   if (typeof renderPresence === 'function') renderPresence();
   if (typeof queuePresenceUpdate === 'function') queuePresenceUpdate();
+  if (typeof scheduleEventReminders === 'function') scheduleEventReminders();
   saveToLocalStorage();
   if (typeof refreshGoogleCalendarOverlay === 'function') refreshGoogleCalendarOverlay();
 }
@@ -206,6 +207,7 @@ function wireKeyboardShortcuts() {
 function bootApp() {
   renderUserPill();
   if (typeof initPwa === 'function') initPwa();
+  if (typeof initDiagnostics === 'function') initDiagnostics();
   wireAppShell();
   wireKeyboardShortcuts();
 

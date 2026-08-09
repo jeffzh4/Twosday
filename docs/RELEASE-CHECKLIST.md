@@ -26,6 +26,10 @@ These controls cannot be verified from repository code. Review them in their pro
 3. Firebase App Check: verify current token coverage before changing enforcement. Follow [Security Operations](SECURITY-OPERATIONS.md#firebase-app-check-rollout).
 4. Google Cloud: OAuth authorized JavaScript origins and redirect settings match the deployed Google Calendar overlay configuration.
 
+## Public response audit
+
+After a production deployment settles, run `npm run audit:production`. It checks public response status, required security headers, sharing metadata, privacy-page availability, and custom 404 behavior without signing in or accessing calendar data.
+
 ## Evidence
 
 Use a short release note for meaningful changes: date, commit, checks run, dashboard controls reviewed, and any known limitation. Never include calendar contents, credentials, full tokens, or personal screenshots in that record.

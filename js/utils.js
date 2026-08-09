@@ -212,6 +212,33 @@ function fmtDuration(start, end) {
   return m === 0 ? h + 'h' : h + 'h ' + m + 'm';
 }
 
+function getDeviceTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'local'; }
+  catch (e) { return 'local'; }
+}
+
+function normalizeTimeZone(value) {
+  if (typeof value !== 'string' || !value || value.length > 100) return getDeviceTimeZone();
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: value }).format();
+    return value;
+  } catch (e) {
+    return getDeviceTimeZone();
+  }
+}
+
+function timeZoneSummary(timeZone) {
+  const zone = normalizeTimeZone(timeZone);
+  try {
+    const label = new Intl.DateTimeFormat(undefined, { timeZone: zone, timeZoneName: 'short' })
+      .formatToParts(new Date())
+      .find(part => part.type === 'timeZoneName');
+    return label ? `${zone} (${label.value})` : zone;
+  } catch (e) {
+    return zone;
+  }
+}
+
 function fmtRelativeTime(ts) {
   if (!ts) return 'never';
   const diff = Math.max(0, Date.now() - ts);

@@ -236,6 +236,12 @@ function openSettingsModal() {
         <div class="google-calendar-picker" id="s-google-calendar-picker"></div>
       </div>
 
+      <div class="settings-section">
+        <div class="settings-section-title">system status</div>
+        <div class="settings-msg">release ${escHtml(TWOSDAY_RELEASE)} · browser diagnostics exclude calendar content, account identifiers, URLs with query strings, and stack traces.</div>
+        <button class="mbtn" id="s-copy-diagnostics" type="button">copy diagnostics</button>
+      </div>
+
       <!-- ── Profile names + emoji ── -->
       <div class="settings-section">
         <div class="settings-section-title">profile names</div>
@@ -370,6 +376,7 @@ function openSettingsModal() {
     openAnalyticsModal();
   };
   if (typeof setupGoogleCalendarSettings === 'function') setupGoogleCalendarSettings();
+  document.getElementById('s-copy-diagnostics').onclick = () => copyDiagnostics();
   // ── Connect Google ────────────────────────────────────────────────────────
   const connectGoogleBtn = document.getElementById('s-connect-google');
   if (connectGoogleBtn) {
