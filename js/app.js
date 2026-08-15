@@ -242,7 +242,7 @@ function bootApp() {
     }
   }).catch(e => {
     if (syncBar) syncBar.style.display = 'none';
-    console.warn('Initial Firestore load failed:', e);
+    reportOperationalIssue('initial-firestore-load', e);
   });
 
   NOTES_DOC.get().then(snap => {

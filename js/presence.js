@@ -59,7 +59,7 @@ function publishPresence(force = false) {
       accountId: currentAccount.username,
       ownerUid: currentAccount.ownerUid,
       savedAt: session.updatedAt,
-    }, { merge: true }).catch(e => console.warn('Presence update failed:', e));
+    }, { merge: true }).catch(e => reportOperationalIssue('presence-update', e));
   });
 }
 
@@ -180,7 +180,7 @@ function startPresence() {
       presenceSessions = data.sessions || {};
       renderPresence();
       renderUserSwitcher();
-    }, err => console.warn('Presence listener error:', err));
+    }, err => reportOperationalIssue('presence-listener', err));
   } else {
     _presenceUnsub = () => {};
   }

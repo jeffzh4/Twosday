@@ -13,6 +13,9 @@ const reminders = fs.readFileSync('js/reminders.js', 'utf8');
 const diagnostics = fs.readFileSync('js/diagnostics.js', 'utf8');
 const modal = fs.readFileSync('js/modal.js', 'utf8');
 const audit = fs.readFileSync('js/audit.js', 'utf8');
+const auth = fs.readFileSync('js/auth.js', 'utf8');
+const vercel = fs.readFileSync('vercel.json', 'utf8');
+const browserSources = fs.readdirSync('js').filter(file => file.endsWith('.js')).map(file => fs.readFileSync(`js/${file}`, 'utf8')).join('\n');
 
 const onDragEnd = events.slice(events.indexOf('function onDragEnd()'), events.indexOf('\n}', events.indexOf('function onDragEnd()')) + 2);
 if (!/if \(didMove\) render\(\)/.test(onDragEnd)) {
@@ -73,8 +76,23 @@ if (!/mobile-event-reschedule/.test(modal) || !/quickReschedule/.test(modal)) {
 if (!/Notification\.permission/.test(reminders) || !/event\.reminderMinutes/.test(reminders)) {
   throw new Error('reminder regression: browser-open reminders must remain opt-in and event-scoped');
 }
-if (/JSON\.stringify\(allData\)|currentAccount|location\.search|error\.stack/.test(diagnostics)) {
-  throw new Error('diagnostics privacy regression: browser diagnostics must not collect calendar data, account data, query strings, or stacks');
+if (/JSON\.stringify\(allData\)|currentAccount|location\.search|error\.stack|error\.message/.test(diagnostics)) {
+  throw new Error('diagnostics privacy regression: browser diagnostics must not collect calendar data, account data, query strings, stacks, or provider messages');
+}
+if (!/AUTH_IDLE_TIMEOUT_MS = 30 \* 60 \* 1000/.test(auth) || !/startIdleSessionGuard/.test(auth) || !/sessionIsIdleExpired/.test(auth)) {
+  throw new Error('session regression: authenticated sessions must retain the idle-expiry guard');
+}
+if (!/requireSignupAttestation/.test(auth) || !/firebase\.appCheck\(\)\.getToken\(false\)/.test(auth)) {
+  throw new Error('signup protection regression: production signup must require an App Check token');
+}
+if (!/if \(!e\.isTrusted\) return;/.test(auth)) {
+  throw new Error('auth interaction regression: login and signup handlers must reject synthetic submissions');
+}
+if (!/form-action 'self'/.test(vercel) || !/frame-ancestors 'none'/.test(vercel) || /<form[^>]+action=/.test(index)) {
+  throw new Error('CSRF posture regression: forms must remain same-origin and no cookie-authenticated form endpoint may be introduced');
+}
+if (/console\.warn\([^)]*,\s*(?:err|error|e)\b/.test(browserSources) || /(?:setError|setMsg)\([^\n]*\.(?:message|stack)\b/.test(browserSources)) {
+  throw new Error('logging regression: browser logs and user-facing errors must not expose raw provider details');
 }
 if (!/undo latest local change/.test(audit)) {
   throw new Error('recovery regression: change history must expose the latest local undo action');

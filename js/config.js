@@ -41,7 +41,8 @@ const db = firebase.firestore();
 // Multi-tab mode keeps one browser's tabs from competing over its persistence lock.
 db.enablePersistence({ synchronizeTabs: true }).catch(err => {
   if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
-    console.warn('Firestore offline persistence unavailable:', err);
+    if (typeof reportOperationalIssue === 'function') reportOperationalIssue('offline-persistence', err);
+    else console.warn('Twosday: offline persistence unavailable.');
   }
 });
 
