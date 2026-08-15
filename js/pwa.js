@@ -25,7 +25,7 @@ function registerServiceWorker() {
 
   const register = () => {
     navigator.serviceWorker.register('/sw.js').catch(err => {
-      console.warn('Service worker registration failed:', err);
+      reportOperationalIssue('service-worker-registration', err);
     });
   };
 

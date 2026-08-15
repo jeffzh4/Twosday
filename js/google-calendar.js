@@ -84,7 +84,7 @@ async function connectGoogleCalendar(interactive = true) {
   } catch (error) {
     googleCalendarToken = null;
     updateGoogleCalendarStatus(interactive ? 'error' : 'disconnected', interactive
-      ? `Google Calendar connection failed: ${error.message}`
+      ? 'Google Calendar connection failed. Please reconnect.'
       : 'Google Calendar needs reconnecting');
     return false;
   }
@@ -205,7 +205,7 @@ async function refreshGoogleCalendarOverlay(force = false) {
     googleCalendarEvents = next;
     if (typeof render === 'function') render();
   } catch (error) {
-    console.warn('Google Calendar overlay refresh failed:', error);
+    reportOperationalIssue('google-overlay-refresh', error);
   }
 }
 
@@ -228,7 +228,7 @@ function renderGoogleCalendarPicker() {
     ? googleCalendarList.map(calendar => `<label class="google-calendar-choice"><input type="checkbox" name="google-calendar-id" value="${escHtml(calendar.id)}" ${selected.has(calendar.id) ? 'checked' : ''}><span>${escHtml(calendar.summary)}${calendar.primary ? ' (primary)' : ''}</span></label>`).join('') + '<button class="mbtn mbtn-save" type="button" id="s-google-calendar-save">save selected calendars</button>'
     : '';
   const saveButton = document.getElementById('s-google-calendar-save');
-  if (saveButton) saveButton.onclick = () => saveGoogleCalendarSelection().catch(error => updateGoogleCalendarStatus('error', error.message));
+  if (saveButton) saveButton.onclick = () => saveGoogleCalendarSelection().catch(() => updateGoogleCalendarStatus('error', 'could not save calendar selection'));
 }
 
 function setupGoogleCalendarSettings() {

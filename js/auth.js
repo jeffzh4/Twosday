@@ -7,10 +7,16 @@
 
 const ACCOUNTS_CACHE_KEY = 'twosday_accounts_v1';
 const SESSION_KEY = 'twosday_session_v1';
+const AUTH_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const AUTH_ACTIVITY_WRITE_MS = 15 * 1000;
+const AUTH_EXPIRED_NOTICE_KEY = 'twosday_auth_expired_notice_v1';
 const ACCOUNT_COLLECTION = () => db.collection('accounts');
 const ACCOUNT_DOC = username => ACCOUNT_COLLECTION().doc(username);
 let currentAccount = null;
 let authRequestActive = false;
+let idleSessionTimer = null;
+let idleSessionListening = false;
+let lastSessionActivityWrite = 0;
 
 function syntheticEmail(username) {
   return `${username.toLowerCase()}@twosday.local`;
@@ -75,7 +81,7 @@ async function loadAccountRecord(username, allowCache = true) {
       return account;
     }
   } catch (e) {
-    console.warn('Failed to load account metadata:', e);
+    reportOperationalIssue('account-metadata-load', e);
   }
   return allowCache ? (getCachedAccounts()[username] || null) : null;
 }
@@ -142,6 +148,7 @@ async function prepareAccount(username, account) {
     claimDataDocument(NOTES_DOC, 'notes'),
     claimDataDocument(PRESENCE_DOC, 'sessions'),
   ]);
+  startIdleSessionGuard();
 }
 
 async function handleGoogleSignIn(formId = 'login') {
@@ -165,14 +172,16 @@ async function handleGoogleSignIn(formId = 'login') {
     hideAuth();
     bootApp();
   } catch (err) {
+    reportOperationalIssue('google-sign-in', err);
     if (err.code === 'auth/popup-closed-by-user') { finishAuthRequest(false, false); setError(formId, ''); return; }
     finishAuthRequest(false);
-    setError(formId, 'Google sign-in failed: ' + err.message);
+    setError(formId, 'Google sign-in failed. Please try again.');
   }
 }
 
 function saveSession(username) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username, savedAt: Date.now() }));
+  const now = Date.now();
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ username, savedAt: now, lastActiveAt: now }));
 }
 
 function getSession() {
@@ -180,7 +189,59 @@ function getSession() {
   catch (e) { return null; }
 }
 
+function stopIdleSessionGuard() {
+  if (idleSessionTimer) clearTimeout(idleSessionTimer);
+  idleSessionTimer = null;
+}
+
+function sessionIsIdleExpired(session, now = Date.now()) {
+  const lastActiveAt = Number(session && (session.lastActiveAt || session.savedAt));
+  return !Number.isFinite(lastActiveAt) || now - lastActiveAt >= AUTH_IDLE_TIMEOUT_MS;
+}
+
+function scheduleIdleSessionExpiry() {
+  stopIdleSessionGuard();
+  const session = getSession();
+  if (!session || sessionIsIdleExpired(session)) return expireIdleSession();
+  const lastActiveAt = Number(session.lastActiveAt || session.savedAt);
+  idleSessionTimer = setTimeout(expireIdleSession, Math.max(0, AUTH_IDLE_TIMEOUT_MS - (Date.now() - lastActiveAt)) + 50);
+}
+
+function noteSessionActivity() {
+  const session = getSession();
+  if (!session || !currentAccount) return;
+  const now = Date.now();
+  if (now - lastSessionActivityWrite < AUTH_ACTIVITY_WRITE_MS) return;
+  lastSessionActivityWrite = now;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, lastActiveAt: now }));
+  scheduleIdleSessionExpiry();
+}
+
+function expireIdleSession() {
+  stopIdleSessionGuard();
+  localStorage.removeItem(SESSION_KEY);
+  try { sessionStorage.setItem(AUTH_EXPIRED_NOTICE_KEY, '1'); } catch (e) {}
+  Promise.resolve(firebase.auth().signOut()).finally(() => location.reload());
+}
+
+function startIdleSessionGuard() {
+  if (!idleSessionListening) {
+    const activityEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+    activityEvents.forEach(type => document.addEventListener(type, noteSessionActivity, { passive: true, capture: true }));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      const session = getSession();
+      if (sessionIsIdleExpired(session)) expireIdleSession();
+      else noteSessionActivity();
+    });
+    idleSessionListening = true;
+  }
+  noteSessionActivity();
+  scheduleIdleSessionExpiry();
+}
+
 function logout() {
+  stopIdleSessionGuard();
   localStorage.removeItem(SESSION_KEY);
   try { firebase.auth().signOut(); } catch (e) {}
   location.reload();
@@ -210,6 +271,13 @@ function beginAuthRequest(formId) {
   }
   authRequestActive = true;
   return true;
+}
+
+async function requireSignupAttestation() {
+  if (!TWOSDAY_PRODUCTION_HOSTS.has(location.hostname)) return;
+  if (!firebase.appCheck) throw new Error('signup protection is unavailable');
+  const result = await firebase.appCheck().getToken(false);
+  if (!result || !result.token) throw new Error('signup protection could not verify this browser');
 }
 
 function finishAuthRequest(succeeded, countFailure = true) {
@@ -252,6 +320,7 @@ function setupAuthListeners() {
 
   document.getElementById('login-form').onsubmit = async e => {
     e.preventDefault();
+    if (!e.isTrusted) return;
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
     if (!username || !password) { setError('login', 'username and password required'); return; }
@@ -277,6 +346,7 @@ function setupAuthListeners() {
 
   document.getElementById('signup-form').onsubmit = async e => {
     e.preventDefault();
+    if (!e.isTrusted) return;
     const username = document.getElementById('signup-username').value.trim();
     const password = document.getElementById('signup-password').value;
     const passwordConfirm = document.getElementById('signup-password-confirm').value;
@@ -295,6 +365,7 @@ function setupAuthListeners() {
     setError('signup', 'creating secure account...');
     let authUser = null;
     try {
+      await requireSignupAttestation();
       const claim = await claimFirebaseAuth(username, password);
       authUser = firebase.auth().currentUser;
       const account = {
@@ -315,9 +386,10 @@ function setupAuthListeners() {
       hideAuth();
       bootApp();
     } catch (err) {
+      reportOperationalIssue('signup', err);
       if (authUser) authUser.delete().catch(() => {});
       finishAuthRequest(false);
-      setError('signup', err.code === 'auth/email-already-in-use' ? 'that username is taken' : 'failed to create account: ' + err.message);
+      setError('signup', err.code === 'auth/email-already-in-use' ? 'that username is taken' : 'failed to create account. Please try again.');
     }
   };
 }
@@ -329,6 +401,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   const session = getSession();
   const authUser = await waitForFirebaseAuth();
   if (session && session.username && authUser) {
+    if (sessionIsIdleExpired(session)) {
+      await firebase.auth().signOut();
+      localStorage.removeItem(SESSION_KEY);
+      showAuth();
+      setError('login', 'signed out after 30 minutes of inactivity');
+      return;
+    }
     try {
       const account = await loadAccountRecord(session.username, true);
       if (account && account.ownerUid === authUser.uid) {
@@ -338,10 +417,16 @@ window.addEventListener('DOMContentLoaded', async () => {
         return;
       }
     } catch (e) {
-      console.warn('Saved session could not be restored:', e);
+      reportOperationalIssue('session-restore', e);
     }
     localStorage.removeItem(SESSION_KEY);
   }
 
   showAuth();
+  try {
+    if (sessionStorage.getItem(AUTH_EXPIRED_NOTICE_KEY)) {
+      sessionStorage.removeItem(AUTH_EXPIRED_NOTICE_KEY);
+      setError('login', 'signed out after 30 minutes of inactivity');
+    }
+  } catch (e) {}
 });

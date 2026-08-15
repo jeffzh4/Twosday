@@ -47,7 +47,7 @@ async function createShareLink(ev, dateKey) {
     });
     return shareUrlFor(token);
   } catch (e) {
-    console.warn('Share link creation failed:', e);
+    reportOperationalIssue('share-link-create', e);
     showToast("couldn't create share link");
     return null;
   }

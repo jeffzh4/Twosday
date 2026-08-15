@@ -363,7 +363,7 @@ function getCalendarStore() {
     }),
     setStatus: setSyncStatus,
     onWriteError: error => {
-      console.warn('Firestore save failed:', error);
+      reportOperationalIssue('firestore-save', error);
       setSyncStatus('error');
       showToast("couldn't sync — check your connection");
     },
@@ -376,13 +376,13 @@ function getCalendarStore() {
       return { signature: result.signature, needsReconverge: result.needsReconverge };
     },
     applyFallbackSnapshot: (data, error) => {
-      console.warn('Merge failed, applying remote snapshot directly:', error);
+      reportOperationalIssue('remote-merge', error);
       applyParsedData(data, false);
       applyTheme();
       applyDensity();
       render();
     },
-    onListenerError: error => console.warn('Firestore listener error:', error),
+    onListenerError: error => reportOperationalIssue('firestore-listener', error),
   });
 
   calendarStore = createCalendarStore({ cache, remote });
