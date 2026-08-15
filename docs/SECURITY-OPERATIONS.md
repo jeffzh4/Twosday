@@ -18,6 +18,18 @@ Before each production release:
 5. Enable Firebase Authentication enforcement only after successful production sign-in testing.
 6. If an enforcement change blocks legitimate users, disable only the affected product's enforcement, diagnose the missing token path, then re-enable after a verified fix.
 
+## Browser session and request boundaries
+
+Twosday signs out an inactive browser after 30 minutes. Activity refreshes the local session timestamp at a bounded cadence; returning to an expired background tab signs out before account data is restored.
+
+Signup requests require a current Firebase App Check attestation on production hosts. This adds a browser-side gate, but the durable bot boundary remains Firebase App Check enforcement and Firebase Authentication quotas in the Firebase Console.
+
+Twosday has no first-party server endpoints authenticated by browser cookies. Firebase Authentication and Firestore calls use Firebase-managed credentials, so a traditional CSRF token would not protect a state-changing cookie endpoint because none exists. The relevant controls are the Content Security Policy's `form-action 'self'`, `frame-ancestors 'none'`, Firebase token validation, and owner-scoped Firestore Rules. Revisit this posture before adding any cookie-authenticated API route.
+
+## Diagnostics and browser logs
+
+Operational diagnostics retain only a timestamp, fixed scope, release, path without a query string, and a content-free error category. Calendar contents, account identifiers, passwords, access tokens, provider error text, and stack traces are excluded. Console warnings use the same generic scope and never print a raw provider error object.
+
 ## Sharing lifecycle
 
 Public event links are bearer links. The Firestore Rules layer denies reads after `expiresAt`, even if a recipient calls Firestore directly. A link may still be forwarded before it expires, so do not include sensitive personal, financial, medical, or location details unless the recipient is trusted.
@@ -39,4 +51,3 @@ The following controls are outside this repository and require periodic dashboar
 3. Eradicate: ship the smallest tested code or rule change that removes the cause.
 4. Recover: verify the normal account flow and affected security boundary.
 5. Review: document cause, impact, corrective action, and follow-up owner.
-

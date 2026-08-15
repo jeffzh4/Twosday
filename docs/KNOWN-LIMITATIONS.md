@@ -24,7 +24,7 @@ Twosday is an actively used private shared calendar and a portfolio project. Thi
 ## Public Readiness
 
 - The live app is not presented as a public multi-tenant service.
-- Password reset, email verification, account invitations, formal terms, and a dedicated security reporting mailbox need completion before open registration.
+- Password reset and email verification remain unavailable because username-based Firebase accounts use non-deliverable internal addresses. A recovery-email and mail-delivery design is required before either feature can be implemented safely. Account invitations, formal terms, and a dedicated security reporting mailbox also need completion before open registration.
 - The privacy policy describes current handling; public collection, retention, and support practices need review when product scope changes.
 
 ## Reporting

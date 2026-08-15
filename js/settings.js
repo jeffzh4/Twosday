@@ -403,7 +403,7 @@ function openSettingsModal() {
         } else if (err.code === 'auth/popup-closed-by-user') {
           setMsg('s-google-msg', '');
         } else {
-          setMsg('s-google-msg', 'connect failed: ' + err.message);
+          setMsg('s-google-msg', 'connect failed. Please try again.');
         }
       }
     };
@@ -500,7 +500,7 @@ function openSettingsModal() {
       if (authUser) {
         try { await authUser.updatePassword(cur); } catch (rollbackError) {}
       }
-      setMsg('s-password-msg', 'save failed: ' + err.message); return;
+      setMsg('s-password-msg', 'save failed. Please try again.'); return;
     }
 
     currentAccount = { ...currentAccount };
@@ -543,7 +543,7 @@ function openSettingsModal() {
     try {
       await saveAccountRecord(currentAccount.username, updatedAccount);
     } catch (err) {
-      setMsg('s-profiles-msg', 'save failed: ' + err.message); return;
+      setMsg('s-profiles-msg', 'save failed. Please try again.'); return;
     }
 
     renameProfiles([old1, old2], [p1, p2]);
@@ -569,7 +569,7 @@ function openSettingsModal() {
     try { await NOTES_DOC.delete();     } catch (e) {}
     try { await PRESENCE_DOC.delete();  } catch (e) {}
     try { await ACCOUNT_DOC(currentAccount.username).delete(); }
-    catch (err) { setMsg('s-delete-msg', 'failed: ' + err.message); return; }
+    catch (err) { setMsg('s-delete-msg', 'failed. Please try again.'); return; }
     if (currentAccount.authClaimed && firebase.auth().currentUser) {
       try { await firebase.auth().currentUser.delete(); } catch (e) {}
     }

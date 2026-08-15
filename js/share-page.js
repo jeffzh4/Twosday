@@ -38,7 +38,7 @@
       `;
     })
     .catch(error => {
-      console.warn('Share lookup failed:', error);
+      reportOperationalIssue('share-lookup', error);
       fail('this link has expired or was never valid.');
     });
 })();

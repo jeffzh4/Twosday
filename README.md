@@ -94,7 +94,8 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 
 - Firebase web configuration is intentionally committed: its API key identifies the Firebase project; it does not authorize calendar access. Firebase Auth, Firestore Rules, and App Check provide the access boundary.
 - Passwords are handled only by Firebase Authentication. Twosday does not write password hashes to Firestore or browser storage.
-- Browser sign-in and sign-up flows apply an escalating retry delay after repeated failed requests. This is a user-facing guard, not a replacement for server-side abuse protection.
+- Browser sign-in and sign-up flows apply an escalating retry delay after repeated failed requests. Production signup also requires a current App Check attestation; Firebase App Check enforcement and Authentication quotas remain the server-side boundary.
+- Active browser sessions expire after 30 minutes without interaction. Browser diagnostics and console warnings use content-free categories rather than provider-supplied error text.
 - The production web app is registered with Firebase App Check using reCAPTCHA Enterprise. The client activates it only on `twosday.dev` and `www.twosday.dev`; monitor App Check metrics before enforcing it for Cloud Firestore or Firebase Authentication. Also review the Firebase API key's API restrictions and tighten the `identitytoolkit.googleapis.com` quota to expected traffic.
 - The default Vercel domain redirects to the canonical domain before app code loads; `config.js` also refuses Firebase initialization on any non-production hostname. In Vercel, enable **Settings → Deployment Protection → Vercel Authentication** for preview deployments as the stronger dashboard-level control.
 - Create or forward `privacy@twosday.dev` before publishing the privacy policy link publicly.

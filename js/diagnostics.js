@@ -1,21 +1,38 @@
 // Browser-only operational breadcrumbs. Entries intentionally exclude event
-// text, account identifiers, URLs with query strings, and stack traces.
+// text, account identifiers, URLs with query strings, stack traces, tokens,
+// and provider-supplied error messages.
 const DIAGNOSTIC_CAP = 20;
 const DIAGNOSTIC_KEY = 'twosday_diagnostics_v1';
 let diagnosticsInitialized = false;
 
 function diagnosticMessage(error) {
-  const raw = typeof error === 'string' ? error : (error && error.message) || 'unknown browser error';
-  return String(raw).replace(/[\r\n]+/g, ' ').slice(0, 180);
+  // Provider messages may echo request context. Keep a stable, content-free
+  // category instead of preserving raw text in browser storage or copied logs.
+  return error && error.name === 'TypeError' ? 'browser TypeError' : 'operation failed';
+}
+
+function sanitizeDiagnosticEntry(entry) {
+  return {
+    at: typeof entry?.at === 'string' ? entry.at.slice(0, 40) : new Date().toISOString(),
+    scope: String(entry?.scope || 'browser').replace(/[^a-z0-9-]/gi, '').slice(0, 48) || 'browser',
+    message: diagnosticMessage(entry),
+    release: String(entry?.release || TWOSDAY_RELEASE).replace(/[^0-9.]/g, '').slice(0, 24) || TWOSDAY_RELEASE,
+    path: typeof entry?.path === 'string' && entry.path.startsWith('/') ? entry.path.split('?')[0].slice(0, 160) : '/',
+  };
 }
 
 function getDiagnostics() {
   try {
     const entries = JSON.parse(localStorage.getItem(DIAGNOSTIC_KEY) || '[]');
-    return Array.isArray(entries) ? entries.slice(0, DIAGNOSTIC_CAP) : [];
+    return Array.isArray(entries) ? entries.slice(0, DIAGNOSTIC_CAP).map(sanitizeDiagnosticEntry) : [];
   } catch (e) {
     return [];
   }
+}
+
+function reportOperationalIssue(scope, error) {
+  recordDiagnostic(scope, error);
+  console.warn(`Twosday: ${String(scope || 'operation').replace(/[^a-z0-9-]/gi, '').slice(0, 48) || 'operation'} failed.`);
 }
 
 function recordDiagnostic(scope, error) {
