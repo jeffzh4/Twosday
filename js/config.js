@@ -66,16 +66,19 @@ const PX_PER_HOUR = 60;
 
 // First 7 are shown in the picker (ROYGBIV order). 'gray' is hidden — used
 // only as the auto-categorization fallback and for legacy events.
+// Text shades are picked for >=4.5:1 contrast against their .ev background,
+// composited over the calendar grid and the glass-events sheen overlay — not
+// just eyeballed against the raw swatch.
 const COLOR_PRESETS = [
-  { name: 'red',    dark: { bg:'rgba(248,113,113,0.15)', text:'#f87171' }, light: { bg:'rgba(239,68,68,0.13)',   text:'#dc2626' } },
-  { name: 'orange', dark: { bg:'rgba(251,146,60,0.15)',  text:'#fb923c' }, light: { bg:'rgba(234,88,12,0.13)',   text:'#c2410c' } },
+  { name: 'red',    dark: { bg:'rgba(248,113,113,0.15)', text:'#fca5a5' }, light: { bg:'rgba(239,68,68,0.13)',   text:'#b91c1c' } },
+  { name: 'orange', dark: { bg:'rgba(251,146,60,0.15)',  text:'#fdba74' }, light: { bg:'rgba(234,88,12,0.13)',   text:'#c2410c' } },
   { name: 'yellow', dark: { bg:'rgba(250,204,21,0.13)',  text:'#fde047' }, light: { bg:'rgba(234,179,8,0.13)',   text:'#a16207' } },
-  { name: 'green',  dark: { bg:'rgba(52,211,153,0.13)',  text:'#6ee7b7' }, light: { bg:'rgba(16,185,129,0.13)',  text:'#059669' } },
+  { name: 'green',  dark: { bg:'rgba(52,211,153,0.13)',  text:'#6ee7b7' }, light: { bg:'rgba(16,185,129,0.13)',  text:'#047857' } },
   { name: 'blue',   dark: { bg:'rgba(96,165,250,0.15)',  text:'#93c5fd' }, light: { bg:'rgba(59,130,246,0.13)',  text:'#2563eb' } },
   { name: 'indigo', dark: { bg:'rgba(129,140,248,0.15)', text:'#a5b4fc' }, light: { bg:'rgba(99,102,241,0.13)',  text:'#4338ca' } },
   { name: 'violet', dark: { bg:'rgba(192,132,252,0.15)', text:'#d8b4fe' }, light: { bg:'rgba(139,92,246,0.13)',  text:'#7c3aed' } },
   // Hidden — fallback only, not shown in the color picker:
-  { name: 'gray',   dark: { bg:'rgba(161,161,170,0.10)', text:'#a1a1aa' }, light: { bg:'rgba(113,113,122,0.10)', text:'#52525b' } },
+  { name: 'gray',   dark: { bg:'rgba(161,161,170,0.10)', text:'#d4d4d8' }, light: { bg:'rgba(113,113,122,0.10)', text:'#52525b' } },
 ];
 
 const SHARED_COLOR = {
