@@ -148,6 +148,9 @@ async function prepareAccount(username, account) {
     claimDataDocument(NOTES_DOC, 'notes'),
     claimDataDocument(PRESENCE_DOC, 'sessions'),
   ]);
+  // Must run before startIdleSessionGuard: the guard treats a missing session
+  // as already-expired, and would otherwise sign this fresh login back out.
+  saveSession(username);
   startIdleSessionGuard();
 }
 
@@ -166,7 +169,6 @@ async function handleGoogleSignIn(formId = 'login') {
     }
 
     await prepareAccount(found.username, found.account);
-    saveSession(found.username);
     finishAuthRequest(true);
     setError(formId, '');
     hideAuth();
@@ -332,7 +334,6 @@ function setupAuthListeners() {
       const account = await loadAccountRecord(username, false);
       if (!account || account.ownerUid !== cred.user.uid) throw new Error('account ownership could not be verified');
       await prepareAccount(username, account);
-      saveSession(username);
       finishAuthRequest(true);
       setError('login', '');
       hideAuth();
@@ -380,7 +381,6 @@ function setupAuthListeners() {
       };
       await saveAccountRecord(username, account);
       await prepareAccount(username, account);
-      saveSession(username);
       finishAuthRequest(true);
       setError('signup', '');
       hideAuth();
