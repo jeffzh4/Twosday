@@ -1,6 +1,6 @@
 // ── Global app state ──────────────────────────────────────────────────────────
 // allData[dateKey][user] = Event[]
-//   e.g. allData["2026-05-16"]["jeff"] = [...]
+//   e.g. allData["2026-05-16"]["alex"] = [...]
 // USERS / activeUser / userTheme are populated by auth.js after login.
 const allData = {};
 

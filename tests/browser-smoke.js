@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '..');
 const captureDir = process.env.TWOSDAY_CAPTURE_DIR || null;
 const firebaseMock = `
 (() => {
-  const account = { profiles: ['jeff', 'helen'], firestoreDoc: 'smoke-data', notesDoc: 'smoke-notes', ownerUid: 'smoke-owner', authClaimed: true, googleCalendar: { calendarIds: [] } };
+  const account = { profiles: ['alex', 'jamie'], firestoreDoc: 'smoke-data', notesDoc: 'smoke-notes', ownerUid: 'smoke-owner', authClaimed: true, googleCalendar: { calendarIds: [] } };
   const user = { uid: 'smoke-owner', email: 'smoke@twosday.local', delete: async () => {}, linkWithPopup: async () => ({ user }) };
   const doc = (collection, id) => ({
     get: async () => collection === 'accounts' && id === 'smoke' ? { exists: true, data: () => account } : { exists: false, data: () => ({}) },
@@ -54,8 +54,8 @@ function server() {
   await page.addInitScript(() => {
     localStorage.setItem('twosday_session_v1', JSON.stringify({ username: 'smoke', savedAt: Date.now() }));
     localStorage.setItem('twosday_v2_smoke', JSON.stringify({
-      allData: { '2026-07-21': { jeff: [{ id: 'seed', text: 'smoke event', start: 9, end: 10, shared: false, done: false }], helen: [] } },
-      activeUser: 'jeff', viewMode: 'week', currentDate: '2026-07-21T12:00:00.000Z', userTheme: { jeff: 'dark', helen: 'light' }, calendarDensity: {}, tombstones: {}, auditLog: [], savedAt: Date.now(),
+      allData: { '2026-07-21': { alex: [{ id: 'seed', text: 'smoke event', start: 9, end: 10, shared: false, done: false }], jamie: [] } },
+      activeUser: 'alex', viewMode: 'week', currentDate: '2026-07-21T12:00:00.000Z', userTheme: { alex: 'dark', jamie: 'light' }, calendarDensity: {}, tombstones: {}, auditLog: [], savedAt: Date.now(),
     }));
   });
   // Fonts and third-party SDK requests are intentionally outside this smoke
@@ -116,11 +116,11 @@ function server() {
     localStorage.setItem('twosday_v2_smoke', JSON.stringify({
       allData: {
         '2026-07-21': {
-          jeff: [{ id: 'mobile-seed', sharedId: 'mobile-share', text: 'mobile smoke event', start: 9, end: 10, shared: true, done: false }],
-          helen: [{ id: 'mobile-mirror', sharedId: 'mobile-share', text: 'mobile smoke event', start: 9, end: 10, shared: true, done: false }],
+          alex: [{ id: 'mobile-seed', sharedId: 'mobile-share', text: 'mobile smoke event', start: 9, end: 10, shared: true, done: false }],
+          jamie: [{ id: 'mobile-mirror', sharedId: 'mobile-share', text: 'mobile smoke event', start: 9, end: 10, shared: true, done: false }],
         },
       },
-      activeUser: 'jeff', viewMode: 'day', currentDate: '2026-07-21T12:00:00.000Z', userTheme: { jeff: 'dark', helen: 'light' }, calendarDensity: {}, tombstones: {}, auditLog: [], savedAt: Date.now(),
+      activeUser: 'alex', viewMode: 'day', currentDate: '2026-07-21T12:00:00.000Z', userTheme: { alex: 'dark', jamie: 'light' }, calendarDensity: {}, tombstones: {}, auditLog: [], savedAt: Date.now(),
     }));
   });
   await mobile.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
