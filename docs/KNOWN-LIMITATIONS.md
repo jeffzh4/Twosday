@@ -12,7 +12,7 @@ Twosday is an actively used private shared calendar and a portfolio project. Thi
 
 - Events use local date keys and decimal local hours. New events record their source IANA time zone, but travel-aware conversion and daylight-saving rescheduling are not implemented yet.
 - Google Calendar overlay is read-only busy time. It requires manual OAuth setup, does not write to Google, and intentionally hides external titles and details.
-- ICS import (`js/import.js`, `importParsedEvents`) has no duplicate detection. Re-importing the same file, or the same underlying calendar via two different exports, silently creates a second copy of every event — each gets a fresh id, so nothing about the existing data stops it. The import preview should flag rows whose date, time, and title closely match an event already on the target profile, so an accidental re-import is caught before it lands rather than after.
+- ICS import flags likely duplicates (same day, same normalized title as an existing event on the target profile) and leaves them unchecked in the preview, but the match is title-based only — a re-import under a reworded title, or of a different event that happens to share a title, won't be caught or will be flagged incorrectly, respectively. Past 150 parsed rows, individual rows stop being reviewable in the preview UI; only bulk select all/none remain available.
 - Optional browser reminders work only while Twosday is open. Background or push delivery is not implemented.
 - The product is scoped to two profiles; it is not designed for teams or group scheduling.
 

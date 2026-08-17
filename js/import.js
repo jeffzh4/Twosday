@@ -99,6 +99,21 @@ function parseICSEvents(text) {
     });
 }
 
+// Two events on the same day with the same title (case/whitespace-insensitive)
+// are almost always the same import run twice, or two exports of the same
+// source calendar — not a coincidence worth trusting. Time isn't part of the
+// comparison: a re-import can land on different times than the original
+// (e.g. this app assigns its own times when a source has none), so matching
+// on time would miss exactly the duplicates this exists to catch.
+function normalizeForDuplicateCheck(text) {
+  return String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function findLikelyDuplicate(item, user) {
+  const target = normalizeForDuplicateCheck(item.text);
+  return getEventsForDate(item.dateKey, user).find(ev => normalizeForDuplicateCheck(ev.text) === target) || null;
+}
+
 function importParsedEvents(events, user, shared) {
   const importedAt = Date.now();
   events.forEach((item, idx) => {
@@ -127,8 +142,30 @@ function importParsedEvents(events, user, shared) {
   }
 }
 
+// Only the first IMPORT_PREVIEW_RENDER_CAP rows get a real checkbox — past
+// that, reviewing each row stops being realistic for a human anyway (a few
+// hundred rows is already a lot of scrolling), so selection state moves to
+// select-all/none instead of individual review.
+const IMPORT_PREVIEW_RENDER_CAP = 150;
+
 function openICSImportPreview(fileName, parsedEvents, defaultUser) {
   if (document.querySelector('.import-preview-modal')) return;
+
+  const selected = new Set(parsedEvents.map(ev => ev.importId));
+  let duplicateIds = new Set();
+
+  function applyDuplicateDefaults(user) {
+    duplicateIds = new Set();
+    parsedEvents.forEach(ev => {
+      if (findLikelyDuplicate(ev, user)) {
+        duplicateIds.add(ev.importId);
+        selected.delete(ev.importId);
+      } else {
+        selected.add(ev.importId);
+      }
+    });
+  }
+  applyDuplicateDefaults(defaultUser);
 
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
@@ -156,26 +193,73 @@ function openICSImportPreview(fileName, parsedEvents, defaultUser) {
           </select>
         </div>
       </div>
-      <div class="import-preview-list">
-        ${parsedEvents.map(ev => {
-          const d = parseDateKey(ev.dateKey);
-          return `
-            <label class="import-preview-row">
-              <input type="checkbox" value="${escHtml(ev.importId)}" checked>
-              <span>
-                <strong>${escHtml(ev.text)}</strong>
-                <em>${escHtml(MONTH_SHORT[d.getMonth()])} ${d.getDate()} &middot; ${fmtFull(ev.start)} - ${fmtFull(ev.end)}</em>
-              </span>
-            </label>
-          `;
-        }).join('')}
+      <div class="import-preview-toolbar">
+        <div class="import-preview-bulk">
+          <button type="button" class="import-preview-link" id="i-select-all">select all</button>
+          <button type="button" class="import-preview-link" id="i-select-none">select none</button>
+        </div>
+        <div class="import-preview-count" id="i-count" aria-live="polite"></div>
       </div>
+      <div class="import-preview-list" id="i-list"></div>
       <div class="modal-btns">
         <button class="mbtn mbtn-cancel" id="i-cancel">cancel</button>
         <button class="mbtn mbtn-save" id="i-import">import selected</button>
       </div>
     </div>
   `;
+
+  const listEl = bg.querySelector('#i-list');
+  const countEl = bg.querySelector('#i-count');
+
+  function rowHtml(ev) {
+    const d = parseDateKey(ev.dateKey);
+    const isDup = duplicateIds.has(ev.importId);
+    return `
+      <label class="import-preview-row${isDup ? ' import-preview-row-dup' : ''}">
+        <input type="checkbox" value="${escHtml(ev.importId)}" ${selected.has(ev.importId) ? 'checked' : ''}>
+        <span>
+          <strong>${escHtml(ev.text)}</strong>
+          <em>${escHtml(MONTH_SHORT[d.getMonth()])} ${d.getDate()} &middot; ${fmtFull(ev.start)} - ${fmtFull(ev.end)}${isDup ? ' &middot; possible duplicate — already on this profile' : ''}</em>
+        </span>
+      </label>
+    `;
+  }
+
+  function updateCount() {
+    const dupCount = duplicateIds.size;
+    countEl.textContent = `${selected.size} of ${parsedEvents.length} selected` +
+      (dupCount ? ` · ${dupCount} possible duplicate${dupCount === 1 ? '' : 's'} flagged` : '');
+  }
+
+  function renderList() {
+    const visible = parsedEvents.slice(0, IMPORT_PREVIEW_RENDER_CAP);
+    const remaining = parsedEvents.length - visible.length;
+    listEl.innerHTML = visible.map(rowHtml).join('') +
+      (remaining > 0
+        ? `<div class="import-preview-more">+${remaining} more not shown — use select all / select none above, individual rows aren't reviewable at this size</div>`
+        : '');
+    listEl.querySelectorAll('.import-preview-row input').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.checked) selected.add(input.value); else selected.delete(input.value);
+        updateCount();
+      });
+    });
+    updateCount();
+  }
+  renderList();
+
+  bg.querySelector('#i-select-all').onclick = () => {
+    parsedEvents.forEach(ev => selected.add(ev.importId));
+    renderList();
+  };
+  bg.querySelector('#i-select-none').onclick = () => {
+    selected.clear();
+    renderList();
+  };
+  bg.querySelector('#i-user').addEventListener('change', e => {
+    applyDuplicateDefaults(e.target.value);
+    renderList();
+  });
 
   function close() { bg.remove(); }
   bg.addEventListener('click', e => { if (e.target === bg) close(); });
@@ -184,7 +268,6 @@ function openICSImportPreview(fileName, parsedEvents, defaultUser) {
   document.getElementById('i-close').onclick = close;
   document.getElementById('i-cancel').onclick = close;
   document.getElementById('i-import').onclick = () => {
-    const selected = new Set(Array.from(bg.querySelectorAll('.import-preview-row input:checked')).map(el => el.value));
     const selectedEvents = parsedEvents.filter(ev => selected.has(ev.importId));
     if (!selectedEvents.length) return;
     pushHistory();
