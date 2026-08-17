@@ -2398,6 +2398,24 @@ html, body {
 }
 .auth-privacy-link:hover { color: var(--accent); }
 
+.auth-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  text-align: center;
+}
+.auth-link-btn:hover { color: var(--accent); }
+
+#forgot-password-newpwd-fields {
+  display: flex;
+  flex-direction: column;
+}
+#forgot-password-newpwd-fields.hidden { display: none; }
+
 /* ══════════════════════════════════════
    USER PILL (logged-in indicator + logout)
 ══════════════════════════════════════ */

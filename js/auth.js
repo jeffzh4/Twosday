@@ -181,6 +181,106 @@ async function handleGoogleSignIn(formId = 'login') {
   }
 }
 
+// Twosday has no recovery email on file — accounts sign in through a synthetic
+// address (syntheticEmail) that no inbox can receive, so Firebase's built-in
+// emailed reset link has nothing to send to. Instead, a fresh Google sign-in
+// stands in for password proof: if that Google identity is already linked to
+// this account (see settings.js's "connect Google"), owning it is enough to
+// set a new password directly, no email round-trip required.
+let forgotPasswordResetUser = null;
+
+function setupForgotPasswordPanel() {
+  const panel = document.getElementById('forgot-password-panel');
+  const newPwdFields = document.getElementById('forgot-password-newpwd-fields');
+
+  // .auth-form sets its own `display: flex`, an author rule that beats the
+  // UA default for the `hidden` attribute — so visibility must go through the
+  // `.hidden` class (matching selectAuthTab's convention), not `hidden` alone.
+  const setFormHidden = (el, isHidden) => {
+    el.hidden = isHidden;
+    el.classList.toggle('hidden', isHidden);
+  };
+
+  const resetPanelState = () => {
+    forgotPasswordResetUser = null;
+    newPwdFields.classList.add('hidden');
+    document.getElementById('reset-new-pwd').value = '';
+    document.getElementById('reset-confirm-pwd').value = '';
+    setError('forgot-password', '');
+  };
+
+  document.getElementById('btn-forgot-password').onclick = () => {
+    selectAuthTab('login');
+    setFormHidden(document.getElementById('login-form'), true);
+    resetPanelState();
+    setFormHidden(panel, false);
+    requestAnimationFrame(() => document.getElementById('btn-google-reset').focus());
+  };
+
+  document.getElementById('btn-forgot-password-back').onclick = () => {
+    setFormHidden(panel, true);
+    setFormHidden(document.getElementById('login-form'), false);
+    resetPanelState();
+    requestAnimationFrame(() => document.getElementById('login-username').focus());
+  };
+
+  document.getElementById('btn-google-reset').onclick = async () => {
+    if (!beginAuthRequest('forgot-password')) return;
+    setError('forgot-password', 'connecting to Google...');
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      const result = await firebase.auth().signInWithPopup(provider);
+      const found = await findAccountForAuthUser(result.user);
+      if (!found) {
+        await firebase.auth().signOut();
+        finishAuthRequest(false);
+        setError('forgot-password', 'no Twosday account is linked to this Google account. Log in with your password once, then connect Google in settings.');
+        return;
+      }
+      forgotPasswordResetUser = found;
+      finishAuthRequest(true);
+      setError('forgot-password', `signed in as ${found.username}. choose a new password below.`);
+      newPwdFields.classList.remove('hidden');
+      requestAnimationFrame(() => document.getElementById('reset-new-pwd').focus());
+    } catch (err) {
+      reportOperationalIssue('forgot-password-google', err);
+      if (err.code === 'auth/popup-closed-by-user') { finishAuthRequest(false, false); setError('forgot-password', ''); return; }
+      finishAuthRequest(false);
+      setError('forgot-password', 'Google sign-in failed. Please try again.');
+    }
+  };
+
+  document.getElementById('btn-reset-submit').onclick = async () => {
+    if (!forgotPasswordResetUser) return;
+    const newPwd = document.getElementById('reset-new-pwd').value;
+    const confirmPwd = document.getElementById('reset-confirm-pwd').value;
+    if (newPwd.length < 6) { setError('forgot-password', 'password must be at least 6 characters'); return; }
+    if (newPwd !== confirmPwd) { setError('forgot-password', 'passwords do not match'); return; }
+    if (!beginAuthRequest('forgot-password')) return;
+
+    setError('forgot-password', 'updating password...');
+    try {
+      await firebase.auth().currentUser.updatePassword(newPwd);
+      await prepareAccount(forgotPasswordResetUser.username, forgotPasswordResetUser.account);
+      finishAuthRequest(true);
+      setError('forgot-password', '');
+      setFormHidden(panel, true);
+      hideAuth();
+      bootApp();
+    } catch (err) {
+      reportOperationalIssue('forgot-password-update', err);
+      finishAuthRequest(false);
+      if (err.code === 'auth/requires-recent-login') {
+        setError('forgot-password', 'that Google sign-in has aged out — click "continue with Google" again, then set the new password right away.');
+        newPwdFields.classList.add('hidden');
+        forgotPasswordResetUser = null;
+      } else {
+        setError('forgot-password', 'could not update password. Please try again.');
+      }
+    }
+  };
+}
+
 function saveSession(username) {
   const now = Date.now();
   localStorage.setItem(SESSION_KEY, JSON.stringify({ username, savedAt: now, lastActiveAt: now }));
@@ -319,6 +419,7 @@ function setupAuthListeners() {
 
   document.getElementById('btn-google-signin').onclick = () => handleGoogleSignIn('login');
   document.getElementById('btn-google-signup').onclick = () => handleGoogleSignIn('signup');
+  setupForgotPasswordPanel();
 
   document.getElementById('login-form').onsubmit = async e => {
     e.preventDefault();
