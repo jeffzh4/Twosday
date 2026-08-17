@@ -12,6 +12,7 @@ Twosday is an actively used private shared calendar and a portfolio project. Thi
 
 - Events use local date keys and decimal local hours. New events record their source IANA time zone, but travel-aware conversion and daylight-saving rescheduling are not implemented yet.
 - Google Calendar overlay is read-only busy time. It requires manual OAuth setup, does not write to Google, and intentionally hides external titles and details.
+- ICS import (`js/import.js`, `importParsedEvents`) has no duplicate detection. Re-importing the same file, or the same underlying calendar via two different exports, silently creates a second copy of every event — each gets a fresh id, so nothing about the existing data stops it. The import preview should flag rows whose date, time, and title closely match an event already on the target profile, so an accidental re-import is caught before it lands rather than after.
 - Optional browser reminders work only while Twosday is open. Background or push delivery is not implemented.
 - The product is scoped to two profiles; it is not designed for teams or group scheduling.
 
@@ -24,7 +25,7 @@ Twosday is an actively used private shared calendar and a portfolio project. Thi
 ## Public Readiness
 
 - The live app is not presented as a public multi-tenant service.
-- Password reset and email verification remain unavailable because username-based Firebase accounts use non-deliverable internal addresses. A recovery-email and mail-delivery design is required before either feature can be implemented safely. Account invitations, formal terms, and a dedicated security reporting mailbox also need completion before open registration.
+- Password reset works only for accounts with Google linked — a fresh Google sign-in proves ownership in place of an emailed reset link, since username-based Firebase accounts use non-deliverable internal addresses. Accounts without Google linked still have no recovery path. Email verification, account invitations, formal terms, and a dedicated security reporting mailbox also need completion before open registration.
 - The privacy policy describes current handling; public collection, retention, and support practices need review when product scope changes.
 
 ## Reporting
