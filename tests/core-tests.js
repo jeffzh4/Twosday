@@ -155,6 +155,21 @@ run('ics parser imports common VEVENT fields', () => {
   assert.strictEqual(parsed[0].end, 10.5);
 });
 
+run('findLikelyDuplicate matches on date and normalized title, not time', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    insertEvent('2026-06-20', 'alex', normalizeEvent({ id:'e1', text:'  Gym   Session ', start:9, end:10 }));
+  `);
+  // Same day, same title once normalized, different time -- still a duplicate.
+  assert.strictEqual(exec(`!!findLikelyDuplicate({ dateKey:'2026-06-20', text:'gym session' }, 'alex')`), true);
+  // Different day -- not a duplicate.
+  assert.strictEqual(exec(`!!findLikelyDuplicate({ dateKey:'2026-06-21', text:'gym session' }, 'alex')`), false);
+  // Different title -- not a duplicate.
+  assert.strictEqual(exec(`!!findLikelyDuplicate({ dateKey:'2026-06-20', text:'gym class' }, 'alex')`), false);
+  // Different profile -- not a duplicate, each profile's calendar is independent.
+  assert.strictEqual(exec(`!!findLikelyDuplicate({ dateKey:'2026-06-20', text:'gym session' }, 'jamie')`), false);
+});
+
 run('conflict center finds own and shared conflicts', () => {
   exec(`
     Object.keys(allData).forEach(k => delete allData[k]);
