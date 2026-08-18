@@ -242,6 +242,18 @@ function openSettingsModal() {
         <button class="mbtn" id="s-copy-diagnostics" type="button">copy diagnostics</button>
       </div>
 
+      <div class="settings-section settings-cleanup-zone">
+        <div class="settings-section-title">calendar cleanup</div>
+        <div class="settings-msg">remove events before a date from both profiles. your login, profiles, notes, and newer events stay unchanged.</div>
+        <div class="field cleanup-date-field">
+          <label for="s-cleanup-cutoff">remove events before</label>
+          <input id="s-cleanup-cutoff" type="date" value="2026-06-01" />
+        </div>
+        <div class="settings-msg" id="s-cleanup-preview" role="status" aria-live="polite">choose a date to preview the cleanup.</div>
+        <button class="mbtn danger-btn" id="s-cleanup-events" type="button" disabled>remove older events</button>
+        <div class="settings-msg" id="s-cleanup-msg" role="status" aria-live="polite"></div>
+      </div>
+
       <!-- ── Profile names + emoji ── -->
       <div class="settings-section">
         <div class="settings-section-title">profile names</div>
@@ -377,6 +389,56 @@ function openSettingsModal() {
   };
   if (typeof setupGoogleCalendarSettings === 'function') setupGoogleCalendarSettings();
   document.getElementById('s-copy-diagnostics').onclick = () => copyDiagnostics();
+
+  // ── One-time calendar cleanup ────────────────────────────────────────────
+  const cleanupCutoff = document.getElementById('s-cleanup-cutoff');
+  const cleanupPreview = document.getElementById('s-cleanup-preview');
+  const cleanupButton = document.getElementById('s-cleanup-events');
+  const cleanupMsg = document.getElementById('s-cleanup-msg');
+  function refreshCleanupPreview() {
+    const cutoff = cleanupCutoff.value;
+    if (!cutoff) {
+      cleanupPreview.textContent = 'choose a date to preview the cleanup.';
+      cleanupButton.disabled = true;
+      return;
+    }
+    const count = Object.keys(allData).reduce((total, dateKey) => {
+      if (dateKey >= cutoff) return total;
+      return total + USERS.reduce((sum, user) => sum + getEventsForDate(dateKey, user).length, 0);
+    }, 0);
+    cleanupPreview.textContent = count
+      ? `${count} stored event${count === 1 ? '' : 's'} will be removed before ${cutoff}.`
+      : `no stored events before ${cutoff}.`;
+    cleanupButton.disabled = count === 0;
+  }
+  cleanupCutoff.addEventListener('input', refreshCleanupPreview);
+  refreshCleanupPreview();
+  cleanupButton.onclick = async () => {
+    const cutoff = cleanupCutoff.value;
+    if (!cutoff || !/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) return;
+    const count = Object.keys(allData).reduce((total, dateKey) => {
+      if (dateKey >= cutoff) return total;
+      return total + USERS.reduce((sum, user) => sum + getEventsForDate(dateKey, user).length, 0);
+    }, 0);
+    if (!count || !window.confirm(`Remove ${count} event${count === 1 ? '' : 's'} before ${cutoff}? This cannot be undone in Twosday.`)) return;
+
+    cleanupButton.disabled = true;
+    cleanupMsg.textContent = 'removing…';
+    cleanupMsg.className = 'settings-msg settings-msg-ok';
+    try {
+      const result = removeEventsBefore(cutoff);
+      logAudit('bulk-deleted', `${result.removed} older events`);
+      saveToLocalStorage();
+      await saveToFirestore();
+      render();
+      cleanupMsg.textContent = `removed ${result.removed} event${result.removed === 1 ? '' : 's'} before ${cutoff}.`;
+      cleanupPreview.textContent = `no stored events before ${cutoff}.`;
+    } catch (err) {
+      cleanupMsg.textContent = 'cleanup failed. your calendar was not fully changed; please refresh and verify.';
+      cleanupMsg.className = 'settings-msg settings-msg-error';
+      refreshCleanupPreview();
+    }
+  };
   // ── Connect Google ────────────────────────────────────────────────────────
   const connectGoogleBtn = document.getElementById('s-connect-google');
   if (connectGoogleBtn) {

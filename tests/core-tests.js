@@ -100,6 +100,27 @@ run('date helpers use local calendar keys', () => {
   assert.strictEqual(exec(`getWeekDates(new Date(2026, 5, 17))[0].getDay()`), 0);
 });
 
+run('bulk cleanup removes only pre-cutoff events and tombstones mirrors', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    tombstones = {};
+    ensureDateUser('2026-05-31', 'alex');
+    ensureDateUser('2026-05-31', 'jamie');
+    ensureDateUser('2026-06-01', 'alex');
+    ensureDateUser('2026-06-01', 'jamie');
+    allData['2026-05-31'].alex.push({ id:'old-private', text:'old', start:9, end:10, shared:false });
+    allData['2026-05-31'].alex.push({ id:'old-shared-a', text:'old shared', start:11, end:12, shared:true, sharedId:'old-shared' });
+    allData['2026-05-31'].jamie.push({ id:'old-shared-b', text:'old shared', start:11, end:12, shared:true, sharedId:'old-shared' });
+    allData['2026-06-01'].alex.push({ id:'new', text:'keep', start:13, end:14, shared:false });
+  `);
+  const result = plain(exec(`removeEventsBefore('2026-06-01')`));
+  assert.deepStrictEqual(result, { removed: 3, shared: 2 });
+  assert.strictEqual(exec(`allData['2026-05-31'].alex.length`), 0);
+  assert.strictEqual(exec(`allData['2026-05-31'].jamie.length`), 0);
+  assert.strictEqual(exec(`allData['2026-06-01'].alex[0].id`), 'new');
+  assert.strictEqual(exec(`Boolean(tombstones['old-private'] && tombstones['old-shared-a'] && tombstones['old-shared-b'])`), true);
+});
+
 run('event normalization keeps safe time-zone provenance and reminder bounds', () => {
   const normalized = plain(exec(`normalizeEvent({ id:'tz', text:'flight', start:9, end:10, timeZone:'America/Los_Angeles', reminderMinutes:15 })`));
   assert.strictEqual(normalized.timeZone, 'America/Los_Angeles');
