@@ -38,6 +38,30 @@ function removeEventById(dateKey, user, evId) {
   return ev ? removeEvent(dateKey, user, ev) : null;
 }
 
+// Remove every event before an exclusive YYYY-MM-DD cutoff. This is a narrow
+// account-cleanup operation: profile/account metadata stays untouched, and
+// both sides of a shared mirror are tombstoned so sync cannot resurrect them.
+function removeEventsBefore(cutoffDateKey) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoffDateKey)) return { removed: 0, shared: 0 };
+
+  const removedIds = new Set();
+  let shared = 0;
+  Object.keys(allData).forEach(dateKey => {
+    if (dateKey >= cutoffDateKey) return;
+    USERS.forEach(user => {
+      const events = [...getEventsForDate(dateKey, user)];
+      events.forEach(ev => {
+        if (removedIds.has(ev.id)) return;
+        if (ev.shared) shared++;
+        removeEvent(dateKey, user, ev);
+        removedIds.add(ev.id);
+      });
+    });
+  });
+
+  return { removed: removedIds.size, shared };
+}
+
 // Move an event to another day. Deliberately not a delete + insert: a tombstone
 // here would tell the next merge to delete the copy we just re-inserted.
 function moveEventToDate(fromDateKey, toDateKey, user, ev) {
