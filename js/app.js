@@ -178,6 +178,23 @@ function wireAppShell() {
   window.addEventListener('online', () => { setSyncStatus('synced'); saveToLocalStorage(); });
   window.addEventListener('offline', () => setSyncStatus('offline'));
 
+  // renderGrid() only picks desktop-grid vs. mobile-agenda at the moment it
+  // runs -- nothing re-ran it on its own, so a phone rotation or a resized
+  // window crossing the mobile breakpoint left whichever layout was already
+  // mounted (e.g. an invisible, CSS-hidden .grid-wrap) instead of swapping.
+  let lastIsMobileViewport = typeof isMobileCalendarViewport === 'function' && isMobileCalendarViewport();
+  let viewportRenderTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(viewportRenderTimer);
+    viewportRenderTimer = setTimeout(() => {
+      const nowMobile = typeof isMobileCalendarViewport === 'function' && isMobileCalendarViewport();
+      if (nowMobile !== lastIsMobileViewport) {
+        lastIsMobileViewport = nowMobile;
+        render();
+      }
+    }, 150);
+  });
+
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
 }

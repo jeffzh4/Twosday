@@ -895,7 +895,10 @@ html, body {
 .field input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
 .field select option { background: var(--surface2); color: var(--text); }
-.midnight-note {
+/* An author `display` here would beat the browser's own `[hidden]` rule
+   regardless of selector specificity, since origin outranks specificity in
+   the cascade -- so the visible state has to be the one carrying `display`. */
+.midnight-note:not([hidden]) {
   display: block;
   margin-top: 4px;
   color: var(--accent);

@@ -155,8 +155,35 @@ function server() {
   await mobile.emulateMedia({ reducedMotion: 'reduce' });
   const reducedDuration = await mobile.locator('.mobile-nav-btn').first().evaluate(el => parseFloat(getComputedStyle(el).transitionDuration));
   assert(reducedDuration <= 0.02, 'reduced-motion preference must suppress interface transitions');
+
+  // A brand-new event (no explicit end time) defaults to a one-hour span, not
+  // one running to midnight -- the "ends at 12:00am" note must stay hidden.
+  await mobile.getByRole('button', { name: 'Add event' }).click();
+  await mobile.waitForSelector('#m-name');
+  assert.strictEqual(await mobile.locator('#m-end-midnight').isVisible(), false, 'a new one-hour event must not claim it ends at midnight');
+  await mobile.locator('#m-cancel').click();
+
   await mobile.close();
   assert.deepStrictEqual(pageErrors, [], `browser runtime errors: ${pageErrors.join('; ')}`);
+
+  // A viewport resize after the initial render must reflow between the desktop
+  // time grid and the mobile agenda -- the layout choice isn't a one-time,
+  // load-only decision.
+  const resizable = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await resizable.route('https://www.gstatic.com/firebasejs/**', route => route.fulfill({ contentType: 'application/javascript', body: firebaseMock }));
+  await resizable.addInitScript(() => {
+    localStorage.setItem('twosday_session_v1', JSON.stringify({ username: 'smoke', savedAt: Date.now() }));
+    localStorage.setItem('twosday_v2_smoke', JSON.stringify({
+      allData: { '2026-07-21': { alex: [{ id: 'resize-seed', text: 'resize smoke event', start: 9, end: 10, shared: false, done: false }], jamie: [] } },
+      activeUser: 'alex', viewMode: 'day', currentDate: '2026-07-21T12:00:00.000Z', userTheme: { alex: 'dark', jamie: 'light' }, calendarDensity: {}, tombstones: {}, auditLog: [], savedAt: Date.now(),
+    }));
+  });
+  await resizable.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+  await resizable.waitForSelector('.grid-wrap');
+  await resizable.setViewportSize({ width: 390, height: 844 });
+  await resizable.waitForSelector('.mobile-agenda', { timeout: 2000 });
+  assert.strictEqual(await resizable.locator('.grid-wrap').count(), 0, 'resizing into mobile width must swap in the agenda view, not leave the desktop grid mounted');
+  await resizable.close();
 
   // Public static routes stay readable without an account or production data.
   const publicPage = await browser.newPage();
