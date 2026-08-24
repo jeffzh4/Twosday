@@ -3683,10 +3683,10 @@ body::after {
   .header-left { width: 100%; justify-content: space-between; gap: 8px; }
   .header-right { display: none; }
   .title { font-size: 16px; flex-shrink: 0; }
-  .nav-controls { min-width: 0; gap: 5px; }
-  .nav-label { min-width: 0; max-width: 164px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-  .nav-btn, .nav-today-btn { min-width: 34px; min-height: 34px; }
-  .nav-today-btn { padding: 0 9px; }
+  .nav-controls { min-width: 0; gap: 4px; }
+  .nav-label { min-width: 0; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .nav-btn, .nav-today-btn { min-width: 32px; min-height: 34px; }
+  .nav-today-btn { padding: 0 7px; }
 
   .user-switcher { margin-bottom: 4px; }
   .user-tab { min-height: 38px; }
@@ -3801,7 +3801,12 @@ body::after {
   .mobile-agenda-empty span { font-size: 11px; }
 
   .mobile-week-agenda { flex-direction: column; gap: 7px; padding: 5px 1px 12px; }
-  .mobile-week-day { border: 0.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: color-mix(in srgb, var(--surface) 80%, transparent); }
+  /* flex-shrink:0 is load-bearing: .mobile-week-day is a flex item of the
+     scrollable .mobile-week-agenda column, and combining overflow:hidden with
+     the default shrinkable flex item zeroes its automatic minimum size --
+     days get squashed below their content height instead of the scroll
+     container just scrolling past them. */
+  .mobile-week-day { flex-shrink: 0; border: 0.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: color-mix(in srgb, var(--surface) 80%, transparent); }
   .mobile-week-day.today { border-color: color-mix(in srgb, var(--accent) 52%, var(--border)); }
   .mobile-week-heading { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; width: 100%; align-items: center; gap: 8px; padding: 10px; border: 0; border-bottom: 0.5px solid var(--border); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
   .mobile-week-heading span { font-family: var(--mono); font-size: 10px; color: var(--accent); text-transform: uppercase; }
@@ -3836,7 +3841,7 @@ body::after {
   .mobile-nav-add span:last-child { margin-top: -1px; }
 
   .mobile-more-sheet { align-items: end; padding: 0; background: color-mix(in srgb, var(--modal-overlay) 72%, transparent); }
-  .mobile-more-panel { width: 100%; max-height: min(82dvh, 620px); padding: 8px 14px calc(18px + env(safe-area-inset-bottom)); overflow-y: auto; border: 0.5px solid var(--glass-highlight); border-bottom: 0; border-radius: 16px 16px 0 0; background: var(--glass-bg-strong); box-shadow: 0 -18px 50px rgba(0,0,0,0.24); }
+  .mobile-more-panel { width: 100%; max-height: min(82dvh, 620px); padding: 8px 14px calc(18px + env(safe-area-inset-bottom)); overflow-y: auto; border: 0.5px solid var(--glass-highlight); border-bottom: 0; border-radius: 16px 16px 0 0; background: var(--glass-bg-strong); box-shadow: 0 -18px 50px rgba(0,0,0,0.24); backdrop-filter: blur(20px) saturate(130%); -webkit-backdrop-filter: blur(20px) saturate(130%); }
   .mobile-sheet-handle { width: 36px; height: 4px; margin: 2px auto 12px; border-radius: 99px; background: var(--border-hover); }
   .mobile-more-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
   .mobile-more-heading h2 { font-size: 17px; font-weight: 550; }
