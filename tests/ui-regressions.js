@@ -79,9 +79,6 @@ if (!/Notification\.permission/.test(reminders) || !/event\.reminderMinutes/.tes
 if (/JSON\.stringify\(allData\)|currentAccount|location\.search|error\.stack|error\.message/.test(diagnostics)) {
   throw new Error('diagnostics privacy regression: browser diagnostics must not collect calendar data, account data, query strings, stacks, or provider messages');
 }
-if (!/AUTH_IDLE_TIMEOUT_MS = 30 \* 60 \* 1000/.test(auth) || !/startIdleSessionGuard/.test(auth) || !/sessionIsIdleExpired/.test(auth)) {
-  throw new Error('session regression: authenticated sessions must retain the idle-expiry guard');
-}
 if (!/requireSignupAttestation/.test(auth) || !/firebase\.appCheck\(\)\.getToken\(false\)/.test(auth)) {
   throw new Error('signup protection regression: production signup must require an App Check token');
 }

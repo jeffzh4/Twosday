@@ -20,7 +20,7 @@ Before each production release:
 
 ## Browser session and request boundaries
 
-Twosday signs out an inactive browser after 30 minutes. Activity refreshes the local session timestamp at a bounded cadence; returning to an expired background tab signs out before account data is restored.
+Idle-timeout sign-out is disabled for now (see `js/auth.js` git history for the prior implementation). A session currently persists until explicit logout.
 
 Signup requests require a current Firebase App Check attestation on production hosts. This adds a browser-side gate, but the durable bot boundary remains Firebase App Check enforcement and Firebase Authentication quotas in the Firebase Console.
 
