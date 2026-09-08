@@ -19,6 +19,7 @@ Twosday is an actively used private shared calendar and a portfolio project. Thi
 ## Reliability and Operations
 
 - Offline persistence and reconciliation exist, but there is no dedicated user-facing queue inspector or conflict-recovery workspace.
+- Idle-timeout sign-out is disabled for now. A browser session persists until explicit logout, with no automatic expiry after inactivity.
 - App Check is registered for production, but enforcement should remain a monitored dashboard decision until valid-token coverage is confirmed.
 - Preview deployment protection, Firebase quotas, API-key restrictions, and OAuth consent configuration require periodic dashboard review outside this repository.
 

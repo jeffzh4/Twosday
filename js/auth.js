@@ -7,16 +7,10 @@
 
 const ACCOUNTS_CACHE_KEY = 'twosday_accounts_v1';
 const SESSION_KEY = 'twosday_session_v1';
-const AUTH_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
-const AUTH_ACTIVITY_WRITE_MS = 15 * 1000;
-const AUTH_EXPIRED_NOTICE_KEY = 'twosday_auth_expired_notice_v1';
 const ACCOUNT_COLLECTION = () => db.collection('accounts');
 const ACCOUNT_DOC = username => ACCOUNT_COLLECTION().doc(username);
 let currentAccount = null;
 let authRequestActive = false;
-let idleSessionTimer = null;
-let idleSessionListening = false;
-let lastSessionActivityWrite = 0;
 
 function syntheticEmail(username) {
   return `${username.toLowerCase()}@twosday.local`;
@@ -148,10 +142,7 @@ async function prepareAccount(username, account) {
     claimDataDocument(NOTES_DOC, 'notes'),
     claimDataDocument(PRESENCE_DOC, 'sessions'),
   ]);
-  // Must run before startIdleSessionGuard: the guard treats a missing session
-  // as already-expired, and would otherwise sign this fresh login back out.
   saveSession(username);
-  startIdleSessionGuard();
 }
 
 async function handleGoogleSignIn(formId = 'login') {
@@ -282,8 +273,7 @@ function setupForgotPasswordPanel() {
 }
 
 function saveSession(username) {
-  const now = Date.now();
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username, savedAt: now, lastActiveAt: now }));
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ username, savedAt: Date.now() }));
 }
 
 function getSession() {
@@ -291,59 +281,7 @@ function getSession() {
   catch (e) { return null; }
 }
 
-function stopIdleSessionGuard() {
-  if (idleSessionTimer) clearTimeout(idleSessionTimer);
-  idleSessionTimer = null;
-}
-
-function sessionIsIdleExpired(session, now = Date.now()) {
-  const lastActiveAt = Number(session && (session.lastActiveAt || session.savedAt));
-  return !Number.isFinite(lastActiveAt) || now - lastActiveAt >= AUTH_IDLE_TIMEOUT_MS;
-}
-
-function scheduleIdleSessionExpiry() {
-  stopIdleSessionGuard();
-  const session = getSession();
-  if (!session || sessionIsIdleExpired(session)) return expireIdleSession();
-  const lastActiveAt = Number(session.lastActiveAt || session.savedAt);
-  idleSessionTimer = setTimeout(expireIdleSession, Math.max(0, AUTH_IDLE_TIMEOUT_MS - (Date.now() - lastActiveAt)) + 50);
-}
-
-function noteSessionActivity() {
-  const session = getSession();
-  if (!session || !currentAccount) return;
-  const now = Date.now();
-  if (now - lastSessionActivityWrite < AUTH_ACTIVITY_WRITE_MS) return;
-  lastSessionActivityWrite = now;
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, lastActiveAt: now }));
-  scheduleIdleSessionExpiry();
-}
-
-function expireIdleSession() {
-  stopIdleSessionGuard();
-  localStorage.removeItem(SESSION_KEY);
-  try { sessionStorage.setItem(AUTH_EXPIRED_NOTICE_KEY, '1'); } catch (e) {}
-  Promise.resolve(firebase.auth().signOut()).finally(() => location.reload());
-}
-
-function startIdleSessionGuard() {
-  if (!idleSessionListening) {
-    const activityEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
-    activityEvents.forEach(type => document.addEventListener(type, noteSessionActivity, { passive: true, capture: true }));
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') return;
-      const session = getSession();
-      if (sessionIsIdleExpired(session)) expireIdleSession();
-      else noteSessionActivity();
-    });
-    idleSessionListening = true;
-  }
-  noteSessionActivity();
-  scheduleIdleSessionExpiry();
-}
-
 function logout() {
-  stopIdleSessionGuard();
   localStorage.removeItem(SESSION_KEY);
   try { firebase.auth().signOut(); } catch (e) {}
   location.reload();
@@ -502,13 +440,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   const session = getSession();
   const authUser = await waitForFirebaseAuth();
   if (session && session.username && authUser) {
-    if (sessionIsIdleExpired(session)) {
-      await firebase.auth().signOut();
-      localStorage.removeItem(SESSION_KEY);
-      showAuth();
-      setError('login', 'signed out after 30 minutes of inactivity');
-      return;
-    }
     try {
       const account = await loadAccountRecord(session.username, true);
       if (account && account.ownerUid === authUser.uid) {
@@ -524,10 +455,4 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   showAuth();
-  try {
-    if (sessionStorage.getItem(AUTH_EXPIRED_NOTICE_KEY)) {
-      sessionStorage.removeItem(AUTH_EXPIRED_NOTICE_KEY);
-      setError('login', 'signed out after 30 minutes of inactivity');
-    }
-  } catch (e) {}
 });
