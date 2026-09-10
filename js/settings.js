@@ -61,9 +61,12 @@ function computeStats() {
 
 // ── ICS export ────────────────────────────────────────────────────────────────
 function _icsDateTime(dk, h) {
-  const [y, m, d] = dk.split('-');
-  const hh = String(Math.floor(h)).padStart(2, '0');
-  const mm = String(Math.round((h % 1) * 60)).padStart(2, '0');
+  const minutes = Math.round(h * 60);
+  const date = parseDateKey(dk);
+  date.setDate(date.getDate() + Math.floor(minutes / 1440));
+  const [y, m, d] = getDateKey(date).split('-');
+  const hh = String(Math.floor((minutes % 1440) / 60)).padStart(2, '0');
+  const mm = String(minutes % 60).padStart(2, '0');
   return `${y}${m}${d}T${hh}${mm}00`;
 }
 
@@ -137,6 +140,7 @@ function openSettingsModal() {
   if (document.querySelector('.modal-bg')) return;
 
   const stats  = computeStats();
+  const cleanupDefaultDate = `${new Date().getFullYear()}-01-01`;
   const emojis = currentAccount.profileEmojis || ['', ''];
   const emojiOptsHTML = EMOJI_PRESETS
     .map(e => `<button class="emoji-opt" type="button" data-emoji="${e}">${e}</button>`)
@@ -247,7 +251,7 @@ function openSettingsModal() {
         <div class="settings-msg">remove events before a date from both profiles. your login, profiles, notes, and newer events stay unchanged.</div>
         <div class="field cleanup-date-field">
           <label for="s-cleanup-cutoff">remove events before</label>
-          <input id="s-cleanup-cutoff" type="date" value="2026-06-01" />
+          <input id="s-cleanup-cutoff" type="date" value="${cleanupDefaultDate}" />
         </div>
         <div class="settings-msg" id="s-cleanup-preview" role="status" aria-live="polite">choose a date to preview the cleanup.</div>
         <button class="mbtn danger-btn" id="s-cleanup-events" type="button" disabled>remove older events</button>
@@ -429,9 +433,12 @@ function openSettingsModal() {
       const result = removeEventsBefore(cutoff);
       logAudit('bulk-deleted', `${result.removed} older events`);
       saveToLocalStorage();
-      await saveToFirestore();
+      const synced = await saveToFirestore();
       render();
-      cleanupMsg.textContent = `removed ${result.removed} event${result.removed === 1 ? '' : 's'} before ${cutoff}.`;
+      cleanupMsg.textContent = synced
+        ? `removed ${result.removed} event${result.removed === 1 ? '' : 's'} before ${cutoff}.`
+        : 'removed in this browser; cloud sync is not confirmed. Keep this page open and check the sync indicator.';
+      cleanupMsg.className = 'settings-msg ' + (synced ? 'settings-msg-ok' : 'settings-msg-error');
       cleanupPreview.textContent = `no stored events before ${cutoff}.`;
     } catch (err) {
       cleanupMsg.textContent = 'cleanup failed. your calendar was not fully changed; please refresh and verify.';

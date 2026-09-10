@@ -176,6 +176,27 @@ run('ics parser imports common VEVENT fields', () => {
   assert.strictEqual(parsed[0].end, 10.5);
 });
 
+run('ICS round trips midnight, overnight, and all-day boundaries', () => {
+  function parse(start, end) {
+    const text = ['BEGIN:VEVENT', 'UID:reused', 'SUMMARY:plan', `DTSTART:${start}`, ...(end ? [`DTEND:${end}`] : []), 'END:VEVENT'].join('\n');
+    return plain(exec(`parseICSEvents(${JSON.stringify(text)})`));
+  }
+  assert.strictEqual(exec(`_icsDateTime('2026-12-31', 24)`), '20270101T000000');
+  assert.strictEqual(exec(`_icsDateTime('2026-06-01', 9 + 59.9 / 60)`), '20260601T100000');
+  assert.deepStrictEqual(parse('20260601T220000', '20260602T020000').map(e => [e.dateKey, e.start, e.end]), [
+    ['2026-06-01', 22, 24], ['2026-06-02', 0, 2],
+  ]);
+  assert.strictEqual(parse('20260601T220000', '20260602T000000').length, 1);
+  assert.deepStrictEqual(parse('20260601').map(e => [e.start, e.end]), [[0, 24]]);
+  assert.strictEqual(parse('20260230T090000').length, 0);
+  assert.strictEqual(parse('20260601T246000').length, 0);
+  assert.throws(() => parse('20260101', '99991231'), /ICS import block limit exceeded/);
+  const repeated = ['BEGIN:VEVENT', 'UID:same', 'SUMMARY:plan', 'DTSTART:20260601T090000', 'END:VEVENT'].join('\n');
+  const rows = plain(exec(`parseICSEvents(${JSON.stringify(repeated + '\n' + repeated)})`));
+  assert.strictEqual(new Set(rows.map(e => e.importId)).size, 2);
+  assert.strictEqual(exec(`unescapeICSText(${JSON.stringify('literal\\\\n')})`), 'literal\\n');
+});
+
 run('findLikelyDuplicate matches on date and normalized title, not time', () => {
   exec(`
     Object.keys(allData).forEach(k => delete allData[k]);
