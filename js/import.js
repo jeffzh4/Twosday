@@ -1,4 +1,6 @@
 // ICS import
+const ICS_IMPORT_BLOCK_LIMIT = 10000;
+
 function unfoldICSLines(text) {
   return text.replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
@@ -30,10 +32,7 @@ function parseICSProperty(line) {
 
 function unescapeICSText(value) {
   return String(value || '')
-    .replace(/\\n/gi, '\n')
-    .replace(/\\,/g, ',')
-    .replace(/\\;/g, ';')
-    .replace(/\\\\/g, '\\');
+    .replace(/\\([nN,;\\])/g, (_, escaped) => /[nN]/.test(escaped) ? '\n' : escaped);
 }
 
 function parseICSDateTime(value) {
@@ -43,9 +42,11 @@ function parseICSDateTime(value) {
   const y = Number(match[1]);
   const m = Number(match[2]) - 1;
   const d = Number(match[3]);
-  const hh = Number(match[4] || 9);
+  const hh = Number(match[4] || 0);
   const mm = Number(match[5] || 0);
   const ss = Number(match[6] || 0);
+  const check = new Date(Date.UTC(y, m, d));
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m || check.getUTCDate() !== d || hh > 23 || mm > 59 || ss > 59) return null;
   const date = match[7]
     ? new Date(Date.UTC(y, m, d, hh, mm, ss))
     : new Date(y, m, d, hh, mm, ss);
@@ -61,6 +62,7 @@ function parseICSEvents(text) {
   const lines = unfoldICSLines(text);
   const events = [];
   let cur = null;
+  let blockCount = 0;
 
   lines.forEach(line => {
     const trimmed = line.trim();
@@ -78,24 +80,38 @@ function parseICSEvents(text) {
     const prop = parseICSProperty(trimmed);
     if (!prop) return;
     if (prop.name === 'SUMMARY') cur.summary = unescapeICSText(prop.value);
-    if (prop.name === 'DTSTART') cur.start = parseICSDateTime(prop.value);
+    if (prop.name === 'DTSTART') {
+      cur.start = parseICSDateTime(prop.value);
+      cur.allDay = /^\d{8}$/.test(prop.value);
+    }
     if (prop.name === 'DTEND') cur.end = parseICSDateTime(prop.value);
     if (prop.name === 'UID') cur.uid = prop.value;
   });
 
   return events
     .filter(ev => ev.summary && ev.start)
-    .map((ev, idx) => {
+    .flatMap((ev, idx) => {
       const fallbackEnd = new Date(ev.start);
-      fallbackEnd.setHours(fallbackEnd.getHours() + 1);
+      if (ev.allDay) fallbackEnd.setDate(fallbackEnd.getDate() + 1);
+      else fallbackEnd.setHours(fallbackEnd.getHours() + 1);
       const end = ev.end && ev.end > ev.start ? ev.end : fallbackEnd;
-      return {
-        importId: ev.uid || `ics-${idx}`,
-        text: ev.summary,
-        dateKey: getDateKey(ev.start),
-        start: decimalHourFromDate(ev.start),
-        end: Math.max(decimalHourFromDate(end), decimalHourFromDate(ev.start) + STEP_H),
-      };
+      const segments = [];
+      const day = new Date(ev.start);
+      day.setHours(0, 0, 0, 0);
+      while (day < end) {
+        if (++blockCount > ICS_IMPORT_BLOCK_LIMIT) throw new RangeError('ICS import block limit exceeded');
+        const nextDay = new Date(day);
+        nextDay.setDate(nextDay.getDate() + 1);
+        segments.push({
+          importId: `ics-${idx}-${segments.length}`,
+          text: ev.summary,
+          dateKey: getDateKey(day),
+          start: day <= ev.start ? decimalHourFromDate(ev.start) : 0,
+          end: end >= nextDay ? 24 : decimalHourFromDate(end),
+        });
+        day.setDate(day.getDate() + 1);
+      }
+      return segments;
     });
 }
 
@@ -287,7 +303,13 @@ function handleICSFileInput(file, user, setMsg, msgId = 's-import-msg') {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    const parsed = parseICSEvents(String(reader.result || ''));
+    let parsed;
+    try {
+      parsed = parseICSEvents(String(reader.result || ''));
+    } catch (error) {
+      setMsg(msgId, `could not import this file. Try a smaller date range (up to ${ICS_IMPORT_BLOCK_LIMIT.toLocaleString()} daily event blocks).`);
+      return;
+    }
     if (!parsed.length) {
       setMsg(msgId, 'no importable events found');
       return;

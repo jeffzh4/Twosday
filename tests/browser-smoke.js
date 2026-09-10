@@ -183,6 +183,18 @@ function server() {
   await resizable.setViewportSize({ width: 390, height: 844 });
   await resizable.waitForSelector('.mobile-agenda', { timeout: 2000 });
   assert.strictEqual(await resizable.locator('.grid-wrap').count(), 0, 'resizing into mobile width must swap in the agenda view, not leave the desktop grid mounted');
+  // A failed cloud write must not turn destructive cleanup into a false success.
+  await resizable.evaluate(() => {
+    insertEvent('2026-05-31', 'alex', normalizeEvent({ id: 'cleanup-old', text: 'old', start: 9, end: 10 }));
+    saveToFirestore = async () => false;
+    openSettingsModal();
+  });
+  await resizable.locator('#s-cleanup-cutoff').fill('2026-06-01');
+  resizable.once('dialog', dialog => dialog.accept());
+  await resizable.locator('#s-cleanup-events').click();
+  await resizable.getByText('removed in this browser; cloud sync is not confirmed.', { exact: false }).waitFor();
+  assert.strictEqual(await resizable.evaluate(() => getEventsForDate('2026-05-31', 'alex').length), 0);
+  assert.strictEqual(await resizable.evaluate(() => getEventsForDate('2026-07-21', 'alex').length), 1);
   await resizable.close();
 
   // Public static routes stay readable without an account or production data.
