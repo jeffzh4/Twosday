@@ -593,6 +593,24 @@ run('editRecurringSeries patches time and text across the scope', () => {
   assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex')[0].color`), 'red');
 });
 
+run('merge preserves legacy events without deletion markers', () => {
+  const result = plain(exec(`mergeCalendars({ '2026-06-14': { alex: [
+    { id: 'legacy', text: 'keep', start: 9, end: 10 },
+    { id: 'zero', text: 'keep too', start: 10, end: 11, updatedAt: 0 }
+  ] } }, {}, {}, {}, USERS)`));
+  assert.strictEqual(result.allData['2026-06-14'].alex.length, 2);
+});
+
+run('merge resolves equal-time placements consistently in both directions', () => {
+  const results = plain(exec(`(() => {
+    const event = { id: 'moved', text: 'plan', start: 9, end: 10, updatedAt: 100 };
+    const a = { '2026-06-14': { alex: [event] } };
+    const b = { '2026-06-15': { jamie: [event] } };
+    return [mergeCalendars(a, b, {}, {}, USERS), mergeCalendars(b, a, {}, {}, USERS)];
+  })()`));
+  assert.deepStrictEqual(results[0], results[1]);
+});
+
 run('mergeCalendars resolves a concurrent edit by last-write-wins', () => {
   const merged = exec(`(function(){
     const local = { '2026-06-14': { alex: [{ id:'e1', text:'gym', start:7, end:8, updatedAt:100 }], jamie: [] } };

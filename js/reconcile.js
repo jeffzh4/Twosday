@@ -65,13 +65,19 @@ function mergeCalendars(localAll, remoteAll, localTomb, remoteTomb, users) {
     if (L && R) {
       if (R.ts > L.ts) winner = R;
       else if (L.ts > R.ts) winner = L;
-      else winner = JSON.stringify(R.ev) < JSON.stringify(L.ev) ? R : L; // deterministic tie-break
+      else {
+        // Placement is part of the tie-break: concurrent moves can leave the
+        // same event body and timestamp on different days or profiles.
+        const right = JSON.stringify([R.ev, R.dateKey, R.user]);
+        const left = JSON.stringify([L.ev, L.dateKey, L.user]);
+        winner = right < left ? R : L;
+      }
     } else {
       winner = L || R;
     }
 
     // A tombstone at least as new as the surviving edit keeps the event deleted.
-    if ((tombstones[id] || 0) >= winner.ts) return;
+    if (Object.prototype.hasOwnProperty.call(tombstones, id) && tombstones[id] >= winner.ts) return;
 
     if (!merged[winner.dateKey]) merged[winner.dateKey] = {};
     if (!merged[winner.dateKey][winner.user]) merged[winner.dateKey][winner.user] = [];
