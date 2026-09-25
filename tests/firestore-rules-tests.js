@@ -55,7 +55,6 @@ function share(ownerUid, overrides = {}) {
       end: 17,
       location: '151 3rd St',
       description: null,
-      sharedBy: 'Alex',
     },
     createdAt: Date.now(),
     expiresAt: Date.now() + 1000,
