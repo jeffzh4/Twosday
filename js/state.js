@@ -65,6 +65,31 @@ function normalizeEvent(raw) {
   };
 }
 
+// Firestore caps a document at 1 MiB. Every read path re-runs normalizeEvent,
+// so fields holding their default (null / false / 0) can be dropped on write
+// and restored on load without changing the event.
+function compactEvent(ev) {
+  const out = {};
+  Object.keys(ev).forEach(key => {
+    const value = ev[key];
+    if (value === null || value === false || (key === 'reminderMinutes' && value === 0)) return;
+    out[key] = value;
+  });
+  return out;
+}
+
+function compactAllData(all) {
+  const out = {};
+  Object.keys(all).forEach(dk => {
+    const day = {};
+    USERS.forEach(u => {
+      if (all[dk][u] && all[dk][u].length) day[u] = all[dk][u].map(compactEvent);
+    });
+    if (Object.keys(day).length) out[dk] = day;
+  });
+  return out;
+}
+
 function markEventUpdated(ev, user = activeUser, ts = Date.now()) {
   if (!ev) return ev;
   ev.updatedAt = ts;
@@ -357,7 +382,7 @@ function getCalendarStore() {
     isOffline: () => navigator.onLine === false,
     signature: _syncSig,
     buildPayload: () => ({
-      allData, userTheme, calendarDensity, tombstones, auditLog,
+      allData: compactAllData(allData), userTheme, calendarDensity, tombstones, auditLog,
       accountId: currentAccount.username, ownerUid: currentAccount.ownerUid,
       savedAt: Date.now(), clientId: CLIENT_ID,
     }),

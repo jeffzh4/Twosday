@@ -121,6 +121,27 @@ run('bulk cleanup removes only pre-cutoff events and tombstones mirrors', () => 
   assert.strictEqual(exec(`Boolean(tombstones['old-private'] && tombstones['old-shared-a'] && tombstones['old-shared-b'])`), true);
 });
 
+run('compacted Firestore payload round-trips through normalization and shrinks', () => {
+  const result = plain(exec(`(() => {
+    const events = [
+      normalizeEvent({ id:'a', text:'plain', start:9, end:10, timeZone:'America/Vancouver' }),
+      normalizeEvent({ id:'b', text:'full', start:11, end:12.5, done:true, shared:true, sharedId:'s', color:'teal',
+        location:'lab', description:'notes', reminderMinutes:15, updatedAt:5, updatedBy:'alex', timeZone:'America/Vancouver' }),
+    ];
+    const raw = { '2026-06-01': { alex: events, jamie: [] }, '2026-06-02': { alex: [], jamie: [] } };
+    const compact = compactAllData(raw);
+    return {
+      restored: normalizeAllData(compact, USERS)['2026-06-01'].alex,
+      original: events,
+      emptyDateKept: '2026-06-02' in compact,
+      shrunk: JSON.stringify(compact).length < JSON.stringify(raw).length * 0.7,
+    };
+  })()`));
+  assert.deepStrictEqual(result.restored, result.original);
+  assert.strictEqual(result.emptyDateKept, false);
+  assert.strictEqual(result.shrunk, true);
+});
+
 run('event normalization keeps safe time-zone provenance and reminder bounds', () => {
   const normalized = plain(exec(`normalizeEvent({ id:'tz', text:'flight', start:9, end:10, timeZone:'America/Los_Angeles', reminderMinutes:15 })`));
   assert.strictEqual(normalized.timeZone, 'America/Los_Angeles');
