@@ -340,7 +340,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     };
     document.getElementById('m-delete').onclick = () => {
       bg.remove();
-      if (editEv.recurrenceId && seriesCount(editEv.recurrenceId, activeUser) > 1) {
+      if (shouldOfferRecurrenceScope(editEv)) {
         openRecurrenceScopeModal({ verb: 'delete', onChoose: scope => {
           pushHistory();
           if (scope === 'this') deleteEvent(dateKey, activeUser, editEv.id);
@@ -391,6 +391,8 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
         syncSharedEvent(activeUser, oldSharedId, dk, 'edit', {
           text: name, start: s, end: endTime, color: selectedColor, location, description,
           reminderMinutes: nextReminderMinutes, timeZone,
+          recurrenceId: editEv.recurrenceId,
+          recurrence: editEv.recurrence ? clone(editEv.recurrence) : null,
           updatedAt: editEv.updatedAt, updatedBy: editEv.updatedBy,
         });
       }
@@ -421,7 +423,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
 
     if (isEdit) {
       // Recurring instance → ask which occurrences the edit applies to.
-      if (editEv.recurrenceId && seriesCount(editEv.recurrenceId, activeUser) > 1) {
+      if (shouldOfferRecurrenceScope(editEv)) {
         const recurrenceId = editEv.recurrenceId;
         bg.remove();
         openRecurrenceScopeModal({ verb: 'edit', onChoose: scope => {
@@ -431,9 +433,14 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
             editEv.recurrence = null;
             applySingleEdit(name, s, endTime, dk, isShared, location, description, nextReminderMinutes);
           } else {
-            // Time/text/color propagate; per-instance date and sharedness are left as-is.
+            // Apply the same edit to each selected occurrence, including date shifts and sharing.
             editRecurringSeries(recurrenceId, activeUser, scope === 'future' ? dateKey : null,
-              { text: name, start: s, end: endTime, color: selectedColor, location, description, reminderMinutes: nextReminderMinutes, timeZone });
+              {
+                text: name, start: s, end: endTime, color: selectedColor,
+                location, description, reminderMinutes: nextReminderMinutes,
+                timeZone, shared: isShared,
+                dateOffsetDays: dateKeyOffset(dateKey, dk),
+              });
             currentDate = parseDateKey(dateKey);
             render();
           }

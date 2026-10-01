@@ -427,7 +427,7 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
       if (action === 'share') { openShareModal(ev, dateKey); return; }
       if (action === 'del') {
         // Recurring instance → ask which occurrences to remove.
-        if (ev.recurrenceId && seriesCount(ev.recurrenceId, activeUser) > 1) {
+        if (shouldOfferRecurrenceScope(ev)) {
           openRecurrenceScopeModal({ verb: 'delete', onChoose: scope => {
             pushHistory();
             if (scope === 'this') deleteEvent(dateKey, activeUser, ev.id);

@@ -69,6 +69,25 @@ function seriesCount(recurrenceId, user) {
   return collectSeries(recurrenceId, user).length;
 }
 
+function shouldOfferRecurrenceScope(ev) {
+  return !!(ev && ev.recurrenceId);
+}
+
+function dateKeyOffset(fromDateKey, toDateKey) {
+  const from = parseDateKey(fromDateKey);
+  const to = parseDateKey(toDateKey);
+  const fromUtc = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  const toUtc = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((toUtc - fromUtc) / 86400000);
+}
+
+function shiftDateKey(dateKey, offset) {
+  if (!offset) return dateKey;
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() + offset);
+  return getDateKey(date);
+}
+
 // Delete a series. fromDateKey null = all; otherwise this-and-following.
 function deleteRecurringSeries(recurrenceId, user, fromDateKey) {
   const series = collectSeries(recurrenceId, user);
@@ -86,30 +105,78 @@ function deleteRecurringSeries(recurrenceId, user, fromDateKey) {
   }
 }
 
-// Patch time/text/color across a series. Date and sharedness are per-instance and
-// are intentionally left untouched here — those changes go through the single-event
-// path ('this' scope), which detaches the instance as an exception.
+// Patch every selected instance while preserving per-occurrence IDs and shared mirrors.
+// A future-only edit starts a new series at the cutoff occurrence.
 function editRecurringSeries(recurrenceId, user, fromDateKey, patch) {
+  const series = collectSeries(recurrenceId, user);
+  const previous = fromDateKey ? series.filter(item => item.dateKey < fromDateKey) : [];
+  const targets = series.filter(item => !fromDateKey || item.dateKey >= fromDateKey);
+  if (!targets.length) return;
+
+  // A future-only edit creates a separate series so a later all-series edit
+  // cannot unexpectedly include the untouched earlier occurrences.
+  const splitId = fromDateKey && previous.length ? uid() : recurrenceId;
+  if (splitId !== recurrenceId) {
+    previous.forEach(({ dateKey, ev }) => {
+      if (ev.recurrence) ev.recurrence = { ...ev.recurrence, count: previous.length };
+      markEventUpdated(ev, user);
+      if (ev.shared) {
+        syncSharedEvent(user, ev.sharedId, dateKey, 'edit', {
+          recurrence: ev.recurrence ? clone(ev.recurrence) : null,
+          updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
+        });
+      }
+    });
+    targets.forEach(({ ev }) => {
+      if (ev.recurrence) ev.recurrence = { ...ev.recurrence, count: targets.length };
+    });
+  }
+
   let edited = 0;
   let label = '';
-  collectSeries(recurrenceId, user).forEach(({ dateKey, ev }) => {
-    if (fromDateKey && dateKey < fromDateKey) return;
+  targets.forEach(({ dateKey, ev }) => {
+    const nextDateKey = shiftDateKey(dateKey, Number(patch.dateOffsetDays) || 0);
+    const wasShared = !!ev.shared;
+    const oldSharedId = ev.sharedId;
+    if (nextDateKey !== dateKey) moveEventToDate(dateKey, nextDateKey, user, ev);
     if (patch.text != null)  ev.text = patch.text;
     if (patch.start != null) ev.start = patch.start;
     if (patch.end != null)   ev.end = patch.end;
     if (patch.color !== undefined) ev.color = patch.color;
     if (patch.location !== undefined) ev.location = patch.location;
     if (patch.description !== undefined) ev.description = patch.description;
+    if (patch.reminderMinutes !== undefined) ev.reminderMinutes = patch.reminderMinutes;
+    if (patch.timeZone !== undefined) ev.timeZone = patch.timeZone;
+    ev.recurrenceId = splitId;
+    if (patch.shared === false && wasShared) {
+      syncSharedEvent(user, oldSharedId, dateKey, 'delete');
+      ev.shared = false;
+      ev.sharedId = null;
+    } else if (patch.shared === true && !wasShared) {
+      ev.shared = true;
+      ev.sharedId = uid();
+    }
     markEventUpdated(ev, user);
-    sortDateUser(dateKey, user);
+    sortDateUser(nextDateKey, user);
     label = ev.text;
     edited++;
     if (ev.shared) {
-      syncSharedEvent(user, ev.sharedId, dateKey, 'edit', {
+      const updates = {
         text: ev.text, start: ev.start, end: ev.end, color: ev.color,
         location: ev.location, description: ev.description,
+        reminderMinutes: ev.reminderMinutes, timeZone: ev.timeZone,
+        recurrenceId: ev.recurrenceId,
+        recurrence: ev.recurrence ? clone(ev.recurrence) : null,
         updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
-      });
+      };
+      if (!wasShared || nextDateKey !== dateKey) {
+        if (wasShared) syncSharedEvent(user, oldSharedId, dateKey, 'delete');
+        syncSharedEvent(user, ev.sharedId, nextDateKey, 'add', {
+          ...clone(ev), id: uid(), shared: true, sharedId: ev.sharedId,
+        });
+      } else {
+        syncSharedEvent(user, ev.sharedId, nextDateKey, 'edit', updates);
+      }
     }
   });
   if (edited && typeof logAudit === 'function') {
