@@ -54,7 +54,19 @@ function server() {
   await page.addInitScript(() => {
     localStorage.setItem('twosday_session_v1', JSON.stringify({ username: 'smoke', savedAt: Date.now() }));
     localStorage.setItem('twosday_v2_smoke', JSON.stringify({
-      allData: { '2026-07-21': { alex: [{ id: 'seed', text: 'smoke event', start: 9, end: 10, shared: false, done: false }], jamie: [] } },
+      allData: {
+        '2026-07-21': { alex: [
+          { id: 'seed', text: 'smoke event', start: 9, end: 10, shared: false, done: false },
+          { id: 'series-first', text: 'standup', start: 11, end: 12, shared: false, done: false, recurrenceId: 'series-edit', recurrence: { freq: 'daily', count: 3 } },
+          { id: 'series-singleton', text: 'single remaining occurrence', start: 13, end: 14, shared: false, done: false, recurrenceId: 'series-single', recurrence: { freq: 'daily', count: 10 } },
+        ], jamie: [] },
+        '2026-07-22': { alex: [
+          { id: 'series-middle', text: 'standup', start: 11, end: 12, shared: false, done: false, recurrenceId: 'series-edit', recurrence: { freq: 'daily', count: 3 } },
+        ], jamie: [] },
+        '2026-07-23': { alex: [
+          { id: 'series-last', text: 'standup', start: 11, end: 12, shared: false, done: false, recurrenceId: 'series-edit', recurrence: { freq: 'daily', count: 3 } },
+        ], jamie: [] },
+      },
       activeUser: 'alex', viewMode: 'week', currentDate: '2026-07-21T12:00:00.000Z', userTheme: { alex: 'dark', jamie: 'light' }, calendarDensity: {}, tombstones: {}, auditLog: [], savedAt: Date.now(),
     }));
   });
@@ -92,6 +104,37 @@ function server() {
   await page.locator('#m-save').click();
   await page.waitForSelector('.ev[data-id="seed"]');
   assert.strictEqual(await page.locator('.ev-title').first().textContent(), 'edited smoke event');
+
+  await page.locator('.ev[data-id="series-singleton"]').click();
+  await page.locator('#m-save').click();
+  await page.waitForSelector('.scope-modal');
+  assert.strictEqual(await page.locator('.scope-btn[data-scope="all"]').count(), 1, 'a recurring event should retain its scope prompt even when only one occurrence remains');
+  await page.locator('.scope-modal [data-scope="cancel"]').click();
+
+  // A recurring occurrence always offers a scope. Editing from the middle and
+  // choosing future must split the series so the earlier occurrence stays put.
+  await page.evaluate(() => openModal({ dateKey: '2026-07-22', editEvId: 'series-middle' }));
+  await page.locator('#m-name').fill('planning sync');
+  await page.locator('#m-date').fill('2026-07-23');
+  await page.locator('#m-start').fill('13:00');
+  await page.locator('#m-save').click();
+  await page.waitForSelector('.scope-modal');
+  assert.strictEqual(await page.locator('.scope-btn[data-scope="future"]').count(), 1, 'recurring edits should offer this-and-following scope');
+  await page.locator('.scope-btn[data-scope="future"]').click();
+  const recurrenceResult = await page.evaluate(() => ({
+    first: allData['2026-07-21'].alex.find(ev => ev.id === 'series-first'),
+    middle: allData['2026-07-23'].alex.find(ev => ev.id === 'series-middle'),
+    last: allData['2026-07-24'].alex.find(ev => ev.id === 'series-last'),
+    removedOldMiddle: !(allData['2026-07-22'] || {}).alex?.some(ev => ev.id === 'series-middle'),
+  }));
+  assert.strictEqual(recurrenceResult.first.text, 'standup');
+  assert.strictEqual(recurrenceResult.first.recurrenceId, 'series-edit');
+  assert.notStrictEqual(recurrenceResult.middle.recurrenceId, 'series-edit');
+  assert.strictEqual(recurrenceResult.middle.recurrenceId, recurrenceResult.last.recurrenceId);
+  assert.strictEqual(recurrenceResult.middle.text, 'planning sync');
+  assert.strictEqual(recurrenceResult.middle.start, 13);
+  assert.strictEqual(recurrenceResult.removedOldMiddle, true);
+
   await page.locator('#btn-settings').click();
   await page.waitForSelector('#s-google-calendar-connect');
   await page.keyboard.press('Escape');
@@ -100,7 +143,7 @@ function server() {
 
   // Empty schedules still retain their calendar affordances, and connection
   // changes must be visible without a full application redraw.
-  await page.locator('#btn-next').click();
+  await page.locator('#btn-next').click({ clickCount: 3 });
   assert.strictEqual(await page.locator('.ev').count(), 0, 'an empty day must not render stale events');
   assert.strictEqual(await page.locator('.col-body').count(), 1, 'an empty day must remain ready for event creation');
   await page.evaluate(() => window.dispatchEvent(new Event('offline')));

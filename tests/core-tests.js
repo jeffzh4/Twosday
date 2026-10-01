@@ -575,6 +575,11 @@ run('collectSeries and seriesCount find all instances of a series', () => {
   assert.strictEqual(exec(`seriesCount('nope', 'alex')`), 0);
 });
 
+run('recurring scope remains available for a single remaining occurrence', () => {
+  assert.strictEqual(exec(`shouldOfferRecurrenceScope({ recurrenceId: 'series1' })`), true);
+  assert.strictEqual(exec(`shouldOfferRecurrenceScope({ recurrenceId: null })`), false);
+});
+
 run('deleteRecurringSeries removes all or this-and-following', () => {
   function seed() {
     exec(`
@@ -612,6 +617,81 @@ run('editRecurringSeries patches time and text across the scope', () => {
   assert.strictEqual(exec(`getEventsForDate('2026-06-15','alex')[0].text`), 'sync');
   assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex')[0].start`), 10);
   assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex')[0].color`), 'red');
+});
+
+run('future recurring edit splits the series and applies date and detail changes', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ['2026-06-14','2026-06-15','2026-06-16','2026-06-17'].forEach(dk => {
+      ensureDateUser(dk, 'alex');
+      allData[dk].alex.push({ id:'r_'+dk, text:'standup', start:9, end:9.5, done:false, shared:false, sharedId:null, color:'blue', recurrenceId:'series1', recurrence:{freq:'daily',count:4} });
+    });
+    editRecurringSeries('series1', 'alex', '2026-06-16', {
+      text:'sync', start:10, end:10.5, dateOffsetDays:7,
+      reminderMinutes:15, timeZone:'America/Los_Angeles',
+    });
+  `);
+  const earlier = exec(`getEventsForDate('2026-06-14','alex')[0]`);
+  const later = exec(`getEventsForDate('2026-06-23','alex')[0]`);
+  const last = exec(`getEventsForDate('2026-06-24','alex')[0]`);
+  assert.strictEqual(earlier.recurrenceId, 'series1');
+  assert.strictEqual(earlier.recurrence.count, 2);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-16','alex').length`), 0);
+  assert.notStrictEqual(later.recurrenceId, 'series1');
+  assert.strictEqual(later.recurrenceId, last.recurrenceId);
+  assert.strictEqual(later.text, 'sync');
+  assert.strictEqual(later.recurrence.count, 2);
+  assert.strictEqual(later.reminderMinutes, 15);
+  assert.strictEqual(later.timeZone, 'America/Los_Angeles');
+  assert.strictEqual(exec(`seriesCount('series1', 'alex')`), 2);
+  assert.strictEqual(exec(`seriesCount('${later.recurrenceId}', 'alex')`), 2);
+});
+
+run('future recurring edit keeps shared mirrors aligned after splitting and moving', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ['2026-06-14','2026-06-15','2026-06-16'].forEach(dk => {
+      ensureDateUser(dk, 'alex');
+      ensureDateUser(dk, 'jamie');
+      const sharedId = 'share_'+dk;
+      allData[dk].alex.push({ id:'a_'+dk, text:'standup', start:9, end:9.5, done:false, shared:true, sharedId, color:'blue', recurrenceId:'series1', recurrence:{freq:'daily',count:3} });
+      allData[dk].jamie.push({ id:'j_'+dk, text:'standup', start:9, end:9.5, done:false, shared:true, sharedId, color:'blue', recurrenceId:'series1', recurrence:{freq:'daily',count:3} });
+    });
+    editRecurringSeries('series1', 'alex', '2026-06-15', {
+      text:'sync', dateOffsetDays:1, shared:true,
+    });
+  `);
+  const ownerFuture = exec(`getEventsForDate('2026-06-16','alex')[0]`);
+  const mirrorFuture = exec(`getEventsForDate('2026-06-16','jamie')[0]`);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-15','alex').length`), 0);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-15','jamie').length`), 0);
+  assert.strictEqual(ownerFuture.text, 'sync');
+  assert.strictEqual(mirrorFuture.recurrenceId, ownerFuture.recurrenceId);
+  assert.strictEqual(mirrorFuture.sharedId, ownerFuture.sharedId);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-17','alex')[0].recurrenceId`), ownerFuture.recurrenceId);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-17','jamie')[0].recurrenceId`), ownerFuture.recurrenceId);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','jamie')[0].recurrence.count`), 1);
+});
+
+run('series sharing changes add and remove each mirrored occurrence', () => {
+  exec(`
+    Object.keys(allData).forEach(k => delete allData[k]);
+    ['2026-06-14','2026-06-15'].forEach(dk => {
+      ensureDateUser(dk, 'alex');
+      ensureDateUser(dk, 'jamie');
+      allData[dk].alex.push({ id:'r_'+dk, text:'standup', start:9, end:9.5, done:false, shared:false, sharedId:null, recurrenceId:'series1', recurrence:{freq:'daily',count:2} });
+    });
+    editRecurringSeries('series1', 'alex', null, { shared:true });
+  `);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','alex')[0].shared`), true);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','jamie').length`), 1);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-15','jamie').length`), 1);
+
+  exec(`editRecurringSeries('series1', 'alex', null, { shared:false });`);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','alex')[0].shared`), false);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','alex')[0].sharedId`), null);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-14','jamie').length`), 0);
+  assert.strictEqual(exec(`getEventsForDate('2026-06-15','jamie').length`), 0);
 });
 
 run('merge preserves legacy events without deletion markers', () => {

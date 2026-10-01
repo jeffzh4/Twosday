@@ -73,6 +73,9 @@ if (!/touchstart/.test(dayWeek) || !/touchend/.test(dayWeek) || !/Math\.abs\(dx\
 if (!/mobile-event-reschedule/.test(modal) || !/quickReschedule/.test(modal)) {
   throw new Error('mobile reschedule regression: event editor must retain fast rescheduling actions');
 }
+if (!/shouldOfferRecurrenceScope\(editEv\)/.test(modal) || !/shouldOfferRecurrenceScope\(ev\)/.test(dayWeek)) {
+  throw new Error('recurrence regression: edits and deletes must offer scope for any recurring instance');
+}
 if (!/Notification\.permission/.test(reminders) || !/event\.reminderMinutes/.test(reminders)) {
   throw new Error('reminder regression: browser-open reminders must remain opt-in and event-scoped');
 }
