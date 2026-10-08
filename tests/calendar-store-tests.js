@@ -143,7 +143,7 @@ async function run(name, fn) {
       saveRemote: () => { controls.saved = true; },
     };
     const adapter = context.createFirestoreCalendarAdapter({
-      getDocument: () => ({ onSnapshot: fn => { snapshotHandler = fn; return () => {}; }, set: () => Promise.resolve() }),
+      getDocument: () => ({ onSnapshot: (options, fn) => { snapshotHandler = fn; return () => {}; }, set: () => Promise.resolve() }),
       clientId: 'local', isLoading: () => false, setLoading: value => loading.push(value),
       isOffline: () => false, signature: () => 'one', buildPayload: () => ({}),
       setStatus: status => statuses.push(status), onWriteError: () => {},
@@ -163,7 +163,7 @@ async function run(name, fn) {
     const loading = [];
     let syncedSignature = null;
     const adapter = context.createFirestoreCalendarAdapter({
-      getDocument: () => ({ onSnapshot: fn => { snapshotHandler = fn; return () => {}; }, set: () => Promise.resolve() }),
+      getDocument: () => ({ onSnapshot: (options, fn) => { snapshotHandler = fn; return () => {}; }, set: () => Promise.resolve() }),
       clientId: 'local', isLoading: () => false, setLoading: value => loading.push(value),
       isOffline: () => false, signature: () => 'fallback-signature', buildPayload: () => ({}),
       setStatus: () => {}, onWriteError: () => {}, mergeSnapshot: () => { throw new Error('merge failed'); },
@@ -173,6 +173,39 @@ async function run(name, fn) {
     snapshotHandler({ exists: true, data: () => ({ clientId: 'other' }) });
     assert.deepStrictEqual(loading, [true, false]);
     assert.strictEqual(syncedSignature, 'fallback-signature');
+  });
+
+  await run('a fresh device cannot overwrite cloud data before a server snapshot', async () => {
+    let snapshotHandler;
+    let errorHandler;
+    let writes = 0;
+    let events = [];
+    const statuses = [];
+    const adapter = context.createFirestoreCalendarAdapter({
+      getDocument: () => ({
+        onSnapshot: (options, onNext, onError) => { snapshotHandler = onNext; errorHandler = onError; return () => {}; },
+        set: () => { writes++; return Promise.resolve(); },
+      }),
+      clientId: 'phone', isLoading: () => false, setLoading: () => {},
+      isOffline: () => false, signature: () => JSON.stringify(events), buildPayload: () => ({ events }),
+      setStatus: status => statuses.push(status), onWriteError: () => {}, onListenerError: () => {},
+      mergeSnapshot: data => { events = data.events; return { signature: JSON.stringify(events), needsReconverge: false }; },
+      applyFallbackSnapshot: () => {},
+    });
+    const store = context.createCalendarStore({ cache: { load: () => false, save: () => {} }, remote: adapter });
+    store.listen();
+    assert.strictEqual(await store.saveRemote(), false);
+    snapshotHandler({ exists: false, metadata: { fromCache: true } });
+    assert.strictEqual(await store.saveRemote(), false);
+    assert.strictEqual(writes, 0);
+    snapshotHandler({ exists: true, metadata: { fromCache: false }, data: () => ({ events: ['laptop-event'] }) });
+    assert.deepStrictEqual(events, ['laptop-event']);
+    assert.strictEqual(await store.saveRemote(), false);
+    assert.strictEqual(writes, 0, 'loading remote data must not replace it with the empty initial state');
+    errorHandler(new Error('unavailable'));
+    assert.strictEqual(await store.saveRemote(), false);
+    assert.strictEqual(statuses.at(-1), 'error');
+    store.reset();
   });
 
   console.log('all calendar store tests passed');

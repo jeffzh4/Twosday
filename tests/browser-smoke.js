@@ -12,7 +12,18 @@ const firebaseMock = `
   const user = { uid: 'smoke-owner', email: 'smoke@twosday.local', delete: async () => {}, linkWithPopup: async () => ({ user }) };
   const doc = (collection, id) => ({
     get: async () => collection === 'accounts' && id === 'smoke' ? { exists: true, data: () => account } : { exists: false, data: () => ({}) },
-    set: async () => {}, update: async () => {}, delete: async () => {}, onSnapshot: () => () => {},
+    set: async () => { if (id === 'smoke-data') window.__smokeWrites = (window.__smokeWrites || 0) + 1; }, update: async () => {}, delete: async () => {},
+    onSnapshot: (...args) => {
+      const callback = typeof args[0] === 'function' ? args[0] : args[1];
+      if (id === 'smoke-data') {
+        window.__smokeFailSync = () => (typeof args[0] === 'function' ? args[1] : args[2])({ code: 'permission-denied' });
+        setTimeout(() => {
+          window.__smokeWritesBeforeCloud = window.__smokeWrites || 0;
+          callback({ exists: true, metadata: { fromCache: false, hasPendingWrites: false }, data: () => window.__smokeCloudData || { allData: {} } });
+        }, window.__smokeCloudDelay || 0);
+      }
+      return () => {};
+    },
   });
   const auth = () => ({ currentUser: user, onAuthStateChanged: callback => { queueMicrotask(() => callback(user)); return () => {}; }, signOut: async () => {}, signInWithPopup: async () => ({ user }), signInWithEmailAndPassword: async () => ({ user }), createUserWithEmailAndPassword: async () => ({ user }) });
   auth.GoogleAuthProvider = function GoogleAuthProvider() {};
@@ -135,6 +146,75 @@ function server() {
   assert.strictEqual(recurrenceResult.middle.start, 13);
   assert.strictEqual(recurrenceResult.removedOldMiddle, true);
 
+  // Resizing a recurring block must use the same scope chooser as form edits.
+  await page.evaluate(() => {
+    ['2026-07-21', '2026-07-22', '2026-07-23'].forEach((dateKey, index) => {
+      ensureDateUser(dateKey, 'alex');
+      ensureDateUser(dateKey, 'jamie');
+      allData[dateKey].alex.push({
+        id: `resize-${index}`, text: 'resize series', start: 15, end: 16,
+        shared: false, done: false, recurrenceId: 'resize-series',
+        recurrence: { freq: 'daily', count: 3 },
+      });
+      allData[dateKey].alex.push({
+        id: `shared-resize-${index}`, text: 'shared resize', start: 17, end: 18,
+        shared: true, sharedId: `shared-resize-id-${index}`, done: false,
+        recurrenceId: 'shared-resize-series', recurrence: { freq: 'daily', count: 3 },
+      });
+      allData[dateKey].jamie.push({
+        id: `shared-mirror-${index}`, text: 'shared resize', start: 17, end: 18,
+        shared: true, sharedId: `shared-resize-id-${index}`, done: false,
+        recurrenceId: 'shared-resize-series', recurrence: { freq: 'daily', count: 3 },
+      });
+    });
+    currentDate = parseDateKey('2026-07-21');
+    viewMode = 'day';
+    render();
+  });
+  const dragResize = id => page.evaluate(eventId => {
+    const y = 100;
+    startDrag({ button: 0, clientY: y, clientX: 100, preventDefault() {} }, 'resize-end', '2026-07-21', eventId);
+    onDragMove({ clientY: y + PX_PER_HOUR / 2, clientX: 100 });
+    onDragEnd();
+  }, id);
+
+  await page.evaluate(() => openModal({ dateKey: '2026-07-21', editEvId: 'resize-0' }));
+  await page.locator('#m-name').fill('renamed recurring event');
+  await page.locator('#m-save').click();
+  await page.waitForSelector('.scope-modal');
+  await page.locator('.scope-btn[data-scope="all"]').click();
+  const renamedSeries = await page.evaluate(() => ['2026-07-21', '2026-07-22', '2026-07-23']
+    .map(dateKey => allData[dateKey].alex.find(ev => ev.recurrenceId === 'resize-series').text));
+  assert.deepStrictEqual(renamedSeries, Array(3).fill('renamed recurring event'), 'a title-only change must offer and apply series scope');
+
+  await dragResize('resize-0');
+  await page.waitForSelector('.scope-modal');
+  assert.strictEqual(await page.locator('.scope-btn[data-scope="all"]').count(), 1, 'resizing a recurring block must ask for a scope');
+  await page.locator('.scope-modal [data-scope="cancel"]').click();
+  assert.strictEqual(await page.evaluate(() => allData['2026-07-21'].alex.find(ev => ev.id === 'resize-0').end), 16, 'cancel must restore the original duration');
+
+  await dragResize('resize-0');
+  await page.waitForSelector('.scope-modal');
+  await page.locator('.scope-btn[data-scope="all"]').click();
+  const resizedSeries = await page.evaluate(() => ['2026-07-21', '2026-07-22', '2026-07-23']
+    .map(dateKey => allData[dateKey].alex.find(ev => ev.recurrenceId === 'resize-series').end));
+  assert.deepStrictEqual(resizedSeries, [16.5, 16.5, 16.5], 'all-scope resize must update every occurrence');
+
+  await dragResize('shared-resize-0');
+  await page.waitForSelector('.scope-modal');
+  await page.locator('.scope-btn[data-scope="this"]').click();
+  const sharedResize = await page.evaluate(() => ({
+    owner: allData['2026-07-21'].alex.find(ev => ev.id === 'shared-resize-0'),
+    mirror: allData['2026-07-21'].jamie.find(ev => ev.sharedId === 'shared-resize-id-0'),
+    laterOwner: allData['2026-07-22'].alex.find(ev => ev.id === 'shared-resize-1'),
+  }));
+  assert.strictEqual(sharedResize.owner.end, 18.5);
+  assert.strictEqual(sharedResize.owner.recurrenceId, null, 'this-only resize should detach the owner occurrence');
+  assert.strictEqual(sharedResize.mirror.recurrenceId, null, 'this-only resize should detach the shared mirror');
+  assert.strictEqual(sharedResize.mirror.end, 18.5, 'this-only resize should update the shared mirror');
+  assert.strictEqual(sharedResize.laterOwner.recurrenceId, 'shared-resize-series', 'other occurrences should remain in the series');
+  await page.evaluate(() => { currentDate = parseDateKey('2026-07-23'); render(); });
+
   await page.locator('#btn-settings').click();
   await page.waitForSelector('#s-google-calendar-connect');
   await page.keyboard.press('Escape');
@@ -239,6 +319,31 @@ function server() {
   assert.strictEqual(await resizable.evaluate(() => getEventsForDate('2026-05-31', 'alex').length), 0);
   assert.strictEqual(await resizable.evaluate(() => getEventsForDate('2026-07-21', 'alex').length), 1);
   await resizable.close();
+
+  // A phone with no local calendar must load laptop events before any write.
+  const freshPhone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  await freshPhone.route('https://www.gstatic.com/firebasejs/**', route => route.fulfill({ contentType: 'application/javascript', body: firebaseMock }));
+  await freshPhone.addInitScript(() => {
+    localStorage.setItem('twosday_session_v1', JSON.stringify({ username: 'smoke', savedAt: Date.now() }));
+    window.__smokeCloudDelay = 1200;
+    const dateKey = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0');
+    window.__smokeCloudData = { allData: { [dateKey]: {
+      alex: [{ id: 'cloud-only', text: 'laptop calendar event', start: 9, end: 10 }],
+      jamie: [{ id: 'partner-cloud-only', text: 'partner calendar event', start: 11, end: 12 }],
+    } }, userTheme: { alex: 'dark', jamie: 'light' } };
+  });
+  await freshPhone.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+  await freshPhone.waitForSelector('.mobile-agenda');
+  assert.strictEqual(await freshPhone.evaluate(() => window.__smokeWrites || 0), 0, 'fresh phone must not write an empty calendar before the cloud read');
+  await freshPhone.getByText('laptop calendar event', { exact: true }).waitFor();
+  assert.strictEqual(await freshPhone.evaluate(() => window.__smokeWritesBeforeCloud), 0, 'no empty write may occur while the phone waits for the delayed server snapshot');
+  await freshPhone.locator('.user-tab').filter({ hasText: 'jamie' }).click();
+  await freshPhone.getByText('partner calendar event', { exact: true }).waitFor();
+  await freshPhone.evaluate(() => window.__smokeFailSync());
+  await freshPhone.waitForFunction(() => document.getElementById('sync-status').dataset.state === 'error');
+  assert.strictEqual(await freshPhone.evaluate(() => saveToFirestore()), false, 'sync failures must block cloud writes and retain the visible calendar');
+  await freshPhone.getByText('partner calendar event', { exact: true }).waitFor();
+  await freshPhone.close();
 
   // Public static routes stay readable without an account or production data.
   const publicPage = await browser.newPage();

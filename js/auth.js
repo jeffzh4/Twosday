@@ -104,6 +104,13 @@ async function findAccountForAuthUser(user) {
 
 function activateAccount(username, account) {
   if (typeof resetCalendarStore === 'function') resetCalendarStore();
+  Object.keys(allData).forEach(key => delete allData[key]);
+  calendarDensity = {};
+  appHistory.undo = [];
+  appHistory.redo = [];
+  _isLoadingFromFirestore = false;
+  currentDate = new Date();
+  viewMode = 'week';
   currentAccount = { username, ...account };
 
   USERS = account.profiles.slice();

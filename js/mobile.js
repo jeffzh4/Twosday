@@ -78,7 +78,13 @@ function openMobileMoreSheet() {
         render();
       }
       if (action === 'install') promptTwosdayInstall();
-      if (action === 'sync') showToast(navigator.onLine === false ? 'offline changes stay on this device until reconnect' : 'calendar is connected', 'info');
+      if (action === 'sync') {
+        const status = document.getElementById('sync-status').dataset.state;
+        showToast(navigator.onLine === false ? 'offline changes stay on this device until reconnect'
+          : status === 'error' ? "couldn't sync calendar — reload to reconnect"
+          : status === 'pending' ? 'waiting for cloud sync'
+          : 'calendar is connected', 'info');
+      }
       if (action === 'settings') openSettingsModal();
       if (action === 'logout') logout();
     });
