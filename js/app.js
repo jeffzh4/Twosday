@@ -175,7 +175,7 @@ function wireAppShell() {
 
   document.getElementById('btn-settings').onclick = () => openSettingsModal();
   document.getElementById('btn-logout').onclick = logout;
-  window.addEventListener('online', () => { setSyncStatus('synced'); saveToLocalStorage(); });
+  window.addEventListener('online', () => { setSyncStatus('pending'); saveToLocalStorage(); });
   window.addEventListener('offline', () => setSyncStatus('offline'));
 
   // renderGrid() only picks desktop-grid vs. mobile-agenda at the moment it
@@ -237,30 +237,11 @@ function bootApp() {
 
   applyTheme();
   applyDensity();
-  setSyncStatus(navigator.onLine === false ? 'offline' : 'synced');
+  setSyncStatus(navigator.onLine === false ? 'offline' : 'pending');
   render();
 
-  // Firestore: initial fetch (prefer cloud if newer than local)
-  const syncBar = document.getElementById('sync-bar');
-  if (syncBar) syncBar.style.display = 'block';
-  FIRESTORE_DOC.get().then(snap => {
-    if (syncBar) syncBar.style.display = 'none';
-    if (!snap.exists) return;
-    const data = snap.data();
-    if (isRemoteNewer(STORAGE_KEY, data.savedAt)) {
-      _isLoadingFromFirestore = true;
-      applyParsedData(data, false);
-      applyTheme();
-      _isLoadingFromFirestore = false;
-      if (typeof applyTestingDemoSeed === 'function') applyTestingDemoSeed();
-      render();
-    } else if (typeof applyTestingDemoSeed === 'function' && applyTestingDemoSeed()) {
-      render();
-    }
-  }).catch(e => {
-    if (syncBar) syncBar.style.display = 'none';
-    reportOperationalIssue('initial-firestore-load', e);
-  });
+  // The listener owns initial loading and reconciliation. Cloud writes stay
+  // blocked until it receives a confirmed server snapshot.
 
   NOTES_DOC.get().then(snap => {
     if (!snap.exists) return;

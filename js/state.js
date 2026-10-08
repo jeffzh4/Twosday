@@ -407,7 +407,10 @@ function getCalendarStore() {
       applyDensity();
       render();
     },
-    onListenerError: error => reportOperationalIssue('firestore-listener', error),
+    onListenerError: error => {
+      reportOperationalIssue('firestore-listener', error);
+      showToast("couldn't load cloud calendar — reload to reconnect");
+    },
   });
 
   calendarStore = createCalendarStore({ cache, remote });

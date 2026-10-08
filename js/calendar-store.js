@@ -32,9 +32,13 @@ function createCalendarStore(options) {
   }
 
   function saveRemote() {
+    if (remote.isLoading()) return Promise.resolve(false);
     const writeLifecycle = lifecycle;
     const signature = remote.signature();
-    if (signature === lastSyncedSignature) return Promise.resolve(false);
+    if (signature === lastSyncedSignature) {
+      remote.setStatus(remote.isOffline() ? 'offline' : 'synced');
+      return Promise.resolve(false);
+    }
 
     lastSyncedSignature = signature;
     remote.setStatus(remote.isOffline() ? 'offline' : 'pending');
@@ -125,41 +129,56 @@ function createFirestoreCalendarAdapter(options) {
     applyFallbackSnapshot,
     onListenerError,
   } = options;
+  let serverReady = false;
 
   return {
-    isLoading,
+    isLoading: () => isLoading() || !serverReady,
     isOffline,
     signature,
     setStatus,
     write: () => getDocument().set(buildPayload()),
     onWriteError,
     listen(controls) {
-      return getDocument().onSnapshot(snap => {
-        if (!snap.exists) return;
+      return getDocument().onSnapshot({ includeMetadataChanges: true }, snap => {
+        const confirmed = !snap.metadata || (!snap.metadata.fromCache && !snap.metadata.hasPendingWrites);
+        if (confirmed) serverReady = true;
+        if (!snap.exists) {
+          if (confirmed) controls.saveRemote();
+          return;
+        }
         const data = snap.data();
-        if (data.clientId && data.clientId === clientId) return;
+        if (data.clientId && data.clientId === clientId && serverReady) {
+          if (confirmed) setStatus('synced');
+          return;
+        }
 
         setLoading(true);
         try {
           const result = mergeSnapshot(data);
           setLoading(false);
-          if (result.needsReconverge && controls.canReconverge()) {
+          if (confirmed && result.needsReconverge && controls.canReconverge()) {
             controls.markReconverged();
             controls.setLastSyncedSignature(null);
             controls.saveRemote();
-          } else if (!result.needsReconverge) {
+          } else if (confirmed && !result.needsReconverge) {
             controls.setLastSyncedSignature(result.signature);
             setStatus('synced');
           }
         } catch (error) {
+          serverReady = false;
           try {
             applyFallbackSnapshot(data, error);
             controls.setLastSyncedSignature(signature());
           } finally {
             setLoading(false);
+            setStatus('error');
           }
         }
-      }, onListenerError);
+      }, error => {
+        serverReady = false;
+        setStatus('error');
+        onListenerError(error);
+      });
     },
   };
 }

@@ -74,7 +74,7 @@ function startDrag(e, mode, dateKey, evId) {
     startX: e.clientX,
     moved: false,
     historyPushed: false,
-    origin: { start: ev.start, end: ev.end, dateKey },
+    origin: { start: ev.start, end: ev.end, dateKey, event: clone(ev) },
   };
 }
 
@@ -98,7 +98,7 @@ function onDragMove(e) {
   if (!ev) return;
 
   if (!dragState.historyPushed && Math.abs(e.clientY - dragState.startY) > 4) {
-    pushHistory();
+    if (!dragState.origin.event.recurrenceId) pushHistory();
     dragState.historyPushed = true;
     arr = getEventsForDate(dateKey, activeUser);
     ev = arr.find(x => x.id === evId);
@@ -123,7 +123,7 @@ function onDragMove(e) {
       if (body && body.dataset.datekey && body.dataset.datekey !== dateKey) {
         const newDk = body.dataset.datekey;
         moveEventToDate(dateKey, newDk, activeUser, ev);
-        if (ev.shared) {
+        if (ev.shared && !dragState.origin.event.recurrenceId) {
           syncSharedEvent(activeUser, ev.sharedId, dateKey, 'delete');
           syncSharedEvent(activeUser, ev.sharedId, newDk, 'add', {
             ...clone(ev), id: uid(), shared: true, sharedId: ev.sharedId,
@@ -143,7 +143,9 @@ function onDragMove(e) {
   markEventUpdated(ev, activeUser);
   sortDateUser(dragState.dateKey, activeUser);
 
-  if (ev.shared) {
+  // Recurring drags are only a preview until the user chooses a scope. Do not
+  // mutate the other profile during that preview; cancellation must be clean.
+  if (ev.shared && !dragState.origin.event.recurrenceId) {
     syncSharedEvent(activeUser, ev.sharedId, dragState.dateKey, 'edit', {
       start: ev.start, end: ev.end, text: ev.text, color: ev.color,
       updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
@@ -165,10 +167,66 @@ function onDragEnd() {
     return;
   }
   if (!dragState) return;
-  const didMove = dragState.moved;
+  const drag = dragState;
+  const didMove = drag.moved;
   if (didMove) {
-    const ev = getEventsForDate(dragState.dateKey, activeUser).find(x => x.id === dragState.evId);
-    if (ev) logAudit(dragState.mode === 'move' ? 'moved' : 'resized', ev.text, `${fmtFull(ev.start)} – ${fmtFull(ev.end)}`);
+    const ev = getEventsForDate(drag.dateKey, activeUser).find(x => x.id === drag.evId);
+    if (ev && drag.origin.event.recurrenceId && (
+      drag.dateKey !== drag.origin.dateKey ||
+      ev.start !== drag.origin.start || ev.end !== drag.origin.end
+    )) {
+      const proposal = { dateKey: drag.dateKey, start: ev.start, end: ev.end };
+      const original = drag.origin.event;
+
+      if (drag.dateKey !== drag.origin.dateKey) {
+        moveEventToDate(drag.dateKey, drag.origin.dateKey, activeUser, ev);
+      }
+      Object.assign(ev, clone(original));
+      sortDateUser(drag.origin.dateKey, activeUser);
+      dragState = null;
+      render();
+
+      openRecurrenceScopeModal({ verb: 'edit', onChoose: scope => {
+        pushHistory();
+        if (scope === 'this') {
+          if (proposal.dateKey !== drag.origin.dateKey) {
+            moveEventToDate(drag.origin.dateKey, proposal.dateKey, activeUser, ev);
+          }
+          ev.start = proposal.start;
+          ev.end = proposal.end;
+          ev.recurrenceId = null;
+          ev.recurrence = null;
+          markEventUpdated(ev, activeUser);
+          sortDateUser(drag.origin.dateKey, activeUser);
+          sortDateUser(proposal.dateKey, activeUser);
+          if (ev.shared) {
+            if (proposal.dateKey !== drag.origin.dateKey) {
+              syncSharedEvent(activeUser, ev.sharedId, drag.origin.dateKey, 'delete');
+              syncSharedEvent(activeUser, ev.sharedId, proposal.dateKey, 'add', {
+                ...clone(ev), id: uid(), shared: true, sharedId: ev.sharedId,
+              });
+            } else {
+              syncSharedEvent(activeUser, ev.sharedId, proposal.dateKey, 'edit', {
+                start: ev.start, end: ev.end, recurrenceId: null, recurrence: null,
+                updatedAt: ev.updatedAt, updatedBy: ev.updatedBy,
+              });
+            }
+          }
+          logAudit('edited', ev.text, `${fmtFull(ev.start)} – ${fmtFull(ev.end)}`);
+        } else {
+          editRecurringSeries(original.recurrenceId, activeUser,
+            scope === 'future' ? drag.origin.dateKey : null,
+            {
+              start: proposal.start, end: proposal.end,
+              dateOffsetDays: dateKeyOffset(drag.origin.dateKey, proposal.dateKey),
+            });
+        }
+        currentDate = parseDateKey(proposal.dateKey);
+        render();
+      }});
+      return;
+    }
+    if (ev) logAudit(drag.mode === 'move' ? 'moved' : 'resized', ev.text, `${fmtFull(ev.start)} – ${fmtFull(ev.end)}`);
   }
   dragState = null;
   // A normal click briefly creates drag state on mousedown. Avoid rebuilding
