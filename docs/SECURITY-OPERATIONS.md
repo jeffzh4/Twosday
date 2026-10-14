@@ -20,7 +20,7 @@ Before each production release:
 
 ## Browser session and request boundaries
 
-Idle-timeout sign-out is disabled for now (see `js/auth.js` git history for the prior implementation). A session currently persists until explicit logout.
+Idle-timeout sign-out is disabled for now (see `js/auth.js` git history for the prior implementation). The app does not enforce inactivity expiry. Explicit logout or Firebase authentication invalidation can end a session; token renewal is not an idle-session policy.
 
 Signup requests require a current Firebase App Check attestation on production hosts. This adds a browser-side gate, but the durable bot boundary remains Firebase App Check enforcement and Firebase Authentication quotas in the Firebase Console.
 
@@ -43,6 +43,10 @@ The following controls are outside this repository and require periodic dashboar
 - Firestore Rules deployment state.
 - Vercel Deployment Protection for previews and non-production deployments.
 - DNS, domain renewal, and domain-account access.
+
+Localhost and local files are allowed by the client hostname guard, but use the same configured Firebase project as production. Provider-side key restrictions and App Check enforcement can still deny their requests. Use mocked browser tests and the Firestore emulator for isolated verification; a local app page is not an isolated staging environment.
+
+No automated Firestore backup schedule is defined in the repository. Manual calendar exports provide a recovery copy of exported events, not a complete backup of account metadata, notes, or presence. Treat dashboard backup configuration and restore testing as separate operational work.
 
 ## Incident handling
 

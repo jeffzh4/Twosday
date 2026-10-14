@@ -22,7 +22,7 @@ The current product is built for a pair who already coordinate their lives and w
 ## Product Principles
 
 1. **Coordination over administration.** Features should shorten the path from “when are we free?” to a concrete plan.
-2. **Private by default, shared by intent.** An event is shared only when its creator marks it shared. External calendar data is represented as busy time, not copied into Twosday.
+2. **Profile-scoped by default, mirrored by intent.** An event appears in both profiles only when marked shared. Both profiles are accessible to the account owner; this is not private access between separate people. External calendar data is represented as busy time, not copied into Twosday.
 3. **State must stay trustworthy.** Shared edits, offline writes, and concurrent changes need predictable outcomes before new surface area is added.
 4. **Information should earn its place.** The calendar is primary. Supporting controls stay secondary and avoid permanently competing with the schedule.
 5. **Small product, complete workflows.** Import/export, recurrence, search, accessibility, and recovery matter because people depend on calendars for repeated use.
@@ -38,6 +38,7 @@ The current product is built for a pair who already coordinate their lives and w
 | Collaboration context | Show presence, latest event update, and change history. | Gives enough context to trust a change without adding an activity feed. |
 | External calendars | Offer selected Google calendars as read-only busy overlays. | Helps users account for existing commitments without importing private third-party event details. |
 | Resilience | Work from local cache, reconcile remote state, and communicate sync status. | A calendar must remain useful through ordinary connection changes. |
+| Mobile use | Offer agenda-based browsing, event editing, and secondary tools without requiring a desktop-width grid. | Phone use must preserve the same scheduling behavior, not a reduced data model. |
 
 ## Non-Goals
 
@@ -50,6 +51,7 @@ This private project does not publish fabricated adoption or conversion metrics.
 - Can a pair create, edit, and trust a shared event without duplicate or stale copies?
 - Can they identify a conflict or mutual opening without manually comparing schedules?
 - Does calendar state remain usable after refresh, reconnect, or concurrent edits?
+- Does a fresh phone session load cloud events before attempting to write its initially empty state?
 - Can keyboard-only and reduced-motion users complete core workflows?
 - Can an external busy block inform a decision without exposing external event details?
 

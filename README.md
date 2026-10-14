@@ -6,7 +6,11 @@ Twosday helps two people coordinate individual plans, shared events, conflicts, 
 
 [Live project](https://twosday.dev) · [Privacy policy](https://www.twosday.dev/privacy.html) · [Architecture notes](ARCHITECTURE.md) · [Run the test suite](#testing)
 
-<!-- Add assets/twosday-demo.gif here after recording the README walkthrough. -->
+## Product Overview
+
+Twosday keeps two profile schedules in one account. Personal events stay on their profile; shared plans appear in both. Conflict detection and mutual free-window search help turn those schedules into a workable plan. Profile separation is organizational, not a permission boundary: anyone signed into the account can access both profiles.
+
+Desktop uses a time grid for precise placement and drag editing. Mobile uses day and week agendas, month navigation, and a bottom tools menu. Both interfaces edit the same calendar data through the same event workflows.
 
 ## Documentation
 
@@ -24,15 +28,15 @@ Twosday helps two people coordinate individual plans, shared events, conflicts, 
 | [Threat model](docs/THREAT-MODEL.md) | Assets, trust boundaries, controls, and present limits. |
 | [Changelog](CHANGELOG.md) | Repository milestones and release context. |
 
-## Why It Stands Out
+## Engineering Decisions
 
 | Collaboration | Scheduling intelligence | Engineering depth |
 | --- | --- | --- |
 | Two independent profiles with mirrored shared events, live presence, an append-only change history, and per-event update metadata. | Conflict Center and mutual free-window search make coordination visible and actionable. | Deterministic CRDT conflict reconciliation, property-based tests, Firebase Auth ownership, Firestore authorization tests, and real-time listeners. |
 
-## Product Walkthrough
+## Core Workflow
 
-The recorded walkthrough will follow one complete coordination flow:
+The main coordination flow is:
 
 1. Navigate a populated week with two profile calendars and real-time presence.
 2. Create or reschedule a shared event and show its synchronized mirror.
@@ -40,13 +44,14 @@ The recorded walkthrough will follow one complete coordination flow:
 4. Open calendar insights to compare workload, shared time, and scheduling patterns.
 5. Preview calendar import/export and keyboard-accessible event editing.
 
-The walkthrough uses the seeded `testing` account locally. Its credentials are intentionally not published here; the live link is secondary to the recorded product demonstration.
+The seeded `testing` account provides fictional demonstration data. Automated tests use separate mocked or emulator data, not that account or personal calendars.
 
 ## Features
 
 ### Calendar and collaboration
 
 - Day, week, month, and year views across a full 24-hour schedule
+- Mobile day/week agendas, month navigation, quick rescheduling, and a tools menu for search, import/export, conflicts, activity, settings, and undo/redo
 - Two named profiles with independent themes, notes, and optional emoji identifiers
 - Shared events mirrored automatically between profiles
 - True recurring events with this / this-and-following / all-occurrences edit and delete
@@ -74,7 +79,8 @@ The walkthrough uses the seeded `testing` account locally. Its credentials are i
 - Property-based invariant tests alongside example-based and Firestore-rules tests
 - Authentication retry backoff and owner-scoped data access
 - Real-time Firestore synchronization with self-echo suppression
-- A tested calendar-store seam coordinating `localStorage` caching, Firestore writes, duplicate-write suppression, and bounded reconciliation retries
+- A tested calendar-store interface coordinating `localStorage` caching, Firestore writes, duplicate-write suppression, and bounded reconciliation retries
+- Fresh-device writes wait for a confirmed server snapshot; cached absence cannot overwrite an existing cloud calendar, and listener failures surface as sync errors
 - Keyboard-operable calendar controls, focus-managed dialogs, visible focus states, and reduced-motion support
 - Privacy-safe browser diagnostics, release indicator, and a production response audit that never reads calendar data
 
@@ -97,7 +103,7 @@ Firebase Auth establishes the account owner. Firestore rules require that owner 
 - Browser sign-in and sign-up flows apply an escalating retry delay after repeated failed requests. Production signup also requires a current App Check attestation; Firebase App Check enforcement and Authentication quotas remain the server-side boundary.
 - Browser diagnostics and console warnings use content-free categories rather than provider-supplied error text.
 - The production web app is registered with Firebase App Check using reCAPTCHA Enterprise. The client activates it only on `twosday.dev` and `www.twosday.dev`; monitor App Check metrics before enforcing it for Cloud Firestore or Firebase Authentication. Also review the Firebase API key's API restrictions and tighten the `identitytoolkit.googleapis.com` quota to expected traffic.
-- The default Vercel domain redirects to the canonical domain before app code loads; `config.js` also refuses Firebase initialization on any non-production hostname. In Vercel, enable **Settings → Deployment Protection → Vercel Authentication** for preview deployments as the stronger dashboard-level control.
+- The default Vercel domain redirects to the canonical domain before app code loads. `config.js` permits the two production domains, localhost, loopback, and local files; other hosts redirect without initializing Firebase. Local access is not a separate staging database. In Vercel, enable **Settings → Deployment Protection → Vercel Authentication** for preview deployments as the stronger dashboard-level control.
 - Create or forward `privacy@twosday.dev` before publishing the privacy policy link publicly.
 - See [Security Policy](SECURITY.md), [Content Security Policy](docs/CONTENT-SECURITY-POLICY.md), and [Security Operations](docs/SECURITY-OPERATIONS.md) for reporting, browser policy, and release controls.
 
@@ -128,6 +134,8 @@ open index.html
 ```
 
 Java is required to run the Firestore Emulator tests. The browser app itself has no build step.
+
+**Data safety:** opening the app locally loads the configured production Firebase project. Localhost does not automatically switch to an emulator, and provider restrictions may prevent local authentication. Do not use a personal account for experiments. For isolated verification, run `npm test`: browser tests replace Firebase with mocks, and authorization tests use the local emulator. The optional Google overlay remains unavailable until its OAuth client is configured; see the [setup guide](docs/GOOGLE-CALENDAR-OVERLAY.md).
 
 ## Project Structure
 
