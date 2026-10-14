@@ -14,10 +14,10 @@ allData["2026-06-14"]["alex"] = [
 
 Times are decimal hours, so `9.5` means 9:30 AM. Shared events are mirrored into both profiles and linked by `sharedId`. Recurring events are materialized instances that share a `recurrenceId` and each carry the `recurrence` rule, so edit/delete can act on a single occurrence, this-and-following, or the whole series (see `recurrence.js`).
 
-Two more append-only structures travel with the calendar:
+Two history structures travel with the calendar:
 
 - `tombstones` — `{ eventId: deletedAt }`, so a concurrent merge cannot resurrect a deleted event.
-- `auditLog` — a capped, newest-first list of every mutation (`reconcile.js`/`audit.js`).
+- `auditLog` — a capped, newest-first mutation history (`reconcile.js`/`audit.js`), not an unlimited archival log.
 
 ## Sync and Conflict Reconciliation
 
@@ -32,6 +32,12 @@ Each account maps to three Firestore documents:
 The Firestore adapter ignores its own client echo. Remote snapshots are **merged**, not applied wholesale, so two profiles editing at once no longer clobber each other. `mergeCalendars` (in `reconcile.js`) is a last-write-wins element-set CRDT keyed by event id: for an id on both sides the higher `updatedAt` wins, ties break deterministically on serialized form (so both clients converge regardless of arrival order), and tombstones suppress ids the other side deleted. The merge is a pure, idempotent, order-independent function — after merging, a client whose result differs from the remote document writes the merged state back so both sides settle on the same state. A fallback applies the remote snapshot if reconciliation itself throws. Audit logs merge by union of entry ids.
 
 ## Authentication and Authorization
+
+### Fresh-device synchronization
+
+The Firestore adapter listens with metadata changes enabled. Remote writes remain blocked until a snapshot is confirmed by the server, rather than inferred from an empty local cache. Cached snapshots can populate the interface offline, but do not establish permission to write. A confirmed missing document can initialize an empty calendar. Listener errors revoke readiness and set an error status instead of reporting a successful sync. Account activation clears prior in-memory calendar state before restoring the account-specific cache.
+
+Store tests cover the readiness gate; browser tests cover a delayed first cloud response on a fresh mobile session and a listener failure. These checks use mock data and do not establish that every real device or provider configuration has been tested.
 
 Firebase Authentication is the credential source of truth. Account metadata lives at `accounts/{username}` with an immutable `ownerUid`; calendar, notes, and presence documents repeat that UID plus an `accountId`. Firestore rules permit access only when `request.auth.uid` matches the owner and the data document path matches the account metadata.
 
@@ -50,9 +56,12 @@ The former `schedules/accounts` registry stored multiple users' account metadata
 
 `makeModalAccessible()` supplies dialog semantics, focus trapping, `Escape` handling, and trigger-focus restoration across all modal workflows. Calendar dates, events, search results, profile tabs, and view tabs expose keyboard activation and accessible names. CSS provides consistent `:focus-visible` treatment, stronger text contrast, a skip link, and `prefers-reduced-motion` fallbacks.
 
+Mobile presents day and week agendas rather than compressing the desktop time grid. Its navigation and tools sheet call existing calendar commands; they do not own a separate persistence path. Real-device VoiceOver testing, large-text layout checks, and a comprehensive touch-target audit remain manual work, not completed accessibility certification.
+
 ## Core Workflows
 
 - Event editing flows through `modal.js`, `events.js`, `state.js`, and the `CalendarStore` persistence seam.
+- Recurring drag and resize actions are previews until a scope is chosen. Cancel restores the original event; a single-occurrence edit detaches it from the series. Future/all edits use the series-edit path. Events without a recurrence identifier are standalone; the app does not reconstruct missing series links from similar titles.
 - Shared-event writes call `syncSharedEvent` so mirrored copies stay aligned.
 - Free-window detection unions both profiles' busy intervals, de-dupes shared mirrors, and finds gaps.
 - Analytics reads normalized events into derived metrics without mutating calendar state.
@@ -62,15 +71,16 @@ The former `schedules/accounts` registry stored multiple users' account metadata
 
 ## Testing
 
-Seven suites run under `npm test`:
+Eight suites run under `npm test`:
 
 - **`tests/core-tests.js`** — example-based pure-logic checks in a Node VM context: date/month helpers, shared-event mirroring and undo/redo, sync-signature dedup, authentication retry backoff, stats/ICS/rename, demo-seed idempotency, free-window search, analytics, ICS parsing, conflict collection, recurrence expansion and series edit/delete, and the reconciliation merge (LWW, tombstones, idempotence, audit-log union).
-- **`tests/property-tests.js`** — invariants checked across thousands of generated inputs with `fast-check`: `normalizeEvent` always yields a positive-duration event in `[0,24]`; `mergeCalendars` is order-independent, idempotent, and never keeps duplicate ids; `expandRecurrence` is bounded, monotonic, and emits valid date keys. This is the correctness-under-arbitrary-input discipline used for financial reconciliation logic.
+- **`tests/property-tests.js`** — invariants checked across thousands of generated inputs with `fast-check`: `normalizeEvent` always yields a positive-duration event in `[0,24]`; `mergeCalendars` is order-independent, idempotent, and never keeps duplicate ids; `expandRecurrence` is bounded, monotonic, and emits valid date keys.
 - **`tests/calendar-store-tests.js`** — adapter and coordinator checks for cache restore/save, duplicate-write suppression, loading guards, and reconvergence timing.
 - **`tests/ui-regressions.js`** — regression guards for rendering behavior that has broken before (flicker, layout drift) but has no natural home in the pure-logic suite.
 - **`tests/google-calendar-tests.js`** — privacy-preserving normalization checks for the optional Google Calendar overlay: only busy-time fields survive, titles/descriptions/attendees never do.
 - **`tests/browser-smoke.js`** — a Playwright smoke test against mocked Firebase data, covering app startup, view navigation, keyboard interaction, event editing, and modal recovery without touching a real account.
 - **`tests/firestore-rules-tests.js`** — owner isolation, schema checks, immutability, share-token validation, and retired-registry denial against the local Firestore Emulator.
+- **`tests/production-quality.js`** — static guards for public metadata, security configuration, credential patterns, and asset budgets. These checks do not verify dashboard settings or a live deployment.
 
 Run everything:
 

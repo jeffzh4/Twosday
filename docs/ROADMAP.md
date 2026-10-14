@@ -6,7 +6,23 @@ Twosday's next stage is depth, not scale. The product already supports real shar
 
 Priorities are judged by four questions: does this improve everyday coordination, protect user data, clarify the two-person collaboration model, or reduce a known reliability risk?
 
-## Now: Collaboration Model
+## Now: Everyday Reliability
+
+1. **Mobile accessibility**
+   - Improve small secondary touch targets and large-text layouts.
+   - Validate core flows with real-device screen readers, not only browser automation.
+
+2. **Synchronization regression coverage**
+   - Retain fresh-device loading, offline/cache, and failed-listener checks.
+   - Add focused tests when real-device reports expose a new failure mode.
+
+3. **Recurrence consistency**
+   - Keep dialog edits, drag, and resize aligned on the same scope rules.
+   - Explain standalone occurrences without guessing missing series relationships.
+
+## Deferred: Collaboration Model
+
+Account migration is on hold. The following are design options, not authorized implementation work; any migration needs a verified data backup and an explicit rollout decision.
 
 1. **Independent account linking and invitations**
    - Let two authenticated people form one shared calendar relationship.
@@ -30,13 +46,15 @@ Priorities are judged by four questions: does this improve everyday coordination
    - Make pending writes, last successful sync, and recovery actions visible when they matter.
    - Keep normal use quiet when sync is healthy.
 
-3. **Reminder model**
-   - Add per-event reminder preferences only after account ownership and notification permission flows are explicit.
+3. **Background reminder delivery**
+   - Existing browser-open reminders do not provide phone push delivery.
+   - Decide notification consent and account ownership before introducing a delivery service.
 
 ## Later: Interoperability
 
 1. **Google Calendar overlay maturity**
-   - Finish OAuth setup, selected-calendar management, and profile-level policy after account linking is designed.
+   - Configure the existing OAuth integration and validate token renewal on real clients.
+   - Selected-calendar management is implemented; profile-level ownership policy remains an open decision.
 
 2. **Private subscribe-only ICS feed**
    - Let Twosday events travel to Apple Calendar, Outlook, or Google Calendar without making those products a second source of truth.

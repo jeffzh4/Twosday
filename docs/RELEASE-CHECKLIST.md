@@ -9,6 +9,9 @@ Twosday is a private shared calendar. This checklist protects ordinary use and k
 3. Confirm empty-day creation, offline status, reconnect status, and a failed or expired share link. These paths must remain understandable without exposing account data.
 4. Check desktop and mobile views with keyboard navigation. Confirm visible focus, modal focus restoration, readable contrast, and reduced-motion behavior.
 5. Open `/privacy.html`, `/share.html`, and an unknown URL. Privacy and invalid-share pages must render without sign-in; unknown URLs must return the custom 404 page.
+6. On a fresh phone session, confirm both profiles load existing cloud events. Verify a pending connection is not labeled synced and a failed listener produces a recoverable error.
+7. For a recurring event, test a title edit and a drag/resize with this occurrence, following occurrences, and all occurrences. Cancel a scope prompt and confirm no change remains. Use disposable demo events, not personal plans.
+8. After mobile changes, check enlarged text, touch targets, virtual-keyboard clearance, and at least one real-device screen-reader flow. Record untested combinations rather than assuming automation covers them.
 
 ## Metadata and performance
 

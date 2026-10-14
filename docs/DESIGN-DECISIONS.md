@@ -16,7 +16,7 @@ Event color communicates category and is not treated as decoration. Personal and
 
 ## Motion as Feedback
 
-Motion is limited to state changes: view transitions, control feedback, and a one-time presence shimmer when another viewer appears. Event cards do not blur animated backgrounds because that caused rendering instability. All nonessential motion respects `prefers-reduced-motion`.
+Motion includes the ambient corner color fields, pointer-responsive background treatment, control feedback, and a brief presence shimmer. It is decorative rather than a scheduling signal. Event cards do not blur animated backgrounds because that caused rendering instability. Reduced-motion styles provide a quieter alternative.
 
 ## Dark and Light Themes
 
@@ -28,8 +28,10 @@ Calendar dates, events, tabs, controls, and dialogs are keyboard-operable. Focus
 
 ## Responsive Behavior
 
-The full calendar remains the product on smaller screens. Controls compress before calendar geometry changes, and mobile defaults to a day view when a week would become too narrow. Fixed event positioning and stable month rows prevent interface shifts that would make time placement harder to trust.
+At mobile widths, day and week agendas replace the narrow desktop time grid. Bottom navigation keeps calendar views and event creation nearby; a tools sheet retains secondary actions without filling the header. Month view remains available for date scanning. Quick rescheduling and full event dialogs use the existing mutation paths, so mobile and desktop share scheduling semantics and persistence.
+
+This is a responsive web interface, not a native phone app. Safe-area spacing, scrollable dialogs, keyboard activation, and reduced-motion styles are implemented. Larger text, small secondary touch targets, and real-device screen-reader behavior still need dedicated verification.
 
 ## Design Boundaries
 
-Twosday deliberately avoids decorative infinite animation, oversized feature panels, and visual effects that change event layout or obscure text. A shared calendar benefits more from calm, reliable cues than from a constantly animated surface.
+Ambient effects must stay behind the working calendar. They must not change event geometry, intercept input, or conceal sync failures. Oversized feature panels and new permanent chrome need a clear scheduling purpose before being added.
