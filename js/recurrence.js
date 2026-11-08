@@ -185,7 +185,7 @@ function editRecurringSeries(recurrenceId, user, fromDateKey, patch) {
 }
 
 // Small chooser shown before a scoped edit/delete of a recurring event.
-function openRecurrenceScopeModal({ verb, onChoose }) {
+function openRecurrenceScopeModal({ verb, onChoose, returnFocus = null }) {
   if (document.querySelector('.modal-bg')) return;
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
@@ -204,7 +204,7 @@ function openRecurrenceScopeModal({ verb, onChoose }) {
     </div>
   `;
   document.body.appendChild(bg);
-  makeModalAccessible(bg, { initialFocusSelector: '.scope-btn' });
+  makeModalAccessible(bg, { initialFocusSelector: '.scope-btn', returnFocus, fitMobileViewport: true });
   bg.addEventListener('click', e => {
     if (e.target === bg) { bg.remove(); return; }
     const btn = e.target.closest('[data-scope]');

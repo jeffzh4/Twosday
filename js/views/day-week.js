@@ -131,7 +131,8 @@ function buildMobileAgendaCard(ev, dateKey) {
   card.className = 'mobile-agenda-event ' + (ev.shared ? 'shared-event' : 'personal-event') + (ev.done ? ' done' : '');
   card.style.setProperty('--mobile-event-bg', p.bg);
   card.style.setProperty('--mobile-event-text', p.text);
-  card.setAttribute('aria-label', `Edit ${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}${ev.shared ? ', shared' : ''}`);
+  card.dataset.eventId = ev.id;
+  card.setAttribute('aria-label', `Edit ${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}${ev.shared ? ', shared' : ''}${ev.done ? ', completed' : ''}`);
   card.innerHTML = `<span class="mobile-event-time">${fmtFull(ev.start)}<small>${fmtDuration(ev.start, ev.end)}</small></span><span class="mobile-event-copy"><strong>${escHtml(ev.text)}</strong>${ev.shared ? '<em>shared</em>' : ''}${ev.location ? `<small>${escHtml(ev.location)}</small>` : ''}</span>`;
   card.addEventListener('click', () => openModal({ dateKey, editEvId: ev.id }));
   return card;

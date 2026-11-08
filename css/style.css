@@ -3666,6 +3666,7 @@ body::after {
    surfaces so a tap is always an edit, never an accidental drag.
 ══════════════════════════════════════ */
 .mobile-nav { display: none; }
+.mobile-sync-status { display: none; }
 .mobile-agenda,
 .mobile-week-agenda { display: none; }
 
@@ -3694,6 +3695,15 @@ body::after {
   .presence-viewer,
   .presence-last-update { font-size: 10px; }
   .presence-viewer em { max-width: 145px; }
+  .mobile-sync-status:not(:empty) {
+    display: block;
+    padding: 5px 8px;
+    color: var(--text);
+    border-inline-start: 2px solid var(--accent);
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+  }
+  .mobile-sync-status[data-state="error"] { border-inline-start-color: #f87171; }
 
   .main-content { min-height: 0; overflow: hidden; }
   .grid-wrap { display: none; }
@@ -3787,7 +3797,8 @@ body::after {
   .mobile-event-time small,
   .mobile-event-copy small { font-family: var(--font); font-size: 10px; font-weight: 400; opacity: 0.72; }
   .mobile-event-copy { display: flex; min-width: 0; flex-direction: column; justify-content: center; gap: 3px; padding: 9px 11px; }
-  .mobile-event-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+  .mobile-event-copy strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 0.875rem; font-weight: 600; }
+  .mobile-event-copy small { overflow-wrap: anywhere; }
   .mobile-event-copy em { align-self: flex-start; padding: 1px 5px; border: 0.5px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: 99px; font-size: 9px; font-style: normal; opacity: 0.9; }
   .mobile-agenda-event.done { opacity: 0.62; }
   .mobile-agenda-event.done strong { text-decoration: line-through; }
@@ -3845,7 +3856,7 @@ body::after {
   .mobile-sheet-handle { width: 36px; height: 4px; margin: 2px auto 12px; border-radius: 99px; background: var(--border-hover); }
   .mobile-more-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
   .mobile-more-heading h2 { font-size: 17px; font-weight: 550; }
-  .mobile-sheet-close { width: 34px; height: 34px; border: 0.5px solid var(--border); border-radius: 50%; background: var(--surface2); color: var(--text); font-size: 22px; line-height: 1; cursor: pointer; }
+  .mobile-sheet-close { width: 44px; height: 44px; border: 0.5px solid var(--border); border-radius: 50%; background: var(--surface2); color: var(--text); font-size: 22px; line-height: 1; cursor: pointer; }
   .mobile-more-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .mobile-more-grid button { display: flex; min-height: 64px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; padding: 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: var(--font); font-size: 12px; text-align: left; cursor: pointer; }
   .mobile-more-grid button span { color: var(--accent); font-size: 17px; line-height: 1; }
@@ -3856,6 +3867,14 @@ body::after {
   .modal-bg:not(.mobile-more-sheet) > .modal { width: 100%; max-width: none; max-height: min(88dvh, 760px); overflow-y: auto; padding: 16px 16px calc(18px + env(safe-area-inset-bottom)); border: 0.5px solid var(--glass-highlight); border-bottom: 0; border-radius: 16px 16px 0 0; }
   .modal-bg:not(.mobile-more-sheet) > .modal::before { content: ''; display: block; width: 36px; height: 4px; margin: -7px auto 4px; border-radius: 99px; background: var(--border-hover); }
   .modal-bg:not(.mobile-more-sheet) .modal-btns { position: sticky; bottom: -18px; margin: 0 -16px -18px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 90%, transparent); }
+  .modal-bg.fit-mobile-viewport { top: var(--dialog-viewport-top); bottom: auto; height: var(--dialog-viewport-height); }
+  .modal-bg.fit-mobile-viewport > .modal {
+    max-height: min(88dvh, var(--dialog-viewport-height), 760px);
+    overscroll-behavior: contain;
+    scroll-padding-block: 12px 84px;
+  }
+  .modal-bg.fit-mobile-viewport :is(input:not([type="checkbox"]), select, textarea) { font-size: 1rem; }
+  .modal-bg.fit-mobile-viewport .mbtn { min-height: 44px; }
   .mobile-event-quick-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .mobile-event-reschedule { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .mobile-event-reschedule button { min-height: 36px; border: 0.5px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: var(--radius-sm); background: var(--accent-dim); color: var(--accent); font-family: var(--font); font-size: 10px; cursor: pointer; }
@@ -3864,6 +3883,9 @@ body::after {
   .mobile-event-quick-actions button:not(.danger):hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
   .mobile-event-quick-actions .danger { color: #f87171; }
   .mobile-event-quick-actions .danger:hover { border-color: rgba(248, 113, 113, 0.62); background: rgba(248, 113, 113, 0.1); }
+  .mobile-event-reschedule button,
+  .mobile-event-quick-actions button { min-height: 44px; padding: 4px; font-size: 0.6875rem; overflow-wrap: anywhere; }
+  .mobile-event-quick-actions .danger { margin-inline-start: 3px; }
 
   .month-row { min-height: 72px; }
   .month-cell { min-height: 72px; padding: 3px; }
