@@ -93,7 +93,7 @@ function onKeyboardActivate(el, callback) {
   });
 }
 
-function makeModalAccessible(bg, { titleSelector = 'h3', initialFocusSelector = null, onClose = null } = {}) {
+function makeModalAccessible(bg, { titleSelector = 'h3', initialFocusSelector = null, onClose = null, returnFocus = null, fitMobileViewport = false } = {}) {
   const dialog = bg.querySelector('.modal');
   if (!dialog) return;
 
@@ -150,10 +150,27 @@ function makeModalAccessible(bg, { titleSelector = 'h3', initialFocusSelector = 
     if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 
+  const viewport = fitMobileViewport ? window.visualViewport : null;
+  const fitViewport = () => {
+    const fit = viewport.scale === 1;
+    bg.style.setProperty('--dialog-viewport-height', fit ? viewport.height + 'px' : '100dvh');
+    bg.style.setProperty('--dialog-viewport-top', fit ? viewport.offsetTop + 'px' : '0px');
+  };
+  if (viewport) {
+    bg.classList.add('fit-mobile-viewport');
+    fitViewport();
+    viewport.addEventListener('resize', fitViewport);
+    viewport.addEventListener('scroll', fitViewport);
+  }
+
   const observer = new MutationObserver(() => {
     if (bg.isConnected) return;
     observer.disconnect();
-    if (previousFocus && previousFocus.isConnected && previousFocus.focus) previousFocus.focus();
+    viewport?.removeEventListener('resize', fitViewport);
+    viewport?.removeEventListener('scroll', fitViewport);
+    if (document.querySelector('[aria-modal="true"]')) return;
+    const target = returnFocus?.() || previousFocus;
+    if (target?.isConnected) target.focus();
   });
   observer.observe(document.body, { childList: true });
 

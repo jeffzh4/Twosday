@@ -5,6 +5,10 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
   const arr = getEventsForDate(dateKey, activeUser);
   const editEv = editEvId ? arr.find(e => e.id === editEvId) : null;
   const isEdit = !!editEv;
+  const returnFocus = typeof isMobileCalendarViewport === 'function' && isMobileCalendarViewport() && isEdit
+    ? () => document.querySelector(`.mobile-agenda-event[data-event-id="${CSS.escape(editEv.id)}"]`)
+      || document.querySelector('.mobile-nav-add')
+    : null;
   let selectedColor = isEdit ? (editEv.color || null) : null;
 
   const startVal = isEdit ? editEv.start : startH;
@@ -115,7 +119,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
 
   bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
   document.body.appendChild(bg);
-  makeModalAccessible(bg, { initialFocusSelector: '#m-name' });
+  makeModalAccessible(bg, { initialFocusSelector: '#m-name', returnFocus, fitMobileViewport: true });
 
   const endInput = document.getElementById('m-end');
   const midnightNote = document.getElementById('m-end-midnight');
@@ -341,7 +345,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
     document.getElementById('m-delete').onclick = () => {
       bg.remove();
       if (shouldOfferRecurrenceScope(editEv)) {
-        openRecurrenceScopeModal({ verb: 'delete', onChoose: scope => {
+        openRecurrenceScopeModal({ verb: 'delete', returnFocus, onChoose: scope => {
           pushHistory();
           if (scope === 'this') deleteEvent(dateKey, activeUser, editEv.id);
           else deleteRecurringSeries(editEv.recurrenceId, activeUser, scope === 'future' ? dateKey : null);
@@ -426,7 +430,7 @@ function openModal({ dateKey, editEvId = null, startH = 9, endH = null, sharedDe
       if (shouldOfferRecurrenceScope(editEv)) {
         const recurrenceId = editEv.recurrenceId;
         bg.remove();
-        openRecurrenceScopeModal({ verb: 'edit', onChoose: scope => {
+        openRecurrenceScopeModal({ verb: 'edit', returnFocus, onChoose: scope => {
           pushHistory();
           if (scope === 'this') {
             editEv.recurrenceId = null;

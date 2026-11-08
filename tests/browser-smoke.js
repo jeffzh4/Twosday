@@ -265,6 +265,7 @@ function server() {
 
   // Mobile has a purpose-built agenda instead of squeezing desktop's time grid.
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  await mobile.emulateMedia({ reducedMotion: 'reduce' });
   await mobile.route('https://www.gstatic.com/firebasejs/**', route => route.fulfill({ contentType: 'application/javascript', body: firebaseMock }));
   await mobile.addInitScript(() => {
     localStorage.setItem('twosday_session_v1', JSON.stringify({ username: 'smoke', savedAt: Date.now() }));
@@ -289,13 +290,46 @@ function server() {
   assert.strictEqual(await mobile.locator('.modal-bg > .modal').count(), 1, 'mobile event edit should use the standard editor');
   assert.strictEqual(await mobile.locator('.mobile-event-reschedule button').count(), 3, 'mobile editor should retain fast rescheduling controls');
   assert.strictEqual(await mobile.locator('.mobile-event-quick-actions button').count(), 4, 'mobile editor should preserve repeat, share, completion, and delete actions');
+  assert(await mobile.locator('.mobile-event-quick-actions button, .mobile-event-reschedule button')
+    .evaluateAll(buttons => buttons.every(button => button.getBoundingClientRect().height >= 44)), 'mobile editor actions should be at least 44px tall');
+  await mobile.evaluate(() => {
+    Object.defineProperty(visualViewport, 'height', { configurable: true, value: 320 });
+    visualViewport.dispatchEvent(new Event('resize'));
+  });
+  await mobile.waitForFunction(() => {
+    const save = document.querySelector('#m-save').getBoundingClientRect();
+    return save.top >= 0 && save.bottom <= 321;
+  });
   await mobile.locator('#m-cancel').click();
+  await mobile.waitForFunction(() => document.activeElement?.dataset.eventId === 'mobile-seed');
+  await mobile.evaluate(() => { delete visualViewport.height; });
+
+  await mobile.locator('.mobile-agenda-event').click();
+  await mobile.locator('#m-name').fill('A longer mobile event title that wraps onto a second line in the agenda');
+  await mobile.locator('#m-save').click();
+  await mobile.waitForFunction(() => document.activeElement?.dataset.eventId === 'mobile-seed');
+  const title = mobile.locator('.mobile-agenda-event strong');
+  assert.strictEqual(await title.evaluate(el => getComputedStyle(el).webkitLineClamp), '2');
+  await mobile.locator('.mobile-agenda-event').click();
+  await mobile.locator('#m-done').click();
+  await mobile.waitForFunction(() => document.activeElement?.getAttribute('aria-label')?.endsWith(', completed'));
+
+  const syncStatus = mobile.locator('#mobile-sync-status');
+  for (const [state, message] of [['pending', 'Syncing calendar'], ['offline', 'Offline'], ['error', 'Could not sync']]) {
+    await mobile.evaluate(value => setSyncStatus(value), state);
+    assert(await syncStatus.isVisible(), `mobile sync status should remain visible when ${state}`);
+    assert((await syncStatus.textContent()).includes(message));
+  }
+  await mobile.evaluate(() => setSyncStatus('synced'));
+  assert.strictEqual(await syncStatus.isVisible(), false, 'healthy mobile sync status should stay out of the way');
   await mobile.getByRole('button', { name: 'Week' }).click();
   await mobile.waitForSelector('.mobile-week-agenda');
   if (captureDir) { await mobile.waitForTimeout(100); await mobile.screenshot({ path: path.join(captureDir, 'mobile-week.png') }); }
   assert.strictEqual(await mobile.locator('.mobile-week-day').count(), 7, 'mobile week should show seven agenda days');
   await mobile.getByRole('button', { name: 'More' }).click();
   await mobile.waitForSelector('.mobile-more-sheet');
+  const closeBounds = await mobile.getByRole('button', { name: 'Close more menu' }).boundingBox();
+  assert(closeBounds.width >= 44 && closeBounds.height >= 44, 'mobile More close button should have a larger touch target');
   if (captureDir) { await mobile.waitForTimeout(250); await mobile.screenshot({ path: path.join(captureDir, 'mobile-more.png') }); }
   assert.strictEqual(await mobile.getByRole('button', { name: 'find time' }).count(), 1, 'mobile more sheet should retain secondary tools');
   assert.strictEqual(await mobile.getByRole('button', { name: 'year view' }).count(), 1, 'mobile more sheet should retain year view');
@@ -307,7 +341,6 @@ function server() {
   await mobile.waitForSelector('.month-view');
   if (captureDir) { await mobile.waitForTimeout(100); await mobile.screenshot({ path: path.join(captureDir, 'mobile-month.png') }); }
   assert.strictEqual(await mobile.locator('.month-cell').count() > 0, true, 'mobile month should retain the calendar scan view');
-  await mobile.emulateMedia({ reducedMotion: 'reduce' });
   const reducedDuration = await mobile.locator('.mobile-nav-btn').first().evaluate(el => parseFloat(getComputedStyle(el).transitionDuration));
   assert(reducedDuration <= 0.02, 'reduced-motion preference must suppress interface transitions');
 

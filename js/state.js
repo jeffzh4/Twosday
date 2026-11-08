@@ -197,6 +197,14 @@ function setSyncStatus(status) {
   el.dataset.state = status;
   el.textContent = status === 'offline' ? 'offline' : status === 'pending' ? 'syncing' : status === 'error' ? 'sync issue' : 'synced';
   el.title = `Calendar sync: ${el.textContent}`;
+  const mobile = document.getElementById('mobile-sync-status');
+  if (mobile) {
+    const message = status === 'offline' ? 'Offline · changes stay on this device'
+      : status === 'pending' ? 'Syncing calendar…'
+      : status === 'error' ? 'Could not sync · reload to reconnect' : '';
+    if (mobile.textContent !== message) mobile.textContent = message;
+    mobile.dataset.state = status;
+  }
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
