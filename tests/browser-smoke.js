@@ -187,6 +187,24 @@ function server() {
     .map(dateKey => allData[dateKey].alex.find(ev => ev.recurrenceId === 'resize-series').text));
   assert.deepStrictEqual(renamedSeries, Array(3).fill('renamed recurring event'), 'a title-only change must offer and apply series scope');
 
+  const seriesColors = () => page.evaluate(() => ['2026-07-21', '2026-07-22', '2026-07-23']
+    .map(dateKey => allData[dateKey].alex.find(ev => ev.id.startsWith('resize-')).color || null));
+  const originalColors = await seriesColors();
+  await page.evaluate(() => openModal({ dateKey: '2026-07-21', editEvId: 'resize-0' }));
+  await page.getByRole('button', { name: 'red event color', exact: true }).click();
+  await page.locator('#m-save').click();
+  await page.waitForSelector('.scope-modal');
+  await page.locator('.scope-modal [data-scope="cancel"]').click();
+  assert.deepStrictEqual(await seriesColors(), originalColors, 'canceling a color-only edit must leave the series unchanged');
+
+  await page.evaluate(() => openModal({ dateKey: '2026-07-21', editEvId: 'resize-0' }));
+  await page.getByRole('button', { name: 'red event color', exact: true }).click();
+  await page.locator('#m-save').click();
+  await page.waitForSelector('.scope-modal');
+  await page.locator('.scope-btn[data-scope="all"]').click();
+  assert.deepStrictEqual(await seriesColors(), ['red', 'red', 'red'], 'all-scope color-only edits must update the whole series');
+
+
   await dragResize('resize-0');
   await page.waitForSelector('.scope-modal');
   assert.strictEqual(await page.locator('.scope-btn[data-scope="all"]').count(), 1, 'resizing a recurring block must ask for a scope');
@@ -199,6 +217,20 @@ function server() {
   const resizedSeries = await page.evaluate(() => ['2026-07-21', '2026-07-22', '2026-07-23']
     .map(dateKey => allData[dateKey].alex.find(ev => ev.recurrenceId === 'resize-series').end));
   assert.deepStrictEqual(resizedSeries, [16.5, 16.5, 16.5], 'all-scope resize must update every occurrence');
+
+  await page.evaluate(() => openModal({ dateKey: '2026-07-22', editEvId: 'resize-1' }));
+  await page.getByRole('button', { name: 'blue event color', exact: true }).click();
+  await page.locator('#m-save').click();
+  await page.waitForSelector('.scope-modal');
+  await page.locator('.scope-btn[data-scope="future"]').click();
+  assert.deepStrictEqual(await seriesColors(), ['red', 'blue', 'blue'], 'future-scope color edits must leave earlier occurrences unchanged');
+
+  await page.evaluate(() => openModal({ dateKey: '2026-07-21', editEvId: 'resize-0' }));
+  await page.getByRole('button', { name: 'Automatic event color', exact: true }).click();
+  await page.locator('#m-save').click();
+  await page.waitForSelector('.scope-modal');
+  await page.locator('.scope-btn[data-scope="this"]').click();
+  assert.deepStrictEqual(await seriesColors(), [null, 'blue', 'blue'], 'this-only automatic color must leave other occurrences unchanged');
 
   await dragResize('shared-resize-0');
   await page.waitForSelector('.scope-modal');
