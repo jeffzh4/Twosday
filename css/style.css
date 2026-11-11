@@ -598,7 +598,26 @@ html, body {
 }
 .ev.ev-compact:hover { transform: none; }
 .ev-compact .ev-title { font-size: 11px; line-height: 12px; }
-.ev.ev-compact .ev-actions { display: none; }
+.ev.ev-compact .ev-actions {
+  position: absolute;
+  inset: 0 5px 0 auto;
+  align-items: center;
+  z-index: 4;
+  pointer-events: none;
+}
+.ev.ev-compact:is(:hover, :focus-within) .ev-actions {
+  position: relative;
+  inset: auto;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  padding-inline-start: 4px;
+  pointer-events: auto;
+}
+.ev.ev-compact .ev-act { padding: 0 3px; font-size: 10px; line-height: 12px; }
+.ev.ev-compact .ev-act::after { inset: 0; }
+@media (hover: none) {
+  .ev.ev-compact:not(:focus-within) .ev-actions { opacity: 0; }
+}
 .ev-compact .resize-handle { height: 3px; }
 
 /* ── now line ── */

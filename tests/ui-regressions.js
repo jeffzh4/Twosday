@@ -57,6 +57,16 @@ localScripts.forEach(script => {
   }
 });
 
+const versionedAssets = serviceWorker.slice(
+  serviceWorker.indexOf("if (url.searchParams.has('v'))"),
+  serviceWorker.indexOf('caches.match(cacheKey).then')
+);
+if (!versionedAssets.includes('cache.match(request)') ||
+    !versionedAssets.includes("fetch(request, { cache: 'reload' })") ||
+    !versionedAssets.includes('return cache.match(cacheKey)')) {
+  throw new Error('asset update regression: versioned assets must fetch on a version miss and use the shell fallback only offline');
+}
+
 if (!/let googleCalendarEvents = \{\}/.test(googleCalendar) || /buildPayload:[\s\S]*googleCalendarEvents/.test(state)) {
   throw new Error('Google Calendar privacy regression: external event data must remain memory-only');
 }

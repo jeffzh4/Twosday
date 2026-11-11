@@ -287,6 +287,16 @@ function server() {
   await short15.click();
   assert.strictEqual(await page.locator('#m-name').inputValue(), 'Tunneling meeting', 'short events should still open the editor');
   await page.locator('#m-cancel').click();
+  await short15.hover();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-id="short-15"] .ev-actions')).opacity === '1');
+  await short15.locator('[data-a="edit"]').click();
+  assert.strictEqual(await page.locator('#m-name').inputValue(), 'Tunneling meeting');
+  await page.locator('#m-cancel').click();
+  await page.mouse.move(0, 0);
+  await short15.focus();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-id="short-15"] .ev-actions')).opacity === '1');
+  await short15.locator('[data-a="del"]').click();
+  assert.strictEqual(await short15.count(), 0, 'compact events should remain deletable through their quick actions');
 
   // Mobile has a purpose-built agenda instead of squeezing desktop's time grid.
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
