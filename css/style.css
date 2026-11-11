@@ -591,6 +591,16 @@ html, body {
 .resize-handle.top { top: 0; cursor: ns-resize; }
 .resize-handle.bottom { bottom: 0; cursor: ns-resize; }
 
+.ev.ev-compact {
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+}
+.ev.ev-compact:hover { transform: none; }
+.ev-compact .ev-title { font-size: 11px; line-height: 12px; }
+.ev.ev-compact .ev-actions { display: none; }
+.ev-compact .resize-handle { height: 3px; }
+
 /* ── now line ── */
 .now-line {
   position: absolute;
