@@ -263,6 +263,31 @@ function server() {
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await page.waitForFunction(() => document.getElementById('sync-status').textContent === 'synced');
 
+  await page.evaluate(() => {
+    const dateKey = getDateKey(currentDate);
+    insertEvent(dateKey, activeUser, { id: 'short-15', text: 'Tunneling meeting', start: 9, end: 9.25, color: 'orange' });
+    insertEvent(dateKey, activeUser, { id: 'short-30', text: 'Star tracker meeting', start: 9.25, end: 9.75, color: 'green' });
+    insertEvent(dateKey, activeUser, { id: 'short-next', text: 'Design review', start: 9.75, end: 10.5, color: 'violet' });
+    render();
+    document.getElementById('grid-wrap').scrollTop = 8.5 * PX_PER_HOUR;
+  });
+  const short15 = page.locator('.ev[data-id="short-15"]');
+  const short30 = page.locator('.ev[data-id="short-30"]');
+  const first = await short15.boundingBox();
+  const second = await short30.boundingBox();
+  assert.strictEqual(first.height, 15);
+  assert.strictEqual(second.height, 30);
+  assert(first.y + first.height <= second.y, 'back-to-back events must not overlap');
+  assert.strictEqual(await short15.locator('.ev-time, .ev-shared, .ev-meta').count(), 0);
+  assert(await short15.evaluate(el => el.querySelector('.ev-title').scrollHeight <= el.clientHeight), 'short title must fit inside its block');
+  if (captureDir) {
+    fs.mkdirSync(captureDir, { recursive: true });
+    await page.screenshot({ path: path.join(captureDir, 'short-events.png') });
+  }
+  await short15.click();
+  assert.strictEqual(await page.locator('#m-name').inputValue(), 'Tunneling meeting', 'short events should still open the editor');
+  await page.locator('#m-cancel').click();
+
   // Mobile has a purpose-built agenda instead of squeezing desktop's time grid.
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   await mobile.emulateMedia({ reducedMotion: 'reduce' });

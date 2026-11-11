@@ -357,16 +357,18 @@ function buildExternalEventEl(ev) {
 
 function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
   const top    = (ev.start - START_H) * PX_PER_HOUR;
-  const height = Math.max((ev.end - ev.start) * PX_PER_HOUR, 24);
+  const height = (ev.end - ev.start) * PX_PER_HOUR;
+  const compact = height < 36;
   const p      = palette(ev);
   const conflict = hasConflict(activeUser, dateKey, ev);
 
   const div = document.createElement('div');
   div.className = 'ev ' + (ev.shared ? 'shared-event' : 'personal-event') + (ev.done ? ' done' : '') + (conflict ? ' conflict' : '');
+  div.classList.toggle('ev-compact', compact);
   div.tabIndex = 0;
   div.setAttribute('role', 'button');
   div.setAttribute('aria-label', `${ev.text}, ${fmtFull(ev.start)} to ${fmtFull(ev.end)}${ev.shared ? ', shared' : ''}${ev.done ? ', completed' : ''}`);
-  div.title = `${fmtFull(ev.start)} – ${fmtFull(ev.end)} (${fmtDuration(ev.start, ev.end)})`;
+  div.title = `${ev.text}\n${fmtFull(ev.start)} – ${fmtFull(ev.end)} (${fmtDuration(ev.start, ev.end)})`;
   if (ev.location) div.title += `\nlocation: ${ev.location}`;
   if (ev.description) div.title += `\n${ev.description}`;
   if (ev.updatedAt) div.title += `\nupdated ${fmtRelativeTime(ev.updatedAt)} by ${ev.updatedBy || activeUser}`;
@@ -379,12 +381,12 @@ function buildEventEl(ev, dateKey, layout = { col: 0, total: 1 }) {
   div.style.cssText = posStyle;
   div.dataset.id = ev.id;
 
-  const badge = ev.shared ? `<span class="ev-shared">shared</span>` : '';
+  const badge = ev.shared && !compact ? `<span class="ev-shared">shared</span>` : '';
   div.innerHTML =
     '<div class="resize-handle top" data-r="top"></div>' +
     '<div class="resize-handle bottom" data-r="bottom"></div>' +
     `<div class="ev-title" style="color:${p.text}">${escHtml(ev.text)}${badge}</div>` +
-    (height >= 40
+    (compact ? '' : height >= 40
       ? `<div class="ev-time" style="color:${p.text}">${fmtFull(ev.start)} – ${fmtFull(ev.end)} · ${fmtDuration(ev.start, ev.end)}</div>`
       : height >= 28
         ? `<div class="ev-time" style="color:${p.text}">${fmtDuration(ev.start, ev.end)}</div>`
