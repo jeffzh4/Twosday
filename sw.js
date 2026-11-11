@@ -1,15 +1,15 @@
 // Twosday service worker.
 //
-// Two caching rules, both deliberately conservative:
+// Caching rules:
 //   - navigations: network first, cache as fallback. A deploy is picked up on
 //     the next load; the cached shell only appears when the network fails.
-//   - same-origin static assets: stale-while-revalidate, so the app opens
-//     instantly offline and refreshes itself in the background.
+//   - versioned assets: fetch on a version miss, with an offline shell fallback.
+//   - unversioned assets: stale-while-revalidate.
 //
 // Firestore, Firebase Auth, and Google Fonts are never touched here. They are
 // cross-origin and handled by the Firebase SDK's own offline layer.
 
-const CACHE_VERSION = 'twosday-v15';
+const CACHE_VERSION = 'twosday-v16';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
 const SHELL_ASSETS = [
@@ -109,9 +109,24 @@ self.addEventListener('fetch', event => {
 
   if (!isStaticAsset(url)) return;
 
-  // Ignore cache-busting query strings when reading/writing the shell cache.
-  // Otherwise `/js/app.js?v=...` misses the pre-cached `/js/app.js` offline.
   const cacheKey = new Request(url.origin + url.pathname, { method: 'GET' });
+  if (url.searchParams.has('v')) {
+    event.respondWith(
+      caches.open(SHELL_CACHE).then(async cache => {
+        const exact = await cache.match(request);
+        if (exact) return exact;
+        try {
+          const response = await fetch(request, { cache: 'reload' });
+          if (response.ok) await cache.put(request, response.clone()).catch(() => {});
+          return response;
+        } catch {
+          return cache.match(cacheKey);
+        }
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(cacheKey).then(cached => {
       const network = fetch(request)
