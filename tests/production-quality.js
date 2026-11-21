@@ -28,6 +28,15 @@ checkPublicDocument('privacy.html');
 checkPublicDocument('share.html', { noindex: true });
 checkPublicDocument('404.html', { noindex: true });
 
+for (const file of ['index.html', 'privacy.html', 'share.html', '404.html']) {
+  for (const match of read(file).matchAll(/(?:href|src)="([^"]+)"/g)) {
+    const target = match[1];
+    if (/^(?:https?:|mailto:|#|data:)/.test(target)) continue;
+    const pathname = target.split(/[?#]/)[0];
+    if (pathname) assert(fs.existsSync(path.join(root, pathname)), `${file} references a missing local target: ${target}`);
+  }
+}
+
 mustContain(app, 'rel="canonical" href="https://twosday.dev/"', 'app must declare canonical production URL');
 for (const field of ['og:title', 'og:description', 'og:image', 'twitter:card', 'twitter:title', 'twitter:description', 'twitter:image']) {
   mustContain(app, field, `app must include ${field} sharing metadata`);

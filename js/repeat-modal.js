@@ -2,7 +2,6 @@ function openRepeatModal(srcDateKey, srcEv) {
   if (document.querySelector('.modal-bg')) return;
 
   let freq  = 'daily';
-  let count = 7;
   const p   = palette(srcEv);
 
   const bg = document.createElement('div');

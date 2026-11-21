@@ -457,6 +457,11 @@ function server() {
   const missing = await publicPage.goto(`http://127.0.0.1:${port}/not-a-real-page`, { waitUntil: 'domcontentloaded' });
   assert.strictEqual(missing.status(), 404, 'unknown routes must return HTTP 404');
   await publicPage.getByRole('heading', { name: 'That page is not available.' }).waitFor();
+  const nested = await publicPage.goto(`http://127.0.0.1:${port}/missing/nested/page`, { waitUntil: 'load' });
+  assert.strictEqual(nested.status(), 404);
+  await publicPage.getByRole('heading', { name: 'That page is not available.' }).waitFor();
+  assert(await publicPage.locator('link[rel="stylesheet"][href^="/css/"]').count(), 'nested missing pages must load root-relative styles');
+  assert(await publicPage.evaluate(() => [...document.styleSheets].some(sheet => sheet.href?.includes('/css/style.css') && sheet.cssRules.length > 0)), 'nested 404 stylesheet must load successfully');
   assert.deepStrictEqual(publicErrors, [], `public route runtime errors: ${publicErrors.join('; ')}`);
   await publicPage.close();
   console.log('browser smoke tests passed');
